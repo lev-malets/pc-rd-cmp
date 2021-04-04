@@ -1,0 +1,926 @@
+[
+  {
+    "guid": "98fb349c-04c8-479f-b5de-99e5f9475652",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 31,
+    "latitude": -33.145407,
+    "longitude": -34.00386,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Lawson Hobbs"
+      },
+      {
+        "id": 1,
+        "name": "Francine Boyd"
+      },
+      {
+        "id": 2,
+        "name": "Cameron Dale"
+      }
+    ]
+  },
+  {
+    "guid": "c4077625-90b7-4de8-851e-c4b46eb45984",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 29,
+    "latitude": 4.664788,
+    "longitude": -68.237384,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Kathryn Copeland"
+      },
+      {
+        "id": 1,
+        "name": "Isabella Rollins"
+      },
+      {
+        "id": 2,
+        "name": "Kris Harris"
+      }
+    ]
+  },
+  {
+    "guid": "d36418f1-9cf6-4490-8a7d-eaa4bf7bacf1",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 35,
+    "latitude": -65.028014,
+    "longitude": -85.817434,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Nola Moses"
+      },
+      {
+        "id": 1,
+        "name": "Vinson Mcfarland"
+      },
+      {
+        "id": 2,
+        "name": "Lelia Dawson"
+      }
+    ]
+  },
+  {
+    "guid": "8eaa741b-c015-4e63-ba80-71486b0e8217",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 39,
+    "latitude": 79.476163,
+    "longitude": -160.986097,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Malinda Johnston"
+      },
+      {
+        "id": 1,
+        "name": "Townsend Tran"
+      },
+      {
+        "id": 2,
+        "name": "Bonner Vazquez"
+      }
+    ]
+  },
+  {
+    "guid": "02b7fc4c-2941-41fd-ad5e-7016e12c590b",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 20,
+    "latitude": 4.29972,
+    "longitude": 163.356248,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Griffith Rose"
+      },
+      {
+        "id": 1,
+        "name": "Barnes Wright"
+      },
+      {
+        "id": 2,
+        "name": "Hendrix Huffman"
+      }
+    ]
+  },
+  {
+    "guid": "1526dfe5-a178-447b-93dd-201afe77a534",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 26,
+    "latitude": 63.972824,
+    "longitude": 83.844875,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Trujillo Butler"
+      },
+      {
+        "id": 1,
+        "name": "Peggy Brewer"
+      },
+      {
+        "id": 2,
+        "name": "Leon Blevins"
+      }
+    ]
+  },
+  {
+    "guid": "ba05a1a2-5de9-40bf-a406-7a5773c3e3d8",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 20,
+    "latitude": 40.760101,
+    "longitude": 150.659652,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Johanna Weiss"
+      },
+      {
+        "id": 1,
+        "name": "Eddie Lott"
+      },
+      {
+        "id": 2,
+        "name": "Adela Blankenship"
+      }
+    ]
+  },
+  {
+    "guid": "fb7cf38a-6cfc-4268-9e87-80348e253f64",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 34,
+    "latitude": -49.852498,
+    "longitude": 10.404999,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Dana Douglas"
+      },
+      {
+        "id": 1,
+        "name": "Branch Clark"
+      },
+      {
+        "id": 2,
+        "name": "Gayle Larsen"
+      }
+    ]
+  },
+  {
+    "guid": "55d3855f-b858-46d6-96e4-a72d5b063f4a",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 34,
+    "latitude": 20.163759,
+    "longitude": -81.813581,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Jacklyn Mcdaniel"
+      },
+      {
+        "id": 1,
+        "name": "Avery Harper"
+      },
+      {
+        "id": 2,
+        "name": "Callahan Pitts"
+      }
+    ]
+  },
+  {
+    "guid": "1c8ded99-74b1-4d53-ab7e-9e3d9b9ee0e6",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 37,
+    "latitude": -7.177352,
+    "longitude": -117.141853,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Blanche Griffith"
+      },
+      {
+        "id": 1,
+        "name": "Burt Mays"
+      },
+      {
+        "id": 2,
+        "name": "Carmen Bauer"
+      }
+    ]
+  },
+  {
+    "guid": "7b28a0e8-a9a7-4d77-a36c-f7a4578283b1",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 33,
+    "latitude": 68.336982,
+    "longitude": -49.997917,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Bianca Trujillo"
+      },
+      {
+        "id": 1,
+        "name": "Michele Colon"
+      },
+      {
+        "id": 2,
+        "name": "Levine Dudley"
+      }
+    ]
+  },
+  {
+    "guid": "3ce1d481-0ac5-47b3-a973-7fdb5a3fcd75",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 32,
+    "latitude": -17.517125,
+    "longitude": 87.611343,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Hinton Espinoza"
+      },
+      {
+        "id": 1,
+        "name": "Reid Chapman"
+      },
+      {
+        "id": 2,
+        "name": "Gwendolyn Hunt"
+      }
+    ]
+  },
+  {
+    "guid": "9aba0eaf-0c7d-4854-9b26-c0fbbbdc54fb",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 23,
+    "latitude": -81.360419,
+    "longitude": 50.985725,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Montgomery Jacobson"
+      },
+      {
+        "id": 1,
+        "name": "Conley Keith"
+      },
+      {
+        "id": 2,
+        "name": "Haley Chan"
+      }
+    ]
+  },
+  {
+    "guid": "193a16a0-b911-4991-92a8-5c0a8c8c093b",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 40,
+    "latitude": -58.178442,
+    "longitude": -78.393692,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Howell Dorsey"
+      },
+      {
+        "id": 1,
+        "name": "Yvette Hahn"
+      },
+      {
+        "id": 2,
+        "name": "Lana Allison"
+      }
+    ]
+  },
+  {
+    "guid": "48dbb7fa-98f6-4f71-8484-044f8b5fb175",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 36,
+    "latitude": -65.165595,
+    "longitude": 97.191288,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Ball Eaton"
+      },
+      {
+        "id": 1,
+        "name": "Caroline Hewitt"
+      },
+      {
+        "id": 2,
+        "name": "Kathrine Anthony"
+      }
+    ]
+  },
+  {
+    "guid": "316a4182-75cf-489f-91f6-8da1086b0521",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 28,
+    "latitude": 43.469931,
+    "longitude": 0.688419,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Amalia Rocha"
+      },
+      {
+        "id": 1,
+        "name": "Erin Kerr"
+      },
+      {
+        "id": 2,
+        "name": "Nichols Dean"
+      }
+    ]
+  },
+  {
+    "guid": "4d864523-0c82-4abd-a454-f59de60f91cf",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 39,
+    "latitude": 81.59041,
+    "longitude": -32.457757,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Jannie Barry"
+      },
+      {
+        "id": 1,
+        "name": "Romero Ramos"
+      },
+      {
+        "id": 2,
+        "name": "Jenna Acevedo"
+      }
+    ]
+  },
+  {
+    "guid": "b2a71305-bf5e-4ed6-9e95-42edc576478f",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 40,
+    "latitude": 22.327733,
+    "longitude": -58.601452,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Madden Gordon"
+      },
+      {
+        "id": 1,
+        "name": "Bettie Daniel"
+      },
+      {
+        "id": 2,
+        "name": "Latoya Peters"
+      }
+    ]
+  },
+  {
+    "guid": "79ba26a2-1e9e-4c64-8a3f-33d9c599847c",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 35,
+    "latitude": 42.856487,
+    "longitude": 42.083113,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Earlene Chandler"
+      },
+      {
+        "id": 1,
+        "name": "Terrell Atkins"
+      },
+      {
+        "id": 2,
+        "name": "Henson Nunez"
+      }
+    ]
+  },
+  {
+    "guid": "a031eee7-f2bd-4850-a8f2-e1fa4c5eb63f",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 35,
+    "latitude": -35.171511,
+    "longitude": 12.672836,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Thelma Coffey"
+      },
+      {
+        "id": 1,
+        "name": "Alisa Vincent"
+      },
+      {
+        "id": 2,
+        "name": "Wendy Stout"
+      }
+    ]
+  },
+  {
+    "guid": "899880d3-d499-4cca-b521-7731a1b8bc68",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 21,
+    "latitude": 33.908007,
+    "longitude": 76.087921,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Mcdowell Burns"
+      },
+      {
+        "id": 1,
+        "name": "Trina Hurst"
+      },
+      {
+        "id": 2,
+        "name": "Christian Dillard"
+      }
+    ]
+  },
+  {
+    "guid": "e52fc220-7f4e-4040-96fa-4cb2413b6d05",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 31,
+    "latitude": -48.987068,
+    "longitude": 21.598659,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Mandy Mcclain"
+      },
+      {
+        "id": 1,
+        "name": "Aline Holden"
+      },
+      {
+        "id": 2,
+        "name": "Ramirez Wiley"
+      }
+    ]
+  },
+  {
+    "guid": "e866771e-9a10-4240-abe0-7118ee35ccfb",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 30,
+    "latitude": 72.536302,
+    "longitude": 36.283894,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Curtis Curtis"
+      },
+      {
+        "id": 1,
+        "name": "Rosella Price"
+      },
+      {
+        "id": 2,
+        "name": "Lindsay Tyler"
+      }
+    ]
+  },
+  {
+    "guid": "5724dad0-edfa-43bd-b1b8-635d277a6d5b",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 34,
+    "latitude": 22.395211,
+    "longitude": -36.714879,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Meyers Brock"
+      },
+      {
+        "id": 1,
+        "name": "Olive Buchanan"
+      },
+      {
+        "id": 2,
+        "name": "Sophia Campos"
+      }
+    ]
+  },
+  {
+    "guid": "ed2cde4f-7b0b-4279-ac60-468faf770bd2",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 34,
+    "latitude": -39.497954,
+    "longitude": 87.28652,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Vicky Larson"
+      },
+      {
+        "id": 1,
+        "name": "Meagan Fields"
+      },
+      {
+        "id": 2,
+        "name": "Page Keller"
+      }
+    ]
+  },
+  {
+    "guid": "bc22a3f2-3660-4270-81c3-0b84e0cdb51b",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 26,
+    "latitude": -32.928479,
+    "longitude": 33.045956,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Holt Marshall"
+      },
+      {
+        "id": 1,
+        "name": "Patton Bright"
+      },
+      {
+        "id": 2,
+        "name": "Peck Bender"
+      }
+    ]
+  },
+  {
+    "guid": "f1d77ed5-af78-4684-8c1b-bbd636f8bab1",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 34,
+    "latitude": 2.780578,
+    "longitude": 35.222756,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Patrica Knight"
+      },
+      {
+        "id": 1,
+        "name": "Rose Finley"
+      },
+      {
+        "id": 2,
+        "name": "Nash Fernandez"
+      }
+    ]
+  },
+  {
+    "guid": "0fbd0621-f17a-480f-bbce-e85dd619cb17",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 40,
+    "latitude": 45.25154,
+    "longitude": -30.610515,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Cunningham Bowen"
+      },
+      {
+        "id": 1,
+        "name": "Chaney Jackson"
+      },
+      {
+        "id": 2,
+        "name": "Melissa Bird"
+      }
+    ]
+  },
+  {
+    "guid": "f777226a-9cba-46c6-8231-6245f4149943",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 22,
+    "latitude": -27.644826,
+    "longitude": 73.921293,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Gay Buckley"
+      },
+      {
+        "id": 1,
+        "name": "Terrie Santiago"
+      },
+      {
+        "id": 2,
+        "name": "Nicholson Dejesus"
+      }
+    ]
+  },
+  {
+    "guid": "0ab22594-6d45-4769-98ea-cb7ec5430b40",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 36,
+    "latitude": 3.052167,
+    "longitude": -81.938909,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Hodge Hale"
+      },
+      {
+        "id": 1,
+        "name": "Kelly Stokes"
+      },
+      {
+        "id": 2,
+        "name": "Grimes Ashley"
+      }
+    ]
+  },
+  {
+    "guid": "d06d2545-8214-4385-bf55-dcf1cf006c53",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 38,
+    "latitude": -27.002125,
+    "longitude": -131.035327,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Lancaster Reynolds"
+      },
+      {
+        "id": 1,
+        "name": "Houston Richardson"
+      },
+      {
+        "id": 2,
+        "name": "Yolanda Joyce"
+      }
+    ]
+  },
+  {
+    "guid": "caf62e01-1357-41e5-b9c3-fe08be96ba0a",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 27,
+    "latitude": 8.236586,
+    "longitude": 0.70713,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Madeline Witt"
+      },
+      {
+        "id": 1,
+        "name": "Concetta Garrett"
+      },
+      {
+        "id": 2,
+        "name": "Tameka Prince"
+      }
+    ]
+  },
+  {
+    "guid": "cbe745f9-751b-4a29-8840-d3529c6391e0",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 23,
+    "latitude": -55.975969,
+    "longitude": -71.550164,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Madeleine Hodge"
+      },
+      {
+        "id": 1,
+        "name": "Riley Finch"
+      },
+      {
+        "id": 2,
+        "name": "Fay Burton"
+      }
+    ]
+  },
+  {
+    "guid": "1bcb435f-689e-46d8-9421-1d43b60365af",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 28,
+    "latitude": 7.943324,
+    "longitude": -133.174863,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Dollie Craig"
+      },
+      {
+        "id": 1,
+        "name": "Sasha Hodges"
+      },
+      {
+        "id": 2,
+        "name": "Lindsey Owens"
+      }
+    ]
+  },
+  {
+    "guid": "c220bafe-2393-4c46-a6b6-b466c933c5eb",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 25,
+    "latitude": -59.425299,
+    "longitude": 126.24161,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Oneal Mcmillan"
+      },
+      {
+        "id": 1,
+        "name": "Rosa Lynch"
+      },
+      {
+        "id": 2,
+        "name": "Wallace Yates"
+      }
+    ]
+  },
+  {
+    "guid": "fb017f1f-4287-4054-9b02-dfe5653a8f2b",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 21,
+    "latitude": 68.239855,
+    "longitude": 23.039033,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Ellen Oneill"
+      },
+      {
+        "id": 1,
+        "name": "Marva Obrien"
+      },
+      {
+        "id": 2,
+        "name": "Serena Vance"
+      }
+    ]
+  },
+  {
+    "guid": "70814dc8-fe47-4143-8043-9842400f66b1",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 37,
+    "latitude": 34.347947,
+    "longitude": 41.380648,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Bird Tillman"
+      },
+      {
+        "id": 1,
+        "name": "Dodson Wolfe"
+      },
+      {
+        "id": 2,
+        "name": "Hurst Beach"
+      }
+    ]
+  },
+  {
+    "guid": "3796cc28-09ef-4b21-b171-af71abac60d9",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 24,
+    "latitude": 13.45227,
+    "longitude": -8.430426,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Shawn Woods"
+      },
+      {
+        "id": 1,
+        "name": "Travis Leonard"
+      },
+      {
+        "id": 2,
+        "name": "George Bray"
+      }
+    ]
+  },
+  {
+    "guid": "48436811-b31c-4b2d-8ddd-8fe51a13c7bb",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 27,
+    "latitude": -44.796675,
+    "longitude": -29.01672,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Mccarthy Whitfield"
+      },
+      {
+        "id": 1,
+        "name": "Grace Chen"
+      },
+      {
+        "id": 2,
+        "name": "Elba Bates"
+      }
+    ]
+  },
+  {
+    "guid": "b0b2b741-7433-47c1-807e-889c2d732bff",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 35,
+    "latitude": 69.716122,
+    "longitude": -139.716214,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Rachel Clarke"
+      },
+      {
+        "id": 1,
+        "name": "Jennings Salinas"
+      },
+      {
+        "id": 2,
+        "name": "Kaitlin Fisher"
+      }
+    ]
+  },
+  {
+    "guid": "3cf26973-4fe8-44e5-a8c5-80d36ccfd3be",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 23,
+    "latitude": 56.456875,
+    "longitude": -97.161379,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Alisha Pruitt"
+      },
+      {
+        "id": 1,
+        "name": "Sanders Cain"
+      },
+      {
+        "id": 2,
+        "name": "Lucille Booth"
+      }
+    ]
+  },
+  {
+    "guid": "b551e87f-4079-4845-8f00-05552830ecaf",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 39,
+    "latitude": -55.066178,
+    "longitude": 128.442927,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Charlotte Powell"
+      },
+      {
+        "id": 1,
+        "name": "Mathews Mitchell"
+      },
+      {
+        "id": 2,
+        "name": "Thornton Kline"
+      }
+    ]
+  }
+]

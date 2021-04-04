@@ -1,0 +1,222 @@
+[
+  {
+    "guid": "2fc390d9-34fc-4bc3-9781-1b240470831d",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 33,
+    "latitude": 58.207757,
+    "longitude": 45.671536,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Jeanette Carey"
+      },
+      {
+        "id": 1,
+        "name": "Prince Barnes"
+      },
+      {
+        "id": 2,
+        "name": "Candace Franco"
+      }
+    ]
+  },
+  {
+    "guid": "ae512691-5a21-4d94-a1c2-05b0eddbfaae",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 24,
+    "latitude": -69.544853,
+    "longitude": 63.459672,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Letha Maynard"
+      },
+      {
+        "id": 1,
+        "name": "Paula Lane"
+      },
+      {
+        "id": 2,
+        "name": "Rhodes Ferguson"
+      }
+    ]
+  },
+  {
+    "guid": "98e117a0-ac2e-460c-9648-4c2749f3b615",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 22,
+    "latitude": 14.886011,
+    "longitude": 8.09611,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Harrington Berry"
+      },
+      {
+        "id": 1,
+        "name": "Lori Bartlett"
+      },
+      {
+        "id": 2,
+        "name": "Castro George"
+      }
+    ]
+  },
+  {
+    "guid": "6e88ee6c-202f-45be-ab3f-8186d0bf0be1",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 22,
+    "latitude": 68.255825,
+    "longitude": -4.465353,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Chan Buckley"
+      },
+      {
+        "id": 1,
+        "name": "Josephine Wilson"
+      },
+      {
+        "id": 2,
+        "name": "Raquel Weber"
+      }
+    ]
+  },
+  {
+    "guid": "11b74c4b-8492-4a1e-986e-2ee86474318b",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 29,
+    "latitude": 65.249777,
+    "longitude": 108.432672,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Glenn Sweet"
+      },
+      {
+        "id": 1,
+        "name": "Powers Burgess"
+      },
+      {
+        "id": 2,
+        "name": "Chasity Mejia"
+      }
+    ]
+  },
+  {
+    "guid": "5566b17a-3342-4f8e-8776-25b9871ec761",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 21,
+    "latitude": -56.323624,
+    "longitude": -33.964605,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Ofelia Barrera"
+      },
+      {
+        "id": 1,
+        "name": "Madelyn Serrano"
+      },
+      {
+        "id": 2,
+        "name": "Becker Castillo"
+      }
+    ]
+  },
+  {
+    "guid": "2fd67172-1d20-4946-acaf-e407894e073a",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 32,
+    "latitude": 89.116836,
+    "longitude": -26.989246,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Lilly Fitzpatrick"
+      },
+      {
+        "id": 1,
+        "name": "Mccarty Kirby"
+      },
+      {
+        "id": 2,
+        "name": "Bridges Hernandez"
+      }
+    ]
+  },
+  {
+    "guid": "931f358a-1c92-4467-bed5-9874912840f5",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 36,
+    "latitude": -48.564825,
+    "longitude": 17.161093,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Ruth Joyce"
+      },
+      {
+        "id": 1,
+        "name": "Guerrero Owens"
+      },
+      {
+        "id": 2,
+        "name": "Noble Ware"
+      }
+    ]
+  },
+  {
+    "guid": "9bcb675d-fb16-4e2f-96c4-1eeade90ce1d",
+    "isActive": false,
+    "picture": "http://placehold.it/32x32",
+    "age": 34,
+    "latitude": 6.339378,
+    "longitude": 3.107832,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Bolton Hanson"
+      },
+      {
+        "id": 1,
+        "name": "Pruitt Schultz"
+      },
+      {
+        "id": 2,
+        "name": "Susan Hamilton"
+      }
+    ]
+  },
+  {
+    "guid": "0f29950e-c588-4fd5-8d36-24a8115e6d6f",
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 33,
+    "latitude": -7.258851,
+    "longitude": 68.500718,
+    "friends": [
+      {
+        "id": 0,
+        "name": "Marcy Moore"
+      },
+      {
+        "id": 1,
+        "name": "Noel Holt"
+      },
+      {
+        "id": 2,
+        "name": "Russo Mcmillan"
+      }
+    ]
+  }
+]

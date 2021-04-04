@@ -1,0 +1,18 @@
+(library
+ (name p_base)
+ (modules p_base)
+ (libraries yojson extlib))
+
+(library
+ (name p_test)
+ (modules p_test)
+ (libraries p_base alcotest))
+
+(library
+ (name p_bench)
+ (modules p_bench)
+ (libraries p_base core_bench))
+
+(library
+ (name tokens)
+ (modules tokens))

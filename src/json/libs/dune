@@ -1,0 +1,42 @@
+(library
+ (name p_angstrom)
+ (modules p_angstrom)
+ (libraries p_base angstrom)
+ (preprocess future_syntax))
+
+(library
+ (name p_mparser)
+ (modules p_mparser)
+ (libraries p_base mparser)
+ (preprocess future_syntax))
+
+(library
+ (name p_bark)
+ (modules p_bark)
+ (libraries p_base bark str)
+ (preprocess future_syntax))
+
+(library
+ (name json_opal)
+ (modules json_opal)
+ (libraries p_base opal tokens)
+ (preprocess future_syntax))
+
+(library
+ (name p_opal)
+ (modules p_opal)
+ (libraries json_opal)
+ (preprocess future_syntax))
+
+(library
+ (name p_opal_lex)
+ (modules p_opal_lex lexer)
+ (libraries json_opal)
+ (preprocess future_syntax))
+
+(library
+ (name p_yojson)
+ (modules p_yojson)
+ (libraries yojson))
+
+(ocamllex lexer)

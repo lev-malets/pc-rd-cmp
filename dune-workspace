@@ -1,0 +1,7 @@
+(lang dune 2.8)
+
+(context (opam (switch tmp/switch/switch)
+ (name default)
+ (merlin)
+ (env (_
+  (ocamlopt_flags :standard -O3 -inlining-report)))))

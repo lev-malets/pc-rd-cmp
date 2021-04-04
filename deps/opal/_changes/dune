@@ -1,0 +1,4 @@
+(library
+ (name opal)
+ (public_name opal)
+ (preprocess future_syntax))

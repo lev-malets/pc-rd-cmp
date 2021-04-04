@@ -1,0 +1,22 @@
+{
+  "guid": "98fb349c-04c8-479f-b5de-99e5f9475652",
+  "isActive": true,
+  "picture": "http://placehold.it/32x32",
+  "age": 31,
+  "latitude": -33.145407,
+  "longitude": -34.00386,
+  "friends": [
+    {
+      "id": 0,
+      "name": "Lawson Hobbs"
+    },
+    {
+      "id": 1,
+      "name": "Francine Boyd"
+    },
+    {
+      "id": 2,
+      "name": "Cameron Dale"
+    }
+  ]
+}
