@@ -33,3 +33,6 @@ $(TMP_DIR)/created:
 endef
 
 $(eval $(cmd))
+
+override $(CLEAN):
+	true 'no clean for $@'

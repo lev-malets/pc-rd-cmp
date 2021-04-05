@@ -3,7 +3,7 @@ WDIR := $(abspath .)
 TMP := tmp
 DUNE_DIR := _build/default
 
-.DEFAULT_GOAL = $(TMP)/built
+.DEFAULT_GOAL = build
 
 touch_target = mkdir -p $(WDIR)/$(dir $@) && touch $(WDIR)/$@
 
@@ -19,26 +19,44 @@ TMP_DIR := $(TMP)/$$(DIR)
 DIR_ABS := $(WDIR)/$$(DIR)
 TMP_DIR_ABS := $(WDIR)/$$(TMP_DIR)
 DONE := $$(TMP_DIR)/done
-CLEAN := clean.$$(DIR)
-SUB := $$(shell echo $$(DIR)/*/_.mk)
+CLEAN := $$(DIR)/clean
+CLEAN_DEFAULT := $$(CLEAN)/default
+DONE_DEFAULT := $$(DONE)/default
+RE := re.$$(DIR)
+SUB := $$(shell find $$(DIR) -mindepth 2 -maxdepth 2 -name _.mk)
+SUB_DIRS := $$(patsubst %/_.mk,%,$$(SUB))
 
 clean: $$(CLEAN)
-.PHONY: $$(CLEAN) $$(DIR)
+re: $$(RE)
+
+$$(RE): $$(CLEAN) $$(DIR)
+$$(DIR): $$(SUB_DIRS) $$(DONE)
 
 define cmd
-$$(CLEAN):
+$$(CLEAN_DEFAULT):
 	rm -rf $$(TMP_DIR)
-
-$$(DIR): $$(SUB)
+$$(DONE_DEFAULT):
+	@ true
 endef
 $$(eval $$(cmd))
 endef # base
 
-phony:
-.PHONY: phony
+#----------------------------------------#
 
-include $(shell echo */_.mk)
+force: ;
 
-$(TMP)/built: phony $(TMP)/deps/done $(TMP)/switch/done
+%: %/default
+	true $^
+
+%/all:
+	mkdir -p $(dir $@)
+	cat $^ > $@
+
+#----------------------------------------#
+
+build: $(TMP)/deps/done $(TMP)/switch/done
 	dune build
-	touch $@
+
+.PHONY: build
+
+include $(shell find . -mindepth 2 -maxdepth 2 -name _.mk)
