@@ -1,4 +1,4 @@
-include $(BASE_FILE)
+include $(eval $(base))
 
 define cmd
 $(DONE):

@@ -1,0 +1,3 @@
+(executable
+ (name main)
+ (libraries pc_syntax fix extlib syntax core_bench))

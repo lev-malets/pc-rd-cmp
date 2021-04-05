@@ -1,0 +1,4 @@
+(library
+ (name pc_syntax)
+ (libraries angstrom_pos syntax ast_show extlib fmt fmt.tty)
+ (preprocess (pps ppx_jane_fix)))
