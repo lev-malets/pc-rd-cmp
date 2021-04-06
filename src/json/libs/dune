@@ -5,6 +5,12 @@
  (preprocess future_syntax))
 
 (library
+ (name p_angstrom_pos)
+ (modules p_angstrom_pos)
+ (libraries p_base angstrom_pos)
+ (preprocess future_syntax))
+
+(library
  (name p_mparser)
  (modules p_mparser)
  (libraries p_base mparser)

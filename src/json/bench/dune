@@ -1,3 +1,3 @@
 (executable
  (name main)
- (libraries p_angstrom p_opal p_mparser p_opal_lex str p_bark p_yojson core_bench))
+ (libraries p_angstrom p_angstrom_pos p_opal p_mparser p_opal_lex str p_bark p_yojson core_bench))

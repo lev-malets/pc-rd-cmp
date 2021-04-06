@@ -1,322 +1,297 @@
-Architecture:                    x86_64
-CPU op-mode(s):                  32-bit, 64-bit
-Byte Order:                      Little Endian
-Address sizes:                   39 bits physical, 48 bits virtual
-CPU(s):                          8
-On-line CPU(s) list:             0-7
-Thread(s) per core:              2
-Core(s) per socket:              4
-Socket(s):                       1
-NUMA node(s):                    1
-Vendor ID:                       GenuineIntel
-CPU family:                      6
-Model:                           142
-Model name:                      Intel(R) Core(TM) i5-8265U CPU @ 1.60GHz
-Stepping:                        12
-CPU MHz:                         1800.000
-CPU max MHz:                     3900.0000
-CPU min MHz:                     400.0000
-BogoMIPS:                        3600.00
-Virtualization:                  VT-x
-L1d cache:                       128 KiB
-L1i cache:                       128 KiB
-L2 cache:                        1 MiB
-L3 cache:                        6 MiB
-NUMA node0 CPU(s):               0-7
-Vulnerability Itlb multihit:     KVM: Mitigation: VMX disabled
-Vulnerability L1tf:              Not affected
-Vulnerability Mds:               Not affected
-Vulnerability Meltdown:          Not affected
-Vulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl and seccomp
-Vulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization
-Vulnerability Spectre v2:        Mitigation; Enhanced IBRS, IBPB conditional, RSB filling
-Vulnerability Srbds:             Mitigation; TSX disabled
-Vulnerability Tsx async abort:   Not affected
-Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb invpcid_single ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid mpx rdseed adx smap clflushopt intel_pt xsaveopt xsavec xgetbv1 xsaves dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear flush_l1d arch_capabilities
+complex:1
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
+│ Name         │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
+│ angstrom     │   4.34us │  2_814.34w │    2.79w │    2.79w │     18.98% │
+│ angstrom-pos │   4.91us │  5_215.41w │    5.68w │    5.68w │     21.48% │
+│ opal         │   7.07us │  3_374.18w │    5.71w │    5.71w │     30.93% │
+│ opal_lex     │   8.18us │  3_903.19w │    6.62w │    6.62w │     35.79% │
+│ mparser      │  22.87us │ 15_309.77w │   20.95w │   20.95w │    100.00% │
+│ bark         │  16.37us │ 10_496.14w │   20.98w │   20.98w │     71.58% │
+│ yojson       │   3.84us │    375.01w │          │          │     16.81% │
+└──────────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
 
 complex:1
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
-│ Name     │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
-│ angstrom │   3.94us │  2_814.34w │    2.79w │    2.79w │     17.54% │
-│ opal     │   7.20us │  3_374.18w │    5.71w │    5.71w │     32.00% │
-│ opal_lex │   8.33us │  3_903.19w │    6.61w │    6.61w │     37.05% │
-│ mparser  │  22.49us │ 15_309.77w │   20.95w │   20.95w │    100.00% │
-│ bark     │  16.26us │ 10_496.14w │   20.90w │   20.90w │     72.31% │
-│ yojson   │   3.73us │    375.01w │          │          │     16.59% │
-└──────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
-
-complex:1
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
-│ Name     │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
-│ angstrom │   3.92us │  2_814.34w │    2.79w │    2.79w │     17.48% │
-│ opal     │   7.21us │  3_374.18w │    5.71w │    5.71w │     32.13% │
-│ opal_lex │   8.38us │  3_903.19w │    6.61w │    6.61w │     37.32% │
-│ mparser  │  22.45us │ 15_309.77w │   20.97w │   20.97w │    100.00% │
-│ bark     │  16.13us │ 10_496.14w │   20.88w │   20.88w │     71.86% │
-│ yojson   │   3.73us │    375.01w │          │          │     16.62% │
-└──────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
+│ Name         │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
+│ angstrom     │   4.15us │  2_814.34w │    2.79w │    2.79w │     17.67% │
+│ angstrom-pos │   4.82us │  5_215.41w │    5.68w │    5.68w │     20.56% │
+│ opal         │   7.24us │  3_374.18w │    5.71w │    5.71w │     30.85% │
+│ opal_lex     │   8.45us │  3_903.19w │    6.61w │    6.61w │     36.01% │
+│ mparser      │  23.46us │ 15_309.77w │   20.95w │   20.95w │    100.00% │
+│ bark         │  16.60us │ 10_496.14w │   21.00w │   21.00w │     70.75% │
+│ yojson       │   3.90us │    375.01w │          │          │     16.62% │
+└──────────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
+complex:2
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬─────────┬──────────┬──────────┬────────────┐
+│ Name         │ Time/Run │ mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼─────────┼──────────┼──────────┼────────────┤
+│ angstrom     │  21.06us │ 14.25kw │   38.28w │   38.28w │     16.96% │
+│ angstrom-pos │  24.81us │ 26.38kw │   73.01w │   73.01w │     19.98% │
+│ opal         │  39.18us │ 17.20kw │  138.58w │  138.58w │     31.55% │
+│ opal_lex     │  47.65us │ 19.70kw │  404.79w │  139.79w │     38.37% │
+│ mparser      │ 124.18us │ 77.90kw │  498.23w │  233.23w │    100.00% │
+│ bark         │  86.68us │ 53.35kw │  228.34w │  228.34w │     69.80% │
+│ yojson       │  21.70us │  1.33kw │  267.92w │    2.92w │     17.48% │
+└──────────────┴──────────┴─────────┴──────────┴──────────┴────────────┘
 
 complex:2
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬─────────┬──────────┬──────────┬────────────┐
-│ Name     │ Time/Run │ mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼─────────┼──────────┼──────────┼────────────┤
-│ angstrom │  20.91us │ 14.25kw │   38.29w │   38.29w │     17.06% │
-│ opal     │  44.66us │ 17.20kw │  139.10w │  139.10w │     36.44% │
-│ opal_lex │  49.11us │ 19.70kw │  405.15w │  140.15w │     40.07% │
-│ mparser  │ 122.55us │ 77.90kw │  498.54w │  233.54w │    100.00% │
-│ bark     │  86.28us │ 53.35kw │  228.55w │  228.55w │     70.40% │
-│ yojson   │  21.13us │  1.33kw │  268.01w │    3.01w │     17.24% │
-└──────────┴──────────┴─────────┴──────────┴──────────┴────────────┘
-
-complex:2
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬─────────┬──────────┬──────────┬────────────┐
-│ Name     │ Time/Run │ mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼─────────┼──────────┼──────────┼────────────┤
-│ angstrom │  22.07us │ 14.25kw │   38.28w │   38.28w │     17.53% │
-│ opal     │  41.19us │ 17.20kw │  139.09w │  139.09w │     32.71% │
-│ opal_lex │  49.93us │ 19.70kw │  405.16w │  140.16w │     39.65% │
-│ mparser  │ 125.93us │ 77.90kw │  498.31w │  233.31w │    100.00% │
-│ bark     │  88.59us │ 53.35kw │  228.32w │  228.32w │     70.35% │
-│ yojson   │  21.75us │  1.33kw │  268.00w │    3.00w │     17.27% │
-└──────────┴──────────┴─────────┴──────────┴──────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬─────────┬──────────┬──────────┬────────────┐
+│ Name         │ Time/Run │ mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼─────────┼──────────┼──────────┼────────────┤
+│ angstrom     │  22.09us │ 14.25kw │   38.30w │   38.30w │     17.21% │
+│ angstrom-pos │  26.02us │ 26.38kw │   73.03w │   73.03w │     20.28% │
+│ opal         │  40.04us │ 17.20kw │  138.56w │  138.56w │     31.21% │
+│ opal_lex     │  49.17us │ 19.70kw │  404.71w │  139.71w │     38.32% │
+│ mparser      │ 128.31us │ 77.90kw │  497.94w │  232.94w │    100.00% │
+│ bark         │  89.15us │ 53.35kw │  228.12w │  228.12w │     69.48% │
+│ yojson       │  22.58us │  1.33kw │  267.92w │    2.92w │     17.59% │
+└──────────────┴──────────┴─────────┴──────────┴──────────┴────────────┘
+complex:3
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬──────────┬───────────┬──────────┬────────────┐
+│ Name         │ Time/Run │  mWd/Run │  mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼──────────┼───────────┼──────────┼────────────┤
+│ angstrom     │  43.84us │  28.34kw │   128.43w │  128.43w │     16.20% │
+│ angstrom-pos │  57.29us │  52.51kw │   302.51w │  302.51w │     21.17% │
+│ opal         │  88.24us │  34.21kw │   538.66w │  538.66w │     32.61% │
+│ opal_lex     │ 106.83us │  39.21kw │ 1_073.00w │  548.00w │     39.48% │
+│ mparser      │ 270.60us │ 154.58kw │ 1_284.48w │  759.48w │    100.00% │
+│ bark         │ 187.84us │ 106.30kw │   647.34w │  647.34w │     69.42% │
+│ yojson       │  46.16us │   2.57kw │   535.88w │   10.88w │     17.06% │
+└──────────────┴──────────┴──────────┴───────────┴──────────┴────────────┘
 
 complex:3
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬──────────┬───────────┬──────────┬────────────┐
-│ Name     │ Time/Run │  mWd/Run │  mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼──────────┼───────────┼──────────┼────────────┤
-│ angstrom │  41.30us │  28.34kw │   129.20w │  129.20w │     17.03% │
-│ opal     │  83.28us │  34.21kw │   546.37w │  546.37w │     34.35% │
-│ opal_lex │ 100.01us │  39.21kw │ 1_076.69w │  551.69w │     41.25% │
-│ mparser  │ 242.46us │ 154.58kw │ 1_274.05w │  749.05w │    100.00% │
-│ bark     │ 173.72us │ 106.30kw │   648.09w │  648.09w │     71.65% │
-│ yojson   │  41.52us │   2.57kw │   536.04w │   11.04w │     17.12% │
-└──────────┴──────────┴──────────┴───────────┴──────────┴────────────┘
-
-complex:3
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬──────────┬───────────┬──────────┬────────────┐
-│ Name     │ Time/Run │  mWd/Run │  mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼──────────┼───────────┼──────────┼────────────┤
-│ angstrom │  44.68us │  28.34kw │   129.41w │  129.41w │     17.36% │
-│ opal     │  86.84us │  34.21kw │   545.70w │  545.70w │     33.75% │
-│ opal_lex │ 105.23us │  39.21kw │ 1_076.13w │  551.13w │     40.89% │
-│ mparser  │ 257.32us │ 154.58kw │ 1_273.96w │  748.96w │    100.00% │
-│ bark     │ 182.14us │ 106.30kw │   648.09w │  648.09w │     70.78% │
-│ yojson   │  43.55us │   2.57kw │   535.98w │   10.98w │     16.92% │
-└──────────┴──────────┴──────────┴───────────┴──────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬──────────┬───────────┬──────────┬────────────┐
+│ Name         │ Time/Run │  mWd/Run │  mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼──────────┼───────────┼──────────┼────────────┤
+│ angstrom     │  46.12us │  28.34kw │   128.48w │  128.48w │     17.15% │
+│ angstrom-pos │  56.37us │  52.51kw │   303.52w │  303.52w │     20.96% │
+│ opal         │  87.46us │  34.21kw │   537.30w │  537.30w │     32.52% │
+│ opal_lex     │ 106.36us │  39.21kw │ 1_073.21w │  548.21w │     39.55% │
+│ mparser      │ 268.91us │ 154.58kw │ 1_275.54w │  750.54w │    100.00% │
+│ bark         │ 186.17us │ 106.30kw │   647.64w │  647.64w │     69.23% │
+│ yojson       │  46.16us │   2.57kw │   535.84w │   10.84w │     17.17% │
+└──────────────┴──────────┴──────────┴───────────┴──────────┴────────────┘
+complex:4
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬──────────┬───────────┬───────────┬────────────┐
+│ Name         │ Time/Run │  mWd/Run │  mjWd/Run │  Prom/Run │ Percentage │
+├──────────────┼──────────┼──────────┼───────────┼───────────┼────────────┤
+│ angstrom     │  94.53us │  59.33kw │   534.11w │   534.11w │     17.09% │
+│ angstrom-pos │ 118.37us │ 109.99kw │   998.46w │   998.46w │     21.40% │
+│ opal         │ 195.07us │  71.64kw │ 2_399.06w │ 2_399.06w │     35.26% │
+│ opal_lex     │ 231.97us │  82.14kw │ 3_508.31w │ 2_406.31w │     41.93% │
+│ mparser      │ 553.27us │ 324.01kw │ 3_895.17w │ 2_793.17w │    100.00% │
+│ bark         │ 388.01us │ 222.74kw │ 2_270.92w │ 2_270.92w │     70.13% │
+│ yojson       │  92.54us │   5.30kw │ 1_148.18w │    46.18w │     16.73% │
+└──────────────┴──────────┴──────────┴───────────┴───────────┴────────────┘
 
 complex:4
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬──────────┬───────────┬───────────┬────────────┐
-│ Name     │ Time/Run │  mWd/Run │  mjWd/Run │  Prom/Run │ Percentage │
-├──────────┼──────────┼──────────┼───────────┼───────────┼────────────┤
-│ angstrom │  96.10us │  59.33kw │   538.81w │   538.81w │     17.48% │
-│ opal     │ 200.29us │  71.64kw │ 2_430.86w │ 2_430.86w │     36.43% │
-│ opal_lex │ 235.74us │  82.14kw │ 3_522.38w │ 2_420.38w │     42.88% │
-│ mparser  │ 549.75us │ 324.01kw │ 3_840.65w │ 2_738.65w │    100.00% │
-│ bark     │ 390.11us │ 222.74kw │ 2_265.02w │ 2_265.02w │     70.96% │
-│ yojson   │  89.63us │   5.30kw │ 1_147.89w │    45.89w │     16.30% │
-└──────────┴──────────┴──────────┴───────────┴───────────┴────────────┘
-
-complex:4
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬──────────┬───────────┬───────────┬────────────┐
-│ Name     │ Time/Run │  mWd/Run │  mjWd/Run │  Prom/Run │ Percentage │
-├──────────┼──────────┼──────────┼───────────┼───────────┼────────────┤
-│ angstrom │ 100.44us │  59.33kw │   538.46w │   538.46w │     17.69% │
-│ opal     │ 206.72us │  71.64kw │ 2_433.04w │ 2_433.04w │     36.40% │
-│ opal_lex │ 242.04us │  82.14kw │ 3_519.58w │ 2_417.58w │     42.62% │
-│ mparser  │ 567.85us │ 324.01kw │ 3_849.14w │ 2_747.14w │    100.00% │
-│ bark     │ 402.18us │ 222.74kw │ 2_270.74w │ 2_270.74w │     70.83% │
-│ yojson   │  92.36us │   5.30kw │ 1_147.58w │    45.58w │     16.26% │
-└──────────┴──────────┴──────────┴───────────┴───────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬──────────┬───────────┬───────────┬────────────┐
+│ Name         │ Time/Run │  mWd/Run │  mjWd/Run │  Prom/Run │ Percentage │
+├──────────────┼──────────┼──────────┼───────────┼───────────┼────────────┤
+│ angstrom     │ 103.10us │  59.33kw │   535.01w │   535.01w │     17.75% │
+│ angstrom-pos │ 124.06us │ 109.99kw │   999.36w │   999.36w │     21.36% │
+│ opal         │ 204.71us │  71.64kw │ 2_403.45w │ 2_403.45w │     35.24% │
+│ opal_lex     │ 241.74us │  82.14kw │ 3_509.73w │ 2_407.73w │     41.61% │
+│ mparser      │ 580.95us │ 324.01kw │ 3_898.63w │ 2_796.63w │    100.00% │
+│ bark         │ 404.15us │ 222.74kw │ 2_266.49w │ 2_266.49w │     69.57% │
+│ yojson       │  96.30us │   5.30kw │ 1_147.43w │    45.43w │     16.58% │
+└──────────────┴──────────┴──────────┴───────────┴───────────┴────────────┘
+complex:5
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬────────────┬──────────┬──────────┬───────────┬────────────┐
+│ Name         │   Time/Run │  mWd/Run │ mjWd/Run │  Prom/Run │ Percentage │
+├──────────────┼────────────┼──────────┼──────────┼───────────┼────────────┤
+│ angstrom     │   207.68us │ 118.51kw │   2.09kw │ 2_093.22w │     18.28% │
+│ angstrom-pos │   267.34us │ 219.74kw │   3.88kw │ 3_878.61w │     23.54% │
+│ opal         │   465.81us │ 143.10kw │   9.91kw │ 9_905.67w │     41.01% │
+│ opal_lex     │   538.80us │ 164.11kw │  11.83kw │ 9_629.55w │     47.43% │
+│ mparser      │ 1_135.88us │ 646.90kw │   9.30kw │ 7_101.45w │    100.00% │
+│ bark         │   813.15us │ 445.08kw │   6.71kw │ 6_708.26w │     71.59% │
+│ yojson       │   187.55us │  10.52kw │   2.37kw │   173.44w │     16.51% │
+└──────────────┴────────────┴──────────┴──────────┴───────────┴────────────┘
 
 complex:5
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬────────────┬──────────┬──────────┬───────────┬────────────┐
-│ Name     │   Time/Run │  mWd/Run │ mjWd/Run │  Prom/Run │ Percentage │
-├──────────┼────────────┼──────────┼──────────┼───────────┼────────────┤
-│ angstrom │   210.40us │ 118.51kw │   2.06kw │ 2_064.85w │     18.41% │
-│ opal     │   476.12us │ 143.10kw │   9.97kw │ 9_970.45w │     41.66% │
-│ opal_lex │   552.79us │ 164.11kw │  11.88kw │ 9_683.13w │     48.37% │
-│ mparser  │ 1_142.91us │ 646.90kw │   9.30kw │ 7_100.96w │    100.00% │
-│ bark     │   830.10us │ 445.08kw │   6.69kw │ 6_687.67w │     72.63% │
-│ yojson   │   182.60us │  10.52kw │   2.32kw │   119.73w │     15.98% │
-└──────────┴────────────┴──────────┴──────────┴───────────┴────────────┘
-
-complex:5
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬────────────┬──────────┬──────────┬───────────┬────────────┐
-│ Name     │   Time/Run │  mWd/Run │ mjWd/Run │  Prom/Run │ Percentage │
-├──────────┼────────────┼──────────┼──────────┼───────────┼────────────┤
-│ angstrom │   213.79us │ 118.51kw │   2.07kw │ 2_066.35w │     18.70% │
-│ opal     │   475.41us │ 143.10kw │   9.97kw │ 9_967.05w │     41.58% │
-│ opal_lex │   550.13us │ 164.11kw │  11.85kw │ 9_651.48w │     48.12% │
-│ mparser  │ 1_143.27us │ 646.90kw │   9.29kw │ 7_092.87w │    100.00% │
-│ bark     │   829.16us │ 445.08kw │   6.67kw │ 6_668.98w │     72.53% │
-│ yojson   │   183.14us │  10.52kw │   2.32kw │   119.96w │     16.02% │
-└──────────┴────────────┴──────────┴──────────┴───────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬────────────┬──────────┬──────────┬───────────┬────────────┐
+│ Name         │   Time/Run │  mWd/Run │ mjWd/Run │  Prom/Run │ Percentage │
+├──────────────┼────────────┼──────────┼──────────┼───────────┼────────────┤
+│ angstrom     │   220.18us │ 118.51kw │   2.09kw │ 2_090.00w │     18.80% │
+│ angstrom-pos │   276.29us │ 219.74kw │   3.88kw │ 3_876.54w │     23.59% │
+│ opal         │   478.72us │ 143.10kw │   9.89kw │ 9_894.08w │     40.88% │
+│ opal_lex     │   555.49us │ 164.11kw │  11.82kw │ 9_626.27w │     47.43% │
+│ mparser      │ 1_171.15us │ 646.90kw │   9.30kw │ 7_104.41w │    100.00% │
+│ bark         │   836.86us │ 445.08kw │   6.71kw │ 6_705.39w │     71.46% │
+│ yojson       │   191.66us │  10.52kw │   2.34kw │   139.76w │     16.36% │
+└──────────────┴────────────┴──────────┴──────────┴───────────┴────────────┘
+complex:6
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬────────────┬────────────┬──────────┬────────────┬────────────┐
+│ Name         │   Time/Run │    mWd/Run │ mjWd/Run │   Prom/Run │ Percentage │
+├──────────────┼────────────┼────────────┼──────────┼────────────┼────────────┤
+│ angstrom     │   483.24us │   236.84kw │   8.87kw │  8_869.72w │     20.83% │
+│ angstrom-pos │   611.62us │   439.23kw │  12.42kw │ 12_420.40w │     26.36% │
+│ opal         │ 1_180.93us │   286.00kw │  37.95kw │ 37_954.94w │     50.90% │
+│ opal_lex     │ 1_265.45us │   328.03kw │  35.45kw │ 31_041.38w │     54.55% │
+│ mparser      │ 2_319.98us │ 1_295.99kw │  20.41kw │ 16_004.61w │    100.00% │
+│ bark         │ 1_669.11us │   889.64kw │  15.60kw │ 15_599.99w │     71.95% │
+│ yojson       │   378.62us │    20.95kw │   5.12kw │    711.63w │     16.32% │
+└──────────────┴────────────┴────────────┴──────────┴────────────┴────────────┘
 
 complex:6
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬────────────┬────────────┬──────────┬────────────┬────────────┐
-│ Name     │   Time/Run │    mWd/Run │ mjWd/Run │   Prom/Run │ Percentage │
-├──────────┼────────────┼────────────┼──────────┼────────────┼────────────┤
-│ angstrom │   467.30us │   236.84kw │   8.74kw │  8_735.49w │     20.95% │
-│ opal     │ 1_184.89us │   286.00kw │  38.95kw │ 38_948.11w │     53.12% │
-│ opal_lex │ 1_221.25us │   328.03kw │  35.44kw │ 31_035.41w │     54.75% │
-│ mparser  │ 2_230.67us │ 1_295.99kw │  19.98kw │ 15_578.17w │    100.00% │
-│ bark     │ 1_643.81us │   889.64kw │  15.64kw │ 15_642.98w │     73.69% │
-│ yojson   │   358.70us │    20.95kw │   5.11kw │    708.02w │     16.08% │
-└──────────┴────────────┴────────────┴──────────┴────────────┴────────────┘
-
-complex:6
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬────────────┬────────────┬──────────┬────────────┬────────────┐
-│ Name     │   Time/Run │    mWd/Run │ mjWd/Run │   Prom/Run │ Percentage │
-├──────────┼────────────┼────────────┼──────────┼────────────┼────────────┤
-│ angstrom │   484.47us │   236.84kw │   8.73kw │  8_731.00w │     21.13% │
-│ opal     │ 1_208.13us │   286.00kw │  38.94kw │ 38_944.74w │     52.70% │
-│ opal_lex │ 1_251.50us │   328.03kw │  35.48kw │ 31_072.95w │     54.59% │
-│ mparser  │ 2_292.42us │ 1_295.99kw │  19.97kw │ 15_561.86w │    100.00% │
-│ bark     │ 1_685.86us │   889.64kw │  15.65kw │ 15_651.68w │     73.54% │
-│ yojson   │   369.56us │    20.95kw │   5.11kw │    701.36w │     16.12% │
-└──────────┴────────────┴────────────┴──────────┴────────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬────────────┬────────────┬──────────┬────────────┬────────────┐
+│ Name         │   Time/Run │    mWd/Run │ mjWd/Run │   Prom/Run │ Percentage │
+├──────────────┼────────────┼────────────┼──────────┼────────────┼────────────┤
+│ angstrom     │   491.11us │   236.84kw │   8.87kw │  8_872.17w │     21.24% │
+│ angstrom-pos │   617.82us │   439.23kw │  12.41kw │ 12_405.09w │     26.72% │
+│ opal         │ 1_182.38us │   286.00kw │  37.93kw │ 37_934.71w │     51.13% │
+│ opal_lex     │ 1_261.41us │   328.03kw │  35.44kw │ 31_039.75w │     54.54% │
+│ mparser      │ 2_312.61us │ 1_295.99kw │  20.38kw │ 15_978.98w │    100.00% │
+│ bark         │ 1_672.62us │   889.64kw │  15.62kw │ 15_619.84w │     72.33% │
+│ yojson       │   380.28us │    20.95kw │   5.11kw │    705.63w │     16.44% │
+└──────────────┴────────────┴────────────┴──────────┴────────────┴────────────┘
+others:repeat
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
+│ Name         │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
+│ angstrom     │   3.52us │  3_185.15w │    4.33w │    4.33w │     16.93% │
+│ angstrom-pos │   4.17us │  5_835.59w │    8.45w │    8.45w │     20.06% │
+│ opal         │   7.73us │  5_058.25w │    8.74w │    8.74w │     37.18% │
+│ opal_lex     │   8.63us │  5_475.37w │    8.79w │    8.79w │     41.54% │
+│ mparser      │  20.78us │ 16_463.65w │   14.71w │   14.71w │    100.00% │
+│ bark         │   5.50us │  6_012.71w │    6.03w │    6.03w │     26.48% │
+│ yojson       │   3.15us │    384.01w │    0.25w │    0.25w │     15.16% │
+└──────────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
 
 others:repeat
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
-│ Name     │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
-│ angstrom │   3.65us │  3_185.15w │    4.33w │    4.33w │     17.18% │
-│ opal     │   7.81us │  5_058.25w │    8.73w │    8.73w │     36.72% │
-│ opal_lex │   8.85us │  5_475.37w │    8.79w │    8.79w │     41.62% │
-│ mparser  │  21.26us │ 16_463.66w │   14.73w │   14.73w │    100.00% │
-│ bark     │   5.89us │  6_012.71w │    6.04w │    6.04w │     27.69% │
-│ yojson   │   3.10us │    384.01w │    0.25w │    0.25w │     14.57% │
-└──────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
-
-others:repeat
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
-│ Name     │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
-│ angstrom │   3.55us │  3_185.15w │    4.33w │    4.33w │     17.74% │
-│ opal     │   7.70us │  5_058.25w │    8.73w │    8.73w │     38.52% │
-│ opal_lex │   8.73us │  5_475.37w │    8.79w │    8.79w │     43.65% │
-│ mparser  │  20.00us │ 16_463.65w │   14.73w │   14.73w │    100.00% │
-│ bark     │   5.38us │  6_012.71w │    6.10w │    6.10w │     26.93% │
-│ yojson   │   2.99us │    384.01w │    0.25w │    0.25w │     14.95% │
-└──────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
+│ Name         │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
+│ angstrom     │   3.82us │  3_185.15w │    4.33w │    4.33w │     17.41% │
+│ angstrom-pos │   4.47us │  5_835.58w │    8.40w │    8.40w │     20.36% │
+│ opal         │   8.13us │  5_058.25w │    8.74w │    8.74w │     37.04% │
+│ opal_lex     │   9.07us │  5_475.37w │    8.79w │    8.79w │     41.33% │
+│ mparser      │  21.95us │ 16_463.65w │   14.71w │   14.71w │    100.00% │
+│ bark         │   5.79us │  6_012.71w │    6.09w │    6.09w │     26.37% │
+│ yojson       │   3.32us │    384.01w │    0.25w │    0.25w │     15.13% │
+└──────────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
+others:repeat-compact
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
+│ Name         │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
+│ angstrom     │   3.41us │  3_185.15w │    4.33w │    4.33w │     16.03% │
+│ angstrom-pos │   3.76us │  5_061.40w │    7.14w │    7.14w │     17.67% │
+│ opal         │   7.60us │  5_058.25w │    8.72w │    8.72w │     35.71% │
+│ opal_lex     │   8.04us │  5_244.26w │    8.20w │    8.20w │     37.81% │
+│ mparser      │  21.28us │ 16_107.86w │   13.44w │   13.44w │    100.00% │
+│ bark         │   5.08us │  6_012.71w │    6.07w │    6.07w │     23.86% │
+│ yojson       │   2.24us │    368.01w │    0.20w │    0.20w │     10.54% │
+└──────────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
 
 others:repeat-compact
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
-│ Name     │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
-│ angstrom │   3.58us │  3_185.15w │    4.33w │    4.33w │     17.43% │
-│ opal     │   7.58us │  5_058.25w │    8.73w │    8.73w │     36.88% │
-│ opal_lex │   8.25us │  5_244.26w │    8.20w │    8.20w │     40.14% │
-│ mparser  │  20.54us │ 16_107.86w │   13.44w │   13.44w │    100.00% │
-│ bark     │   5.06us │  6_012.71w │    6.06w │    6.06w │     24.63% │
-│ yojson   │   2.17us │    368.01w │    0.20w │    0.20w │     10.58% │
-└──────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
-
-others:repeat-compact
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
-│ Name     │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
-├──────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
-│ angstrom │   3.43us │  3_185.15w │    4.33w │    4.33w │     17.15% │
-│ opal     │   7.36us │  5_058.25w │    8.73w │    8.73w │     36.83% │
-│ opal_lex │   8.05us │  5_244.26w │    8.20w │    8.20w │     40.29% │
-│ mparser  │  19.98us │ 16_107.86w │   13.44w │   13.44w │    100.00% │
-│ bark     │   4.91us │  6_012.71w │    6.15w │    6.15w │     24.60% │
-│ yojson   │   2.13us │    368.01w │    0.20w │    0.20w │     10.66% │
-└──────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬────────────┬──────────┬──────────┬────────────┐
+│ Name         │ Time/Run │    mWd/Run │ mjWd/Run │ Prom/Run │ Percentage │
+├──────────────┼──────────┼────────────┼──────────┼──────────┼────────────┤
+│ angstrom     │   3.13us │  3_185.15w │    4.33w │    4.33w │     15.53% │
+│ angstrom-pos │   3.51us │  5_061.40w │    7.14w │    7.14w │     17.45% │
+│ opal         │   7.22us │  5_058.25w │    8.73w │    8.73w │     35.86% │
+│ opal_lex     │   7.64us │  5_244.26w │    8.20w │    8.20w │     37.96% │
+│ mparser      │  20.14us │ 16_107.86w │   13.43w │   13.43w │    100.00% │
+│ bark         │   4.80us │  6_012.71w │    6.06w │    6.06w │     23.83% │
+│ yojson       │   2.13us │    368.01w │    0.20w │    0.20w │     10.56% │
+└──────────────┴──────────┴────────────┴──────────┴──────────┴────────────┘
+ws:lines
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬────────────┬─────────┬────────────┐
+│ Name         │   Time/Run │ mWd/Run │ Percentage │
+├──────────────┼────────────┼─────────┼────────────┤
+│ angstrom     │   382.20ns │  69.00w │     37.48% │
+│ angstrom-pos │   375.31ns │ 141.02w │     36.80% │
+│ opal         │   383.36ns │  88.01w │     37.59% │
+│ opal_lex     │   494.73ns │  96.00w │     48.51% │
+│ mparser      │ 1_010.89ns │ 533.02w │     99.13% │
+│ bark         │   525.31ns │  53.00w │     51.51% │
+│ yojson       │ 1_019.78ns │  98.00w │    100.00% │
+└──────────────┴────────────┴─────────┴────────────┘
 
 ws:lines
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬─────────┬────────────┐
-│ Name     │ Time/Run │ mWd/Run │ Percentage │
-├──────────┼──────────┼─────────┼────────────┤
-│ angstrom │ 322.62ns │  69.00w │     33.29% │
-│ opal     │ 396.09ns │  88.01w │     40.87% │
-│ opal_lex │ 490.66ns │  96.00w │     50.62% │
-│ mparser  │ 969.26ns │ 533.02w │    100.00% │
-│ bark     │ 506.70ns │  53.00w │     52.28% │
-│ yojson   │ 898.90ns │  98.00w │     92.74% │
-└──────────┴──────────┴─────────┴────────────┘
-
-ws:lines
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬─────────┬────────────┐
-│ Name     │ Time/Run │ mWd/Run │ Percentage │
-├──────────┼──────────┼─────────┼────────────┤
-│ angstrom │ 320.71ns │  69.00w │     33.83% │
-│ opal     │ 388.09ns │  88.01w │     40.94% │
-│ opal_lex │ 483.31ns │  96.00w │     50.98% │
-│ mparser  │ 947.98ns │ 533.02w │    100.00% │
-│ bark     │ 484.22ns │  53.00w │     51.08% │
-│ yojson   │ 883.13ns │  98.00w │     93.16% │
-└──────────┴──────────┴─────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬────────────┬─────────┬────────────┐
+│ Name         │   Time/Run │ mWd/Run │ Percentage │
+├──────────────┼────────────┼─────────┼────────────┤
+│ angstrom     │   369.90ns │  69.00w │     36.43% │
+│ angstrom-pos │   367.65ns │ 141.02w │     36.21% │
+│ opal         │   381.88ns │  88.01w │     37.61% │
+│ opal_lex     │   491.88ns │  96.00w │     48.44% │
+│ mparser      │ 1_009.42ns │ 533.02w │     99.42% │
+│ bark         │   524.53ns │  53.00w │     51.66% │
+│ yojson       │ 1_015.35ns │  98.00w │    100.00% │
+└──────────────┴────────────┴─────────┴────────────┘
+ws:mix
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬─────────┬────────────┐
+│ Name         │ Time/Run │ mWd/Run │ Percentage │
+├──────────────┼──────────┼─────────┼────────────┤
+│ angstrom     │ 319.53ns │  69.00w │     33.80% │
+│ angstrom-pos │ 319.56ns │ 141.02w │     33.81% │
+│ opal         │ 393.43ns │  88.01w │     41.62% │
+│ opal_lex     │ 476.34ns │  96.00w │     50.39% │
+│ mparser      │ 945.24ns │ 533.02w │    100.00% │
+│ bark         │ 618.04ns │  53.00w │     65.38% │
+│ yojson       │ 623.64ns │  98.00w │     65.98% │
+└──────────────┴──────────┴─────────┴────────────┘
 
 ws:mix
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬─────────┬────────────┐
-│ Name     │ Time/Run │ mWd/Run │ Percentage │
-├──────────┼──────────┼─────────┼────────────┤
-│ angstrom │ 308.11ns │  69.00w │     32.36% │
-│ opal     │ 404.33ns │  88.01w │     42.47% │
-│ opal_lex │ 488.18ns │  96.00w │     51.27% │
-│ mparser  │ 952.11ns │ 533.02w │    100.00% │
-│ bark     │ 561.79ns │  53.00w │     59.01% │
-│ yojson   │ 624.82ns │  98.00w │     65.63% │
-└──────────┴──────────┴─────────┴────────────┘
-
-ws:mix
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬─────────┬────────────┐
-│ Name     │ Time/Run │ mWd/Run │ Percentage │
-├──────────┼──────────┼─────────┼────────────┤
-│ angstrom │ 293.68ns │  69.00w │     32.21% │
-│ opal     │ 389.65ns │  88.01w │     42.73% │
-│ opal_lex │ 474.44ns │  96.00w │     52.03% │
-│ mparser  │ 911.80ns │ 533.02w │    100.00% │
-│ bark     │ 563.57ns │  53.00w │     61.81% │
-│ yojson   │ 608.67ns │  98.00w │     66.76% │
-└──────────┴──────────┴─────────┴────────────┘
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬─────────┬────────────┐
+│ Name         │ Time/Run │ mWd/Run │ Percentage │
+├──────────────┼──────────┼─────────┼────────────┤
+│ angstrom     │ 312.84ns │  69.00w │     33.54% │
+│ angstrom-pos │ 313.83ns │ 141.02w │     33.64% │
+│ opal         │ 385.35ns │  88.01w │     41.31% │
+│ opal_lex     │ 468.19ns │  96.00w │     50.19% │
+│ mparser      │ 932.84ns │ 533.02w │    100.00% │
+│ bark         │ 609.94ns │  53.00w │     65.39% │
+│ yojson       │ 616.27ns │  98.00w │     66.06% │
+└──────────────┴──────────┴─────────┴────────────┘
+ws:spaces
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬─────────┬────────────┐
+│ Name         │ Time/Run │ mWd/Run │ Percentage │
+├──────────────┼──────────┼─────────┼────────────┤
+│ angstrom     │ 337.41ns │  69.00w │     37.01% │
+│ angstrom-pos │ 341.98ns │ 138.01w │     37.51% │
+│ opal         │ 381.68ns │  88.01w │     41.86% │
+│ opal_lex     │ 494.42ns │  96.00w │     54.23% │
+│ mparser      │ 911.76ns │ 533.02w │    100.00% │
+│ bark         │ 520.33ns │  53.00w │     57.07% │
+│ yojson       │ 497.16ns │  98.00w │     54.53% │
+└──────────────┴──────────┴─────────┴────────────┘
 
 ws:spaces
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬─────────┬────────────┐
-│ Name     │ Time/Run │ mWd/Run │ Percentage │
-├──────────┼──────────┼─────────┼────────────┤
-│ angstrom │ 297.24ns │  69.00w │     34.20% │
-│ opal     │ 358.07ns │  88.01w │     41.20% │
-│ opal_lex │ 484.49ns │  96.00w │     55.74% │
-│ mparser  │ 869.20ns │ 533.02w │    100.00% │
-│ bark     │ 471.36ns │  53.00w │     54.23% │
-│ yojson   │ 452.21ns │  98.00w │     52.03% │
-└──────────┴──────────┴─────────┴────────────┘
-
-ws:spaces
-Estimated testing time 1m (6 benchmarks x 10s). Change using -quota SECS.
-┌──────────┬──────────┬─────────┬────────────┐
-│ Name     │ Time/Run │ mWd/Run │ Percentage │
-├──────────┼──────────┼─────────┼────────────┤
-│ angstrom │ 281.05ns │  69.00w │     33.72% │
-│ opal     │ 342.35ns │  88.01w │     41.08% │
-│ opal_lex │ 466.41ns │  96.00w │     55.97% │
-│ mparser  │ 833.39ns │ 533.02w │    100.00% │
-│ bark     │ 454.42ns │  53.00w │     54.53% │
-│ yojson   │ 438.00ns │  98.00w │     52.56% │
-└──────────┴──────────┴─────────┴────────────┘
-
+Estimated testing time 1.16667m (7 benchmarks x 10s). Change using -quota SECS.
+┌──────────────┬──────────┬─────────┬────────────┐
+│ Name         │ Time/Run │ mWd/Run │ Percentage │
+├──────────────┼──────────┼─────────┼────────────┤
+│ angstrom     │ 355.80ns │  69.00w │     40.64% │
+│ angstrom-pos │ 329.46ns │ 138.01w │     37.63% │
+│ opal         │ 368.98ns │  88.01w │     42.15% │
+│ opal_lex     │ 499.17ns │  96.00w │     57.02% │
+│ mparser      │ 875.49ns │ 533.02w │    100.00% │
+│ bark         │ 504.08ns │  53.00w │     57.58% │
+│ yojson       │ 452.38ns │  98.00w │     51.67% │
+└──────────────┴──────────┴─────────┴────────────┘
