@@ -16,7 +16,7 @@ module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
         parse_string ~consume:All p (State.make filename state)
 
     let make_position (state : Parser.pstate) ~prev =
-        let open Angstrom_mod__Parser in
+        let open Angstrom_mod.Parser in
         let {line; prev_line_start; info; _} = state.custom in
         let (pos_lnum, pos_bol, pos_cnum) = match prev with
             | false -> (line.no, line.start, state.pos)
@@ -53,7 +53,7 @@ module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
             | false -> succ input pos state more @@ make_position (pstate_exported pos state) ~prev:false
         }
 
-    let whitespace =
+    let whitespace_ update_end_position =
         { run = fun input pos state more fail succ ->
             let module Input = Angstrom_mod__Input in
             let len = Input.length input in
@@ -63,7 +63,11 @@ module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
                 let new_state = match pos1 = pos with
                     | true -> state
                     | false ->
-                        let token_end = make_position (pstate_exported pos state) ~prev:false in
+                        let token_end =
+                            match update_end_position with
+                            | true -> make_position (pstate_exported pos state) ~prev:false
+                            | false -> state.custom.token_end
+                        in
                         let ws_end = pos1 - 1 in
 
                         match lines with
@@ -99,6 +103,9 @@ module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
             in
             loop 0 0 pos
         }
+
+    let whitespace = whitespace_ true
+    let whitespace_nepu = whitespace_ false
 
     let newline_skipped =
         { run = fun input pos state more fail succ ->

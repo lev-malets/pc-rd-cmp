@@ -17,6 +17,7 @@ module type POS = sig
 
     val newline_skipped : unit t
     val whitespace : unit t
+    val whitespace_nepu : unit t
     val position : Lexing.position t
     val end_position : Lexing.position t
 

@@ -8,9 +8,8 @@ module Pc = struct
       | Ok x -> x
       | Error str -> failwith @@ "fail to unwrap" ^ str
 
-  let signature file = unwrap @@ Pc_syntax.parse_interface file
+  let signature file = unwrap @@ Pc_syntax.Parser.parse_interface file
 end
-
 
 module type A = module type of Res
 

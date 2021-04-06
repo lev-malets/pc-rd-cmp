@@ -1,61 +1,15 @@
-module Pcs = struct
-    type trace = {
-        prefix : string;
-        count : int;
-    }
-
-    type t = {
-        errors : (int * int * string) list;
-        attributes : (Parsetree.attributes * Lexing.position) list;
-        trace : trace;
-    }
-
-    let default = { errors = []; attributes = []; trace = {prefix = ""; count = 0} }
-end
-
-module Parsetree = Ast_show.Parsetree
-module Angstrom = Angstrom_pos.Make(Pcs)
+open Core_kernel
+open Basic
 open Angstrom
 open Angstrom.Let_syntax
 open Angstrom.Parser
 
-let (%) f g x = f (g x)
-let const a _ = a
-let flip f a b = f b a
 let uncurry f (a, b) = f a b
 let curry f a b = f (a, b)
 
-module Trace = struct
-    let () = Fmt_tty.setup_std_outputs ~style_renderer:`Ansi_tty ()
-    let fmt = Fmt.string
-    let fmt_err = Fmt.styled `Red Fmt.string
-    let print = fmt Fmt.stderr
-    let eprint = fmt_err Fmt.stderr
-end
-
-let trace str f =
-    let open Pcs in
-
-    let p = f () in
-
-    let%bind old_state = get_state in
-    let _ = Trace.print @@ Printf.sprintf "%s|%2d| %s\n" old_state.trace.prefix (old_state.trace.count + 1) str in
-
-    let fail =
-        let%bind pos = position in
-        Trace.eprint @@ Printf.sprintf "%s     err @ %s:%d:%d\n" old_state.trace.prefix pos.pos_fname pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1);
-        fail str
-    in
-
-    map_state (fun s -> {s with trace = {prefix = "     " ^ s.trace.prefix; count = 0}})
-    >>
-    ((p >>| fun x -> Trace.print @@ Printf.sprintf "%s     exit\n" old_state.trace.prefix; x) <|> fail)
-    <<
-    map_state (fun s -> {s with trace = {old_state.trace with count = old_state.trace.count + 1}})
-
 let err start_pos end_pos msg = map_state (fun state -> {state with errors = (start_pos, end_pos, msg) :: state.errors})
 
-let opt p = option None (p >>| fun x -> Some x)
+let opt p = option None (p >>| Option.some)
 
 let sequence ?(sep = return ()) p =
     let p1 = sep >> p in
@@ -84,13 +38,25 @@ let loc p = lift (uncurry Location.mkloc) (with_location p)
 
 let check p = option false (p >>$ true)
 
-let whitespace = trace "whitespace" @@ fun _ -> whitespace
-let p_ p = p << whitespace
+let sline_comment = Trace.point "sline comment" @@ fun _ ->
+    let p = string "//" >> take_while (fun c -> c <> '\n' && c <> '\r') in
+    let%map (str, loc) = with_location (consumed p) in
+    Res_comment.makeSingleLineComment ~loc str
+let comments =
+    let push_comment c =
+        let%bind comment = c << whitespace in
+        map_state (fun s -> {s with comments = comment :: s.comments})
+    in
+    many (push_comment sline_comment)
+
+let nongrammar = Trace.point "nongrammar" @@ fun _ ->
+    whitespace << comments
+let p_ p = p << nongrammar
 
 module Token = struct
-    let token_ p = p >> whitespace
-    let char_ c = trace ("token char '" ^ String.make 1 c ^ "'") @@ fun _ -> token_ @@ char c
-    let string_ str = trace ("token string '" ^ str ^ "'") @@ fun _ -> token_ @@ string str
+    let token_ p = p >> nongrammar
+    let char_ c = Trace.point ("token char '" ^ String.make 1 c ^ "'") @@ fun _ -> token_ @@ char c
+    let string_ str = Trace.point ("token string '" ^ str ^ "'") @@ fun _ -> token_ @@ string str
 
     let dot_ = char_ '.'
 
@@ -102,7 +68,7 @@ module Token = struct
     let colon_ = char_ ':'
     let comma_ = char_ ','
 
-    let delimiter_ = trace __LOC__ @@ fun _ -> semicolon_ <|> newline_skipped <|> end_of_input
+    let delimiter_ = Trace.point __LOC__ @@ fun _ -> semicolon_ <|> newline_skipped <|> end_of_input
 end
 
 open Token
@@ -186,7 +152,7 @@ module Constant = struct
     end
 
     module Character = struct
-        let code offset basic c = Char.code c - Char.code basic + offset
+        let code offset basic c = Char.to_int c - Char.to_int basic + offset
         let octal_code = satisfy (function '0'..'7' -> true | _ -> false) >>| code 0 '0'
         let decimal_code = satisfy (function '0'..'9' -> true | _ -> false) >>| code 0 '0'
         let hexadecimal_code =
@@ -209,36 +175,36 @@ module Constant = struct
             | 'x' ->
                 let%map _1 = hexadecimal_code
                 and     _2 = hexadecimal_code in
-                Char.chr @@ _1 * 16 + _2
+                Char.of_int_exn @@ _1 * 16 + _2
             | '0' .. '2' as ch ->
                 let _1 = code 0 '0' ch in
                 let%bind _2 = decimal_code in
                 let%map _3 = decimal_code in
-                Char.chr @@ _1 * 100 + _2 * 10 + _3
+                Char.of_int_exn @@ _1 * 100 + _2 * 10 + _3
             | 'o' ->
                 let%bind _1 = satisfy (function '0'..'3' -> true | _ -> false) >>| code 0 '0' in
                 let%bind _2 = octal_code in
                 let%map _3 = octal_code in
-                Char.chr @@ _1 * 64 + _2 * 8 + _3
+                Char.of_int_exn @@ _1 * 64 + _2 * 8 + _3
             | _ -> fail "TODO"
 
-        let p = char '\'' >> (escaped <|> satisfy (not % only_escaped)) << char '\''
-        let p : Parsetree.constant Parser.t = trace "character" @@ fun _ ->
+        let p = char '\'' >> (escaped <|> satisfy (Fn.compose not only_escaped)) << char '\''
+        let p : Parsetree.constant Parser.t = Trace.point "character" @@ fun _ ->
             p >>| Ast_helper.Const.char
     end
 
     module String = struct
-        let p = trace "string skip" @@ fun _ -> fix @@ fun p ->
-            skip_while (not % Character.only_escaped) >> any_char >>= function
+        let p = Trace.point "string skip" @@ fun _ -> fix @@ fun p ->
+            skip_while (Fn.compose not Character.only_escaped) >> any_char >>= function
             | '\\' -> Character.escaped >> p
             | '\"' -> return ()
-            | c -> trace ("unexpected symbol: " ^ String.make 1 c) @@ fun _ -> fail "TODO"
-        let p : Parsetree.constant Parser.t = trace "string" @@ fun _ ->
+            | c -> Trace.point ("unexpected symbol: " ^ String.make 1 c) @@ fun _ -> fail "TODO"
+        let p : Parsetree.constant Parser.t = Trace.point "string" @@ fun _ ->
             let%map literal = consumed (char '\"' >> p) in
             Ast_helper.Const.string literal
     end
 
-    let p = trace "constant" @@ fun _ ->
+    let p = Trace.point "constant" @@ fun _ ->
         choice [Number.p; Character.p; String.p]
 end
 
@@ -253,7 +219,7 @@ module Keyword = struct
             match identifier's_character x with
             | true -> fail ""
             | false -> return ()
-    let keyword_ str = keyword str << whitespace
+    let keyword_ str = p_ @@ keyword str
 
     let true_ = keyword_ "true"
     let false_ = keyword_ "false"
@@ -289,7 +255,7 @@ module Keyword = struct
 end
 
 module Name = struct
-    let ident = trace "ident" @@ fun _ ->
+    let ident = Trace.point "ident" @@ fun _ ->
         (take_while1 Keyword.identifier's_character << whitespace)
     let c_ident first = consumed (skip first >> skip_while Keyword.identifier's_character) << whitespace
 
@@ -319,9 +285,9 @@ module Name = struct
         in
         fix p
 
-    let module_name = trace "module name" @@ fun _ ->
+    let module_name = Trace.point "module name" @@ fun _ ->
         longident upper upper
-    let type_name = trace __LOC__ @@ fun _ -> longident upper lower
+    let type_name = Trace.point __LOC__ @@ fun _ -> longident upper lower
     let vartype_name = c_ident ((=) '\'')
 end
 
@@ -329,43 +295,35 @@ module Tree = struct
     open Parsetree
 
     let not_fixed signature structure attribute =
-        let push_attributes = trace ("push attributes: " ^ __LOC__) @@ fun _ ->
+        let push_attributes = Trace.point ("push attributes: " ^ __LOC__) @@ fun _ ->
             let%bind pos = position
             and attrs = many attribute
             in
-            map_state (fun s -> {s with attributes = (attrs, pos) :: s.attributes})
+            map_state @@ fun s -> {s with attrs = (pos, attrs) :: s.attrs}
         in
 
-        let pop_attributes = trace ("pop attributes: " ^ __LOC__) @@ fun _ ->
+        let pop_attributes = Trace.point ("pop attributes: " ^ __LOC__) @@ fun _ ->
             let%bind state = get_state in
-            match state.attributes with
+            match state.attrs with
             | [] -> fail "TODO"
-            | attrs :: attributes -> set_state {state with attributes} >>$ attrs
-        in
-
-        let with_attributes p =
-            let%map (attrs, pos) = pop_attributes
-            and res = p
-            and end_pos = end_position
-            in
-            (res, attrs, make_location pos end_pos)
+            | (pos, attrs) :: tail ->
+                let%bind end_pos = end_position in
+                set_state {state with attrs = tail} >>$ (make_location pos end_pos, attrs)
         in
 
         let attributed: 'a 'b. (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) -> 'a t -> 'b t = fun f p ->
             let%map res = p
-            and end_pos = end_position
-            and (attrs, pos) = pop_attributes
+            and (loc, attrs) = pop_attributes
             in
-            f ~loc:(make_location pos end_pos) ~attrs res
+            f ~loc ~attrs res
         in
 
         let attributed2: 'a 'b 'c. (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t = fun f p1 p2 ->
             let%map res1 = p1
             and res2 = p2
-            and end_pos = end_position
-            and (attrs, pos) = pop_attributes
+            and (loc, attrs) = pop_attributes
             in
-            f ~loc:(make_location pos end_pos) ~attrs res1 res2
+            f ~loc ~attrs res1 res2
         in
 
         let _located: 'a 'b. (?loc:Warnings.loc -> 'a -> 'b) -> 'a t -> 'b t = fun f p ->
@@ -388,8 +346,8 @@ module Tree = struct
             both p label
         in
 
-        let typexpr = trace __LOC__ @@ fun _ -> fix @@ fun typexpr ->
-            let atom = trace __LOC__ @@ fun _ ->
+        let typexpr = Trace.point __LOC__ @@ fun _ -> fix @@ fun typexpr ->
+            let atom = Trace.point __LOC__ @@ fun _ ->
                 let%bind () = push_attributes in
 
                 (attributed Ast_helper.Typ.var Name.vartype_name)
@@ -397,7 +355,7 @@ module Tree = struct
                 (attributed Ast_helper.Typ.any @@ char_ '_')
                 <|>
                 (
-                    let args = trace __LOC__ @@ fun _ ->
+                    let args = Trace.point __LOC__ @@ fun _ ->
                         Brackets.in_chevrons_ (sequence1 typexpr ~sep:comma_ << opt comma_) <|> return []
                     in
                     attributed2 Ast_helper.Typ.constr (loc Name.type_name) args
@@ -407,7 +365,7 @@ module Tree = struct
             let tuple_to_type loc = function
                 | [] -> failwith "unreachable"
                 | [x, _] -> {x with ptyp_loc = loc}
-                | xs -> Ast_helper.Typ.tuple ~loc @@ List.map (fun (x, _) -> x) xs
+                | xs -> Ast_helper.Typ.tuple ~loc @@ List.map xs ~f:(fun (x, _) -> x)
             in
     
             let tuple =
@@ -424,14 +382,14 @@ module Tree = struct
                     and end_pos = end_position
                     in
                     List.fold_right
-                        (fun (arg, _pos) acc -> Ast_helper.Typ.arrow ~loc:(make_location arg.ptyp_loc.loc_start end_pos) Nolabel arg acc)
+                        ~f:(fun (arg, _pos) acc -> Ast_helper.Typ.arrow ~loc:(make_location arg.ptyp_loc.loc_start end_pos) Nolabel arg acc)
+                        ~init:next
                         tuple
-                        next
                 )
                 <|>
                 (
                     let [@warning "-8"] (_, pos)::_ = tuple in
-                    let tuple = List.map (fun (x, _) -> x) tuple in
+                    let tuple = List.map ~f:(fun (x, _) -> x) tuple in
                     (match tuple with
                     | x::_ -> return x
                     | xs -> let%map end_pos = end_position in Ast_helper.Typ.tuple ~loc:(make_location pos end_pos) xs)
@@ -452,7 +410,7 @@ module Tree = struct
                 try_arrow tuple
             in
     
-            let poly = trace ("poly " ^ __LOC__) @@ fun _ ->
+            let poly = Trace.point ("poly " ^ __LOC__) @@ fun _ ->
                 let%bind pos = position
                 and vars = many @@ loc Name.vartype_name
                 in
@@ -465,7 +423,7 @@ module Tree = struct
                         Ast_helper.Typ.poly ~loc:(make_location pos typ.ptyp_loc.loc_end) vars typ
                     | _ ->
                         let%map tail = arrow_tail in
-                        let arg = List.hd xs in
+                        let arg = List.hd_exn xs in
                         let arg = Ast_helper.Typ.var ~loc:arg.loc arg.txt in
                         Ast_helper.Typ.arrow ~loc:(make_location pos tail.ptyp_loc.loc_end) Nolabel arg tail
             in
@@ -473,7 +431,7 @@ module Tree = struct
             poly
         in
 
-        let pattern = trace ("pattern: " ^ __LOC__) @@ fun _ -> fix @@ fun pattern ->
+        let pattern = Trace.point ("pattern: " ^ __LOC__) @@ fun _ -> fix @@ fun pattern ->
             let with_constr =
                 let%map pattern = pattern
                 and typ = opt (colon_ >> typexpr)
@@ -494,7 +452,7 @@ module Tree = struct
                 Brackets.in_brackets_ @@ sequence1 ~sep:comma_ with_constr
             in
 
-            let atom = trace "pattern atom" @@ fun _ ->
+            let atom = Trace.point "pattern atom" @@ fun _ ->
                 let%bind _ = push_attributes in
 
                 (attributed Ast_helper.Pat.any (char_ '_'))
@@ -515,7 +473,7 @@ module Tree = struct
             atom
         in
 
-        let attrubute_id = take_while (fun x -> Keyword.identifier's_character x || x == '.') << whitespace in
+        let attrubute_id = take_while (fun x -> Keyword.identifier's_character x || x = '.') << whitespace in
         let payload =
             match%bind check Brackets.parentheses_open_ with
             | false -> return @@ PStr []
@@ -545,69 +503,98 @@ module Tree = struct
                 payload
         in
 
-        let attribute = trace ("attribute: " ^ __LOC__) @@ fun _ ->
+        let attribute = Trace.point ("attribute: " ^ __LOC__) @@ fun _ ->
             id_payload_pair at
         in
 
-        let _extension = trace ("extension: " ^ __LOC__) @@ fun _ ->
+        let _extension = Trace.point ("extension: " ^ __LOC__) @@ fun _ ->
             id_payload_pair percent
         in
 
-        let module_extension = trace ("module extension @ " ^ __LOC__) @@ fun _ ->
+        let module_extension = Trace.point ("module extension @ " ^ __LOC__) @@ fun _ ->
             id_payload_pair @@ string_ "%%"
         in
 
-        let open_ = trace "open" @@ fun _ ->
+        let open_ = Trace.point "open" @@ fun _ ->
             let override = option Asttypes.Fresh (bang_ >>$ Asttypes.Override) in
 
-            let%map _ = Keyword.open_
-            and override = override
-            and lid = loc Name.module_name
-            and (attrs, pos) = pop_attributes
-            and end_pos = end_position
-            in
-            Ast_helper.Opn.mk ~loc:(make_location pos end_pos) ~attrs ~override lid
+            let%bind override = Keyword.open_ >> override in
+            attributed (Ast_helper.Opn.mk ~override ?docs:None) @@ loc Name.module_name
         in
 
         let module_type = fix @@ fun module_type ->
             let functor_arg =
                 let%map par_name = loc (Name.u_ident <|> p_ (string "_"))
                 and par_type = match%bind check (char_ ':') with
-                    | true -> let%map mt = module_type in Some mt
+                    | true -> module_type >>| Option.some
                     | false -> return None
                 in
                 (par_name, par_type)
             in
 
             let with_functor_args = fix @@ fun with_functor_args ->
-                let%map (par_name, par_type) = functor_arg
-                and mt = match%bind p_ any_char with
-                    | ',' ->
-                        let%map (desc, loc) = with_location with_functor_args in
-                        Ast_helper.Mty.mk ~loc desc
+                let mt =
+                    match%bind p_ any_char with
+                    | ',' -> with_functor_args
                     | ')' -> string_ "=>" >> module_type
                     | _ -> fail "TODO"
                 in
-                Pmty_functor (par_name, par_type, mt)
+                let%bind (par_name, par_type) = functor_arg in
+                attributed (fun ?loc ?attrs mt -> Ast_helper.Mty.functor_ ?loc ?attrs par_name par_type mt) mt
             in
 
             let desc =
-                (loc Name.module_name >>| fun lid -> Pmty_ident lid)
+                let module Help = Ast_helper.Mty in
+
+                (attributed Help.ident @@ loc Name.module_name)
                 <|>
-                (Brackets.in_parentheses_ @@ loc Name.module_name >>| fun lid -> Pmty_alias lid)
+                (attributed Help.alias @@ Brackets.in_parentheses_ @@ loc Name.module_name)
                 <|>
-                (let%map s = Brackets.in_braces_ signature in Pmty_signature s)
+                (attributed Help.signature @@ Brackets.in_braces_ signature)
                 <|>
                 with_functor_args
             in
 
-            let%map (desc, loc) = with_location desc in
-            Ast_helper.Mty.mk ~loc desc
+            push_attributes >> desc
+        in
+
+        let constr_args =
+            begin
+                Brackets.in_parentheses_ (sequence1 ~sep:comma_ typexpr << opt comma_)
+                    >>| fun x -> Parsetree.Pcstr_tuple x
+            end
+            (* TODO
+            | Pcstr_record of label_declaration list
+            *)
+        in
+
+        let exception_sig =
+            let kind =
+                match%bind peek_char with
+                | Some '(' ->
+                    let%map args = constr_args in
+                    Parsetree.Pext_decl (args, None)
+                | Some '=' ->
+                    p_ (advance 1)
+                    >>
+                    let%map name = loc Name.module_name in Parsetree.Pext_rebind name
+                | Some ':' ->
+                    let%map typ = typexpr in
+                    Parsetree.Pext_decl (Pcstr_tuple [], Some typ)
+                | _ -> return @@ Parsetree.Pext_decl (Pcstr_tuple [], None)
+            in
+            push_attributes >> Keyword.exception_ >> begin
+                let%map name = loc Name.u_ident
+                and kind = kind
+                and (loc, attrs) = pop_attributes
+                in
+                Ast_helper.Te.constructor ~loc ~attrs name kind
+            end
         in
 
         let include_sig = attributed (Ast_helper.Incl.mk ?docs:None) (Keyword.include_ >> module_type) in
 
-        let value_sig = trace __LOC__ @@ fun _ ->
+        let value_sig = Trace.point __LOC__ @@ fun _ ->
             let%map _ = Keyword.let_
             and name = loc Name.l_ident
             and _ = colon_
@@ -617,12 +604,10 @@ module Tree = struct
         in
 
         let modtype =
-            let help =
-                let%map name = Keyword.module_ >> Keyword.type_ >> loc Name.ident
-                and mt = opt (char_ '=' >> module_type) in
-                (name, mt)
+            let%map name = Keyword.module_ >> Keyword.type_ >> loc Name.ident
+            and mt = opt (char_ '=' >> module_type)
+            and (loc, attrs) = pop_attributes
             in
-            let%map ((name, mt), attrs, loc) = with_attributes help in
 
             let mk = Ast_helper.Mtd.mk ~loc ~attrs in
             let mk = match mt with
@@ -639,11 +624,12 @@ module Tree = struct
                 let%map (value, loc) = with_location (value_sig << delimiter_) in
                 Ast_helper.Sig.value ~loc {value with pval_loc = loc} (* just for compatibility *)
             in
-            let modtype = trace __LOC__ @@ fun _ -> modtype in
+            let modtype = Trace.point __LOC__ @@ fun _ -> modtype in
 
             let extension = attributed Ast_helper.Sig.extension module_extension in
+            let exception_ = exception_sig >>| fun x -> Ast_helper.Sig.exception_ ~loc:x.pext_loc x in
 
-            let sig_item = trace ("signature item @ " ^ __LOC__) @@ fun _ -> push_attributes >> match%bind peek_char_fail with
+            let sig_item = Trace.point ("signature item @ " ^ __LOC__) @@ fun _ -> push_attributes >> match%bind peek_char_fail with
                 | 'm' ->
                     let%map mt = modtype in
                     Ast_helper.Sig.modtype ~loc:mt.pmtd_loc mt
@@ -651,6 +637,7 @@ module Tree = struct
                 | 'i' -> include_
                 | 'l' -> let_
                 | '%' -> extension
+                | 'e' -> exception_
                 | _ -> fail "TODO"
             in
             many sig_item
@@ -671,20 +658,22 @@ module Tree = struct
                     in
 
                     List.fold_right
-                        (fun (arg, _pos) acc -> Ast_helper.Exp.fun_ ~loc:(make_location arg.ppat_loc.loc_start end_pos) Nolabel None arg acc)
+                        ~f:(fun (arg, _pos) acc -> Ast_helper.Exp.fun_ ~loc:(make_location arg.ppat_loc.loc_start end_pos) Nolabel None arg acc)
+                        ~init:next
                         args
-                        next
                 in
 
-                let tuple = trace "expr tuple" @@ fun _ ->
-                    let%map (list, attrs, loc) = with_attributes @@ Brackets.in_parentheses_ (sequence expression ~sep:comma_) in
+                let tuple = Trace.point "expr tuple" @@ fun _ ->
+                    let%map list = Brackets.in_parentheses_ (sequence expression ~sep:comma_)
+                    and (loc, attrs) = pop_attributes
+                    in
                     match list with
                     | [] -> failwith "unimplemented"
-                    | [x] -> List.fold_left (fun acc attr -> Ast_helper.Exp.attr acc attr) x attrs
+                    | [x] -> {x with pexp_loc = loc; pexp_attributes = attrs @ x.pexp_attributes}
                     | list -> Ast_helper.Exp.tuple ~loc ~attrs list
                 in
 
-                let atom = trace "expr atom" @@ fun _ ->
+                let atom = Trace.point "expr atom" @@ fun _ ->
                     (attributed Ast_helper.Exp.ident (loc Name.type_name))
                     <|>
                     (attributed Ast_helper.Exp.constant Constant.p)
@@ -711,11 +700,11 @@ module Tree = struct
             fn
         in
 
-        let structure = trace "structure" @@ fun _ ->
+        let structure = Trace.point "structure" @@ fun _ ->
             let expression =
                 attributed Ast_helper.Str.eval expression
             in
-            let structure_item = trace "structure_item" @@ fun _ ->
+            let structure_item = Trace.point "structure_item" @@ fun _ ->
                 push_attributes >> expression
             in
             many structure_item
@@ -738,14 +727,14 @@ let with_print p =
     let%map res = p
     and ctx = get_state
     in
-    List.iter (fun (_, _, str) -> print_endline str) ctx.errors;
+    List.iter ~f:(fun (_, _, str) -> print_endline str) ctx.errors;
     res
 
 let parse p state filename =
-    let in_c = open_in filename in
-    let text = Std.input_all in_c in
-    let () = close_in in_c in
+    let in_c = In_channel.create filename in
+    let text = In_channel.input_all in_c in
+    let () = In_channel.close in_c in
     parse_string p state ~filename text
 
-let parse_interface = parse (with_print Tree.signature) Pcs.default
-let parse_implementation = parse (with_print Tree.structure) Pcs.default
+let parse_interface = parse (with_print Tree.signature) State.default
+let parse_implementation = parse (with_print Tree.structure) State.default

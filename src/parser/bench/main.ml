@@ -1,10 +1,10 @@
 
 open Core
 open Core_bench
-open Pc_syntax.Angstrom
+open Pc_syntax.Basic.Angstrom
 
 let parse parser contents =
-    match parse_string parser Pc_syntax.Pcs.default contents with
+    match parse_string parser Pc_syntax.State.default contents with
     | Ok _ -> ()
     | _ -> failwith "fail to parse"
 
