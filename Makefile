@@ -13,8 +13,6 @@ path2 = $(notdir $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(patsubst %/,%,$@)
 
 f_exe_deps = $(wildcard $(1)/*.ml) $(wildcard $(1)/*.mli) $(wildcard $(1)/dune) dune-workspace
 
-include make/base.mk
-
 define clone_repo
 	rm -rf $(TMP_DIR)/repo
 	git clone $1 -b $2 $(TMP_DIR)/repo
