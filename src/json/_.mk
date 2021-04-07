@@ -1,4 +1,4 @@
-$(eval $(base))
+include make/base.mk
 
 LIBS := $(patsubst $(DIR)/libs/p_%.ml,%,$(wildcard $(DIR)/libs/p_*))
 

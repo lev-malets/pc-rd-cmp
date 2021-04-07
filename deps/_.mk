@@ -1,6 +1,3 @@
-$(eval $(base))
-
-$(DONE): $(patsubst %/_.mk,$(TMP)/%/done,$(SUB))
-	$(touch_target)
+include make/base.mk
 
 include $(SUB)

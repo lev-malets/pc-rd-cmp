@@ -1,4 +1,4 @@
-$(eval $(base))
+include make/base.mk
 
 base_tests := $(wildcard data/res/*)
 syntax_tests := \

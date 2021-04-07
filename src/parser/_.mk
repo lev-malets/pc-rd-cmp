@@ -1,3 +1,3 @@
-$(eval $(base))
+include make/base.mk
 
 include $(SUB)

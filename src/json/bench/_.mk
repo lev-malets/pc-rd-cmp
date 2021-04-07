@@ -1,4 +1,4 @@
-$(eval $(base))
+include make/base.mk
 
 data_files := $(patsubst data/json/%,$(TMP_DIR)/data/%, \
 	$(wildcard data/json/complex/*) \

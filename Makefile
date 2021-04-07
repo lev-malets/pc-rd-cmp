@@ -13,33 +13,13 @@ path2 = $(notdir $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(patsubst %/,%,$@)
 
 f_exe_deps = $(wildcard $(1)/*.ml) $(wildcard $(1)/*.mli) $(wildcard $(1)/dune) dune-workspace
 
-define base
-DIR := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
-TMP_DIR := $(TMP)/$$(DIR)
-DIR_ABS := $(WDIR)/$$(DIR)
-TMP_DIR_ABS := $(WDIR)/$$(TMP_DIR)
-DONE := $$(TMP_DIR)/done
-CLEAN := $$(DIR)/clean
-CLEAN_DEFAULT := $$(CLEAN)/default
-DONE_DEFAULT := $$(DONE)/default
-RE := re.$$(DIR)
-SUB := $$(shell find $$(DIR) -mindepth 2 -maxdepth 2 -name _.mk)
-SUB_DIRS := $$(patsubst %/_.mk,%,$$(SUB))
+include make/base.mk
 
-clean: $$(CLEAN)
-re: $$(RE)
-
-$$(RE): $$(CLEAN) $$(DIR)
-$$(DIR): $$(SUB_DIRS) $$(DONE)
-
-define cmd
-$$(CLEAN_DEFAULT):
-	rm -rf $$(TMP_DIR)
-$$(DONE_DEFAULT):
-	@ true
+define clone_repo
+	rm -rf $(TMP_DIR)/repo
+	git clone $1 -b $2 $(TMP_DIR)/repo
+	git -C $(TMP_DIR)/repo checkout $3 2> /dev/null
 endef
-$$(eval $$(cmd))
-endef # base
 
 #----------------------------------------#
 
@@ -54,7 +34,7 @@ force: ;
 
 #----------------------------------------#
 
-build: $(TMP)/deps/done $(TMP)/switch/done
+build: deps switch
 	dune build
 
 .PHONY: build

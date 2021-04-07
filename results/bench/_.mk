@@ -1,4 +1,4 @@
-$(eval $(base))
+include make/base.mk
 
 $(DONE): \
 	$(DIR)/lscpu \

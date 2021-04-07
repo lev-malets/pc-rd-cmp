@@ -4,10 +4,18 @@ open Angstrom
 open Angstrom.Let_syntax
 open Angstrom.Parser
 
-let uncurry f (a, b) = f a b
-let curry f a b = f (a, b)
+(* TODO errors position *)
+(* TODO memoization *)
+(* TODO mutable state ? check impact
+    variants:
+        remove alteration
+        create state copy on alteration
+*)
 
-let err start_pos end_pos msg = map_state (fun state -> {state with errors = (start_pos, end_pos, msg) :: state.errors})
+(* points:
+    number of calls
+    number of state changes
+*)
 
 let opt p = option None (p >>| Option.some)
 
@@ -34,7 +42,7 @@ let with_location p =
     and loc_end = end_position
     in
     (res, make_location loc_start loc_end)
-let loc p = lift (uncurry Location.mkloc) (with_location p)
+let loc p = let%map (x, loc) = with_location p in Location.mkloc x loc
 
 let check p = option false (p >>$ true)
 
@@ -138,8 +146,9 @@ module Constant = struct
                     ^ literal
                     ^ "`?"
                 in
-                let%bind pos = pos in
-                err pos pos msg >> advance 1 >>$ Some 'n'
+                let category = Res_diagnostics.message msg in
+                let%bind pos = position in
+                Diagnostics.diagnostic pos pos category >> advance 1 >>$ Some 'n'
             | 'g'..'z' | 'G'..'Z' as ch -> advance 1 >>$ Some ch
             | _ -> return None
 
@@ -302,7 +311,7 @@ module Tree = struct
             map_state @@ fun s -> {s with attrs = (pos, attrs) :: s.attrs}
         in
 
-        let pop_attributes = Trace.point ("pop attributes: " ^ __LOC__) @@ fun _ ->
+        let loc_attrs = Trace.point ("pop attributes: " ^ __LOC__) @@ fun _ ->
             let%bind state = get_state in
             match state.attrs with
             | [] -> fail "TODO"
@@ -311,9 +320,15 @@ module Tree = struct
                 set_state {state with attrs = tail} >>$ (make_location pos end_pos, attrs)
         in
 
+        let mk_loc_attrs : 'a. (?loc:Warnings.loc -> ?attrs:attributes -> 'a) -> 'a t =
+            fun f ->
+                let%map (loc, attrs) = loc_attrs in
+                f ~loc ~attrs
+        in
+
         let attributed: 'a 'b. (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) -> 'a t -> 'b t = fun f p ->
             let%map res = p
-            and (loc, attrs) = pop_attributes
+            and (loc, attrs) = loc_attrs
             in
             f ~loc ~attrs res
         in
@@ -321,7 +336,7 @@ module Tree = struct
         let attributed2: 'a 'b 'c. (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t = fun f p1 p2 ->
             let%map res1 = p1
             and res2 = p2
-            and (loc, attrs) = pop_attributes
+            and (loc, attrs) = loc_attrs
             in
             f ~loc ~attrs res1 res2
         in
@@ -361,41 +376,50 @@ module Tree = struct
                     attributed2 Ast_helper.Typ.constr (loc Name.type_name) args
                 )
             in
-    
-            let tuple_to_type loc = function
+
+            let tuple_to_type loc =
+                function
                 | [] -> failwith "unreachable"
-                | [x, _] -> {x with ptyp_loc = loc}
-                | xs -> Ast_helper.Typ.tuple ~loc @@ List.map xs ~f:(fun (x, _) -> x)
+                | [x] -> {x with ptyp_loc = loc}
+                | xs -> Ast_helper.Typ.tuple ~loc xs
             in
-    
+
             let tuple =
-                Brackets.in_parentheses_ (sequence1 (both typexpr position) ~sep:comma_)
+                Brackets.in_parentheses_ (sequence1 typexpr ~sep:comma_)
                 <|>
-                (let%map x = both atom position in [x])
+                (let%map x = push_attributes >> atom in [x])
             in
-    
+
             let arrow_tail = string_ "=>" >> typexpr in
-    
+
             let try_arrow tuple =
                 (
                     let%map next = arrow_tail
-                    and end_pos = end_position
+                    and (loc, attrs) = loc_attrs
                     in
-                    List.fold_right
-                        ~f:(fun (arg, _pos) acc -> Ast_helper.Typ.arrow ~loc:(make_location arg.ptyp_loc.loc_start end_pos) Nolabel arg acc)
+                    let typ = List.fold_right
+                        ~f:(fun arg acc -> Ast_helper.Typ.arrow ~loc:(comb_location arg.ptyp_loc loc) Nolabel arg acc)
                         ~init:next
                         tuple
+                    in
+                    {typ with ptyp_attributes = attrs; ptyp_loc = loc}
                 )
                 <|>
                 (
-                    let [@warning "-8"] (_, pos)::_ = tuple in
-                    let tuple = List.map ~f:(fun (x, _) -> x) tuple in
-                    (match tuple with
-                    | x::_ -> return x
-                    | xs -> let%map end_pos = end_position in Ast_helper.Typ.tuple ~loc:(make_location pos end_pos) xs)
+                    match tuple with
+                    | [] -> failwith "unreachable ?"
+                    | [x] ->
+                        let%map (loc, attrs) = loc_attrs in
+                        { x with
+                            ptyp_attributes = x.ptyp_attributes @ attrs;
+                            ptyp_loc = loc;
+                        }
+                    | xs ->
+                        let%map mk = mk_loc_attrs Ast_helper.Typ.tuple in
+                        mk xs
                 )
             in
-    
+
             let arrow =
                 let%bind pos = position
                 and (tuple, loc) = with_location tuple in
@@ -404,12 +428,12 @@ module Tree = struct
                         let%map alias = Name.vartype_name
                         and end_pos = end_position
                         in
-                        [Ast_helper.Typ.alias ~loc:(make_location pos end_pos) (tuple_to_type loc tuple) alias, pos]
+                        [Ast_helper.Typ.alias ~loc:(make_location pos end_pos) (tuple_to_type loc tuple) alias]
                     | false -> return tuple
                 in
                 try_arrow tuple
             in
-    
+
             let poly = Trace.point ("poly " ^ __LOC__) @@ fun _ ->
                 let%bind pos = position
                 and vars = many @@ loc Name.vartype_name
@@ -586,7 +610,7 @@ module Tree = struct
             push_attributes >> Keyword.exception_ >> begin
                 let%map name = loc Name.u_ident
                 and kind = kind
-                and (loc, attrs) = pop_attributes
+                and (loc, attrs) = loc_attrs
                 in
                 Ast_helper.Te.constructor ~loc ~attrs name kind
             end
@@ -603,10 +627,10 @@ module Tree = struct
             Ast_helper.Val.mk ~loc:(comb_location name.loc typ.ptyp_loc) name typ
         in
 
-        let modtype =
+        let modtype = Trace.point "modtype" @@ fun _ ->
             let%map name = Keyword.module_ >> Keyword.type_ >> loc Name.ident
             and mt = opt (char_ '=' >> module_type)
-            and (loc, attrs) = pop_attributes
+            and (loc, attrs) = loc_attrs
             in
 
             let mk = Ast_helper.Mtd.mk ~loc ~attrs in
@@ -624,8 +648,6 @@ module Tree = struct
                 let%map (value, loc) = with_location (value_sig << delimiter_) in
                 Ast_helper.Sig.value ~loc {value with pval_loc = loc} (* just for compatibility *)
             in
-            let modtype = Trace.point __LOC__ @@ fun _ -> modtype in
-
             let extension = attributed Ast_helper.Sig.extension module_extension in
             let exception_ = exception_sig >>| fun x -> Ast_helper.Sig.exception_ ~loc:x.pext_loc x in
 
@@ -644,7 +666,6 @@ module Tree = struct
         in
 
         let expression = fix @@ fun expression ->
-            (*Pexp_fun of arg_label * expression option * pattern * expression*)
             let fn =
                 let arrow_tail = string_ "=>" >> expression in
 
@@ -665,7 +686,7 @@ module Tree = struct
 
                 let tuple = Trace.point "expr tuple" @@ fun _ ->
                     let%map list = Brackets.in_parentheses_ (sequence expression ~sep:comma_)
-                    and (loc, attrs) = pop_attributes
+                    and (loc, attrs) = loc_attrs
                     in
                     match list with
                     | [] -> failwith "unimplemented"
@@ -686,7 +707,7 @@ module Tree = struct
 
                 arrow <|> atom
             in
-            (*
+            (* TODO
             fun P -> E1                          (Simple, None)
             fun ~l:P -> E1                       (Labelled l, None)
             fun ?l:P -> E1                       (Optional l, None)
@@ -714,7 +735,6 @@ module Tree = struct
 
 
     let (signature, structure) =
-        let open Angstrom_mod__Parser in
         let rec ps = lazy (not_fixed sig_ str_ attr_)
         and sig_ = { run = fun input -> let (p, _, _) = Lazy.force ps in p.run input }
         and str_ = { run = fun input -> let (_, p, _) = Lazy.force ps in p.run input }
@@ -725,9 +745,9 @@ end
 
 let with_print p =
     let%map res = p
-    and ctx = get_state
+    and state = get_state
     in
-    List.iter ~f:(fun (_, _, str) -> print_endline str) ctx.errors;
+    Res_diagnostics.printReport state.diagnostics "TODO";
     res
 
 let parse p state filename =

@@ -1,15 +1,17 @@
 type t =
     {
-        errors : (int * int * string) list;
+        diagnostics : Res_diagnostics.t list;
         comments : Res_comment.t list;
+        scope : (Res_grammar.t * Lexing.position) list;
         attrs : (Lexing.position * Parsetree.attributes) list;
         trace : Trace_ctx.t;
     }
 
 let default =
     {
-        errors = [];
+        diagnostics = [];
         comments = [];
+        scope = [];
         attrs = [];
         trace = Trace_ctx.default
     }
