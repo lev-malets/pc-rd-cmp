@@ -1,0 +1,46 @@
+\input{header.tex}
+\input{header2.tex}
+
+\usepackage{caption}
+\usepackage{listings}
+
+\DeclareCaptionFont{white}{ \color{white} }
+\DeclareCaptionFormat{listing}{
+    \parbox{\textwidth}{\hspace{15pt}#1#2#3}
+}
+\captionsetup[lstlisting]{ format=listing
+  %, labelfont=white, textfont=white
+  , singlelinecheck=false, margin=0pt, font={bf}
+}
+
+\begin{document}
+\input{00_title.tex}
+\maketitle
+\setcounter{tocdepth}{2}
+\tableofcontents
+
+\section{Введение}
+\label{sec:intro}
+\input{01_intro.tex}
+
+\section{Постановка задачи}
+\label{sec:task}
+\input{10_task.tex}
+
+\section{Выбор библиотеки}
+\label{sec:libs}
+\input{11_libs.tex}
+
+\section{Реализация}
+\label{sec:approach}
+\input{12_approach.tex}
+
+\section{Заключение}
+\label{sec:conclusion}
+\input{20_conclusion.tex}
+
+\nocite{*}
+\setmonofont[Mapping=tex-text]{CMU Typewriter Text}
+\bibliographystyle{ugost2008ls}
+\bibliography{bib}
+\end{document}

@@ -1,0 +1,53 @@
+\subsection{Модификация библиотеки}
+
+\subsubsection{Состояние}
+
+В тип парсера было добавлено состояние для возможности сохранения рабочей информации о ходе анализа.
+
+\begin{lstlisting}[escapechar=!,language=Caml]
+    type ('a, 'pstate) failure =
+        input -> 'pstate -> string -> 'a state
+    type ('a, 'r, 'pstate) success =
+        input -> 'pstate -> 'a -> 'r state
+
+    type ('a, 'pstate) t =
+        { run : 'r. input -> 'pstate -> ('r, 'pstate) failure
+            -> ('a, 'r, 'pstate) success -> 'r state
+        }
+\end{lstlisting}
+
+Для взаимодействия с состоянием добавлен "стандартный" набор парсеров:
+
+\begin{lstlisting}[escapechar=!,language=Caml]
+    val get_state : state t
+    val set_state : state -> unit t
+    val map_state : (state -> state) -> unit t
+\end{lstlisting}
+
+\subsubsection{Позиция}
+
+Для построения дерева разбора необходима возможность получения позиции в разбираемом тексте.
+
+Были добавлены парсеры:
+
+\begin{lstlisting}[escapechar=!,language=Caml]
+    val whitespace : unit t
+    val position   : Lexing.position t
+\end{lstlisting}
+
+\newpage
+\subsubsection{Производительность}
+
+После этих изменений производительность json-анализатора снизилась.
+
+\begin{center}
+    \begin{tabular}{|c|c|c|c|c|c|c|c|c|c|}
+        \hline
+                    & c1   & c2   & c3   & c4   & c5   & c6   & r    & r-c
+        \\\hline
+           Default  & 1.1  & 0.97 & 0.97 & 1.05 & 1.13 & 1.28 & 1.13 & 1.5
+        \\ Modified & 1.26 & 1.15 & 1.23 & 1.28 & 1.43 & 1.62 & 1.34 & 1.66
+        \\\hline
+    \end{tabular}
+    \captionof{table}{Производительность модификации}
+\end{center}
