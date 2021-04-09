@@ -18,9 +18,9 @@ $(TMP_DIR)/repo/main.pdf: $(tex_files) $(TMP_DIR)/repo/bib.bib
 	&& xelatex main.tex \
 	&& xelatex main.tex
 
-$(TMP_DIR)/repo/%.tex: $(DIR)/%.tex
+$(TMP_DIR)/repo/%.tex: $(DIR)/%.tex $(TMP_DIR)/template_done
 	cp -f $< $@
-$(TMP_DIR)/repo/bib.bib: $(DIR)/bib.bib
+$(TMP_DIR)/repo/bib.bib: $(DIR)/bib.bib $(TMP_DIR)/template_done
 	cp -f $< $@
 
 $(eval $(cmd))
