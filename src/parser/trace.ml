@@ -28,3 +28,7 @@ let point str f =
     ((p >>| fun x -> print @@ Printf.sprintf "%s     exit\n" old_state.trace.prefix; x) <|> fail)
     <<
     state_revert
+
+module Stub = struct
+    let point _str f = f ()
+end

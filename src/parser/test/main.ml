@@ -4,11 +4,13 @@ module Res = struct
 end
 
 module Pc = struct
+  module Parser = Pc_syntax.Parser.Make(Pc_syntax.Trace)
+
   let unwrap = function
       | Ok x -> x
       | Error str -> failwith @@ "fail to unwrap" ^ str
 
-  let signature file = unwrap @@ Pc_syntax.Parser.parse_interface file
+  let signature file = unwrap @@ Parser.parse_interface file
 end
 
 module type A = module type of Res

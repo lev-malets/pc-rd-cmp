@@ -1,3 +1,10 @@
 (executable
  (name main)
- (libraries pc_syntax fix extlib syntax core_bench))
+ (modules main)
+ (libraries pc_syntax fix core syntax core_bench))
+
+(executable
+ (name exec)
+ (modules exec)
+ (libraries pc_syntax fix core syntax core_bench))
+
