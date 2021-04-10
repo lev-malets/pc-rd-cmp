@@ -59,8 +59,8 @@ module Make(T : sig type t end) = struct
 
     let end_position =
         { run = fun input pos state more _fail succ ->
-            match pos + state.buffer_start - 1 = state.custom.ws_end with
-            | true -> succ input pos state more state.custom.token_end
+            match pos + state.buffer_start - 1 = state.custom.nongrammar_end with
+            | true -> succ input pos state more state.custom.grammar_end
             | false -> succ input pos state more @@ make_position (pstate_exported pos state) ~prev:false
         }
 
@@ -70,10 +70,10 @@ module Make(T : sig type t end) = struct
                 let new_state =
                     { state' with custom =
                         { state'.custom with
-                            ws_end = pos' - 1;
-                            token_end =
-                                match state.custom.ws_end = pos - 1 with
-                                | true -> state.custom.token_end
+                            nongrammar_end = pos' - 1;
+                            grammar_end =
+                                match state.custom.nongrammar_end = pos - 1 with
+                                | true -> state.custom.grammar_end
                                 | false -> make_position (pstate_exported pos state) ~prev:false
                             ;
                         }
@@ -91,24 +91,15 @@ module Make(T : sig type t end) = struct
             let char = Input.unsafe_get_char input in
 
             let succ lines start pos1 =
-                let new_state = match pos1 = pos with
-                    | true -> state
-                    | false ->
-                        let token_end = make_position (pstate_exported pos state) ~prev:false in
-                        let ws_end = pos1 - 1 in
-
-                        match lines with
-                        | 0 ->
-                            { state with custom = { state.custom with token_end; ws_end } }
-                        | lines ->
-                            { state with
-                                custom =
-                                    { state.custom with
-                                        line = Line.advance state.custom.line lines start;
-                                        token_end;
-                                        ws_end;
-                                    }
-                            }
+                let new_state = match lines <> 0 with
+                    | true ->
+                        { state with
+                            custom =
+                                { state.custom with
+                                    line = { no = state.custom.line.no + lines; start };
+                                }
+                        }
+                    | false -> state
                 in
                 succ input pos1 new_state more ()
             in
@@ -133,7 +124,7 @@ module Make(T : sig type t end) = struct
 
     let newline_skipped =
         { run = fun input pos state more fail succ ->
-            match state.custom.line.no <> state.custom.token_end.pos_lnum with
+            match state.custom.line.no <> state.custom.grammar_end.pos_lnum with
             | true -> succ input pos state more ()
             | false -> fail input pos state more [] "newline_skipped"
         }
@@ -149,8 +140,8 @@ module Make(T : sig type t end) = struct
 
         let end_position =
             let%map state = state_get in
-            match state.pos - 1 = state.custom.ws_end with
-            | true -> state.custom.token_end
+            match state.pos - 1 = state.custom.nongrammar_end with
+            | true -> state.custom.grammar_end
             | false -> make_position state ~prev:true
     end
 end

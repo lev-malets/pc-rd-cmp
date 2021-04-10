@@ -6,8 +6,6 @@ module Line = struct
         }
 
     let default = { no = 1; start = 0 }
-
-    let advance t l s = { no = t.no + l; start = s }
 end
 
 module Info = struct
@@ -21,8 +19,8 @@ type 'a t =
     {
         prev_line_start : int;
         line            : Line.t;
-        token_end       : Lexing.position;
-        ws_end          : int;
+        grammar_end     : Lexing.position;
+        nongrammar_end  : int;
         info            : Info.t;
         custom          : 'a;
     }
@@ -32,8 +30,8 @@ let make file_name custom =
     {
         prev_line_start = 0;
         line = Line.default;
-        token_end = default_position;
-        ws_end = 0;
+        grammar_end = default_position;
+        nongrammar_end = 0;
         info =
             {
                 default_position;

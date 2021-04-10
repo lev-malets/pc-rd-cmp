@@ -13,7 +13,7 @@ exe := $(DIR)/main.exe
 $(DUNE_TMP)/$(exe):
 	dune build $(exe)
 
-pc.test: $(tests)
+$(DIR): $(tests)
 
 $(tests): %/done: %/sig/expected %/sig/actual
 	diff $^ > /dev/null || (code --diff $^ && false)
