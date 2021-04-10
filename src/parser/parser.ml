@@ -802,7 +802,7 @@ module Make (Trace : Sigs.TRACE) = struct
                 let open_ = item_helper Ast_helper.Sig.open_ open_ in
                 let include_ = item_helper Ast_helper.Sig.include_ include_sig in
                 let let_ = item_helper Ast_helper.Sig.value value_sig in
-                let extension = attributed Ast_helper.Sig.extension module_extension in
+                let extension = attributed Ast_helper.Sig.extension (module_extension << delimiter_) in
                 let exception_ = item_helper Ast_helper.Sig.exception_ exception_sig in
                 let external_ = item_helper Ast_helper.Sig.value external_ in
                 let modtype = item_helper Ast_helper.Sig.modtype modtype in
@@ -819,7 +819,7 @@ module Make (Trace : Sigs.TRACE) = struct
                     | 't' -> type_sig
                     | _ -> fail "TODO"
                 in
-                many @@ use (sig_item << delimiter_)
+                many @@ use sig_item
             in
 
             let expression = Trace.point "expression" @@ fun _ -> fix @@ fun expression ->
@@ -886,15 +886,10 @@ module Make (Trace : Sigs.TRACE) = struct
             in
 
             let structure = Trace.point "structure" @@ fun _ ->
-                let expression =
-                    let%map exp = use_no_attrs expression in
-                    mk_loc_attrs Ast_helper.Str.eval exp
-                in
-
                 let structure_item = Trace.point "structure_item" @@ fun _ ->
-                    expression
+                    attributed Ast_helper.Str.eval (use_no_attrs expression << delimiter_)
                 in
-                many @@ use (structure_item << delimiter_)
+                many @@ use structure_item
             in
 
             {
