@@ -23,7 +23,7 @@ $(tests_expected): $(TMP_DIR)/%/sig/expected: % | build
 	mkdir -p $(dir $@)
 	dune exec $(exe) res signature $< > $@.tmp
 	mv $@.tmp $@
-$(tests_actual): $(TMP_DIR)/%/sig/actual: % | build
+$(tests_actual): $(TMP_DIR)/%/sig/actual: % $(DUNE_DIR)/$(DIR)/main.exe | build
 	mkdir -p $(dir $@)
 	dune exec $(exe) pc signature $< > $@.tmp
 	mv $@.tmp $@

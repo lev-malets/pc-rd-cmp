@@ -11,10 +11,10 @@ module Line = struct
 end
 
 module Info = struct
-  type t =
-      {
-          default_position : Lexing.position;
-      }
+    type t =
+        {
+            default_position : Lexing.position;
+        }
 end
 
 type 'a t =

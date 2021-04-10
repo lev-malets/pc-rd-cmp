@@ -1,7 +1,3 @@
-module Ctx = struct
-    
-end
-
 let () = Fmt_tty.setup_std_outputs ~style_renderer:`Ansi_tty ()
 let fmt = Fmt.string
 let fmt_err = Fmt.styled `Red Fmt.string
@@ -27,7 +23,7 @@ let point str f =
         state_revert >> fail str
     in
 
-    map_state (fun s -> {s with trace = {prefix = "     " ^ s.trace.prefix; count = 0}})
+    map_state (fun s -> {s with trace = {prefix = "   | " ^ s.trace.prefix; count = 0}})
     >>
     ((p >>| fun x -> print @@ Printf.sprintf "%s     exit\n" old_state.trace.prefix; x) <|> fail)
     <<

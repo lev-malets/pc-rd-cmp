@@ -1,13 +1,15 @@
 
 open State
 
-module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
+module Make(T : sig type t end) = struct
     module Angstrom = Angstrom_mod.Make(struct type t = T.t State.t end)
 
     include Angstrom
     open Let_syntax
 
     type state = T.t
+
+    type 'b generator = { gen: 'a. ('b -> 'a Parser.t) -> 'a Parser.t }
 
     let (>>) = ( *> )
     let (<<) = ( <* )
@@ -35,6 +37,15 @@ module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
 
     open Angstrom_mod.Parser
 
+    let fix_poly f =
+        let rec res = lazy (f generator)
+        and generator =
+            { gen = fun get ->
+                { run = fun input -> (get @@ Lazy.force res).run input }
+            }
+        in
+        Lazy.force res
+
     let (>>$) p v =
         { run = fun input pos state more fail succ ->
             let succ input pos state more _ = succ input pos state more v in
@@ -53,7 +64,27 @@ module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
             | false -> succ input pos state more @@ make_position (pstate_exported pos state) ~prev:false
         }
 
-    let whitespace_ update_end_position =
+    let nongrammar p =
+        { run = fun input pos state more fail succ ->
+            let succ' input' pos' state' =
+                let new_state =
+                    { state' with custom =
+                        { state'.custom with
+                            ws_end = pos' - 1;
+                            token_end =
+                                match state.custom.ws_end = pos - 1 with
+                                | true -> state.custom.token_end
+                                | false -> make_position (pstate_exported pos state) ~prev:false
+                            ;
+                        }
+                    }
+                in
+                succ input' pos' new_state
+            in
+            p.run input pos state more fail succ'
+        }
+
+    let whitespace =
         { run = fun input pos state more fail succ ->
             let module Input = Angstrom_mod__Input in
             let len = Input.length input in
@@ -63,11 +94,7 @@ module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
                 let new_state = match pos1 = pos with
                     | true -> state
                     | false ->
-                        let token_end =
-                            match update_end_position with
-                            | true -> make_position (pstate_exported pos state) ~prev:false
-                            | false -> state.custom.token_end
-                        in
+                        let token_end = make_position (pstate_exported pos state) ~prev:false in
                         let ws_end = pos1 - 1 in
 
                         match lines with
@@ -103,9 +130,6 @@ module Make(T : sig type t end) : Sigs.POS with type state = T.t = struct
             in
             loop 0 0 pos
         }
-
-    let whitespace = whitespace_ true
-    let whitespace_nepu = whitespace_ false
 
     let newline_skipped =
         { run = fun input pos state more fail succ ->
