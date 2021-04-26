@@ -8,13 +8,11 @@ data_files := $(patsubst data/json/%,$(TMP_DIR)/data/%, \
 $(TMP_DIR)/all: $(data_files)
 
 define cmd
-$(data_files): $(TMP_DIR)/data/%: data/json/% | $(TMP)/built
+$(data_files): $(TMP_DIR)/data/%: data/json/% | build
 	mkdir -p $$(dir $$@)
 	echo "$$(path1):$$(path0)" > $$@.tmp
-	dune exec --release $(DIR)/main.exe "$$(path1):$$(path0)" >> $$@.tmp
+	dune exec --release $(DIR)/main.exe "$$(path1):$$(path0)" >> $$@.tmp 2> /dev/null
 	echo >> $$@.tmp
-	echo "$$(path1):$$(path0)" >> $$@.tmp
-	dune exec --release $(DIR)/main.exe "$$(path1):$$(path0)" >> $$@.tmp
 	mv $$@.tmp $$@
 endef
 

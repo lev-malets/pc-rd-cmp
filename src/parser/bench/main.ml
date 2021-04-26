@@ -17,8 +17,6 @@ module Position = struct
     let command = Bench.make_command [
         Bench.Test.create ~name:"position"      @@ parse position;
         Bench.Test.create ~name:"position1"     @@ parse Alt.position;
-        Bench.Test.create ~name:"end_position"  @@ parse end_position;
-        Bench.Test.create ~name:"end_position1" @@ parse Alt.end_position;
     ]
 end
 

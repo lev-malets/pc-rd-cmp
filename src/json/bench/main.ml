@@ -10,7 +10,7 @@ let parsers: parser list = [
     (module P_angstrom.Parser);
     (module P_angstrom_pos.Parser);
     (module P_opal.Parser);
-    (module P_opal_lex.Parser);
+    (*(module P_opal_lex.Parser);*)
     (module P_mparser.Parser);
     (module P_bark.Parser);
     (module P_yojson.Parser);

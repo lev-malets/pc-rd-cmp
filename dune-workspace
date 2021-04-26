@@ -1,6 +1,6 @@
 (lang dune 2.8)
 
-(context (opam (switch tmp/switch/switch)
+(context (opam (switch tmp/switch/switch_bs)
  (name default)
  (merlin)
  (env (_

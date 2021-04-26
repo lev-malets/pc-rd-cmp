@@ -1,3 +1,3 @@
 (executable
  (name main)
- (libraries pc_syntax extlib syntax rescript_ast_fix))
+ (libraries pc_syntax extlib syntax))

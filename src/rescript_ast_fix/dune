@@ -1,3 +1,3 @@
 (library
- (name rescript_ast_fix)
+ (name rescript_ast_fix_)
  (libraries compiler-libs.common))

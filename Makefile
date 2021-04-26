@@ -19,12 +19,14 @@ define clone_repo
 	git -C $(TMP_DIR)/repo checkout $3 2> /dev/null
 endef
 
+xelatex := xelatex main.tex
+
 #----------------------------------------#
 
 force: ;
 
 %: %/default
-	true $^
+	@ true $^
 
 %/all:
 	mkdir -p $(dir $@)

@@ -17,15 +17,11 @@ module Make(T : sig type t end) = struct
     let parse_string p state ?(filename = "none") =
         parse_string ~consume:All p (State.make filename state)
 
-    let make_position (state : Parser.pstate) ~prev =
+    let make_position (state : Parser.pstate) =
         let open Angstrom_mod.Parser in
-        let {line; prev_line_start; info; _} = state.custom in
-        let (pos_lnum, pos_bol, pos_cnum) = match prev with
-            | false -> (line.no, line.start, state.pos)
-            | true ->
-                match line.start = state.pos with
-                | true -> (line.no - 1, prev_line_start, line.start - 1)
-                | false -> (line.no, line.start, state.pos - 1)
+        let {line; info; _} = state.custom in
+        let (pos_lnum, pos_bol, pos_cnum) = 
+            (line.no, line.start, state.pos)
         in
 
         let open Lexing in
@@ -54,34 +50,7 @@ module Make(T : sig type t end) = struct
 
     let position =
         { run = fun input pos state more _fail succ ->
-            succ input pos state more @@ make_position (pstate_exported pos state) ~prev:false
-        }
-
-    let end_position =
-        { run = fun input pos state more _fail succ ->
-            match pos + state.buffer_start - 1 = state.custom.nongrammar_end with
-            | true -> succ input pos state more state.custom.grammar_end
-            | false -> succ input pos state more @@ make_position (pstate_exported pos state) ~prev:false
-        }
-
-    let nongrammar p =
-        { run = fun input pos state more fail succ ->
-            let succ' input' pos' state' =
-                let new_state =
-                    { state' with custom =
-                        { state'.custom with
-                            nongrammar_end = pos' - 1;
-                            grammar_end =
-                                match state.custom.nongrammar_end = pos - 1 with
-                                | true -> state.custom.grammar_end
-                                | false -> make_position (pstate_exported pos state) ~prev:false
-                            ;
-                        }
-                    }
-                in
-                succ input' pos' new_state
-            in
-            p.run input pos state more fail succ'
+            succ input pos state more @@ make_position (pstate_exported pos state) 
         }
 
     let whitespace =
@@ -122,13 +91,6 @@ module Make(T : sig type t end) = struct
             loop 0 0 pos
         }
 
-    let newline_skipped =
-        { run = fun input pos state more fail succ ->
-            match state.custom.line.no <> state.custom.grammar_end.pos_lnum with
-            | true -> succ input pos state more ()
-            | false -> fail input pos state more [] "newline_skipped"
-        }
-
     let get_state = state_get >>| fun s -> s.custom.custom
     let map_state f = state_map (fun s -> {s.custom with custom = f s.custom.custom})
     let set_state custom = map_state (fun _ -> custom)
@@ -136,12 +98,6 @@ module Make(T : sig type t end) = struct
     module Alt = struct
         let position =
             let%map state = state_get in
-            make_position state ~prev:false
-
-        let end_position =
-            let%map state = state_get in
-            match state.pos - 1 = state.custom.nongrammar_end with
-            | true -> state.custom.grammar_end
-            | false -> make_position state ~prev:true
+            make_position state
     end
 end

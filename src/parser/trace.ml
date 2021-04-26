@@ -20,7 +20,7 @@ let point str f =
     let fail =
         let%bind pos = position in
         eprint @@ Printf.sprintf "%s     err @ %s:%d:%d\n" old_state.trace.prefix pos.pos_fname pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1);
-        state_revert >> fail str
+        fail str
     in
 
     map_state (fun s -> {s with trace = {prefix = "   | " ^ s.trace.prefix; count = 0}})
