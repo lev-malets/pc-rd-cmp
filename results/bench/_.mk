@@ -1,5 +1,7 @@
 include make/base.mk
 
+TMP_DIR := $(TMP_DIR)/_
+
 $(DONE): \
 	$(DIR)/lscpu \
 	$(DIR)/json \
