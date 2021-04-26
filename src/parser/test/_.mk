@@ -6,9 +6,9 @@ base_tests := $(wildcard data/res/*)
 signature_tests := $(shell find $(TMP)/deps/syntax/repo/tests/parsing/grammar -name '*.resi')
 structure_tests := $(shell find $(TMP)/deps/syntax/repo/tests/parsing/grammar/signature -name '*.res')
 
-signatire_tests := $(patsubst $(TMP)/deps/syntax/repo/%,$(TMP_DIR)/sig/%/tested,$(signatire_tests))
-signatire_tests_expected = $(patsubst %/tested,%/expected,$(signatire_tests))
-signatire_tests_actual = $(patsubst %/tested,%/actual,$(signatire_tests))
+signature_tests := $(patsubst $(TMP)/deps/syntax/repo/%,$(TMP_DIR)/sig/%/tested,$(signature_tests))
+signature_tests_expected = $(patsubst %/tested,%/expected,$(signature_tests))
+signature_tests_actual = $(patsubst %/tested,%/actual,$(signature_tests))
 
 structure_tests := $(patsubst $(TMP)/deps/syntax/repo/%,$(TMP_DIR)/str/%/tested,$(structure_tests))
 structure_tests_expected = $(patsubst %/tested,%/expected,$(structure_tests))
@@ -23,7 +23,7 @@ exe := $(DIR)/main.exe
 $(DUNE_TMP)/$(exe):
 	dune build $(exe)
 
-$(DIR): $(base_tests) $(signatire_tests) $(structure_tests)
+$(DIR): $(base_tests) $(signature_tests) $(structure_tests)
 
 $(TMP_DIR)/%/tested: $(TMP_DIR)/%/expected $(TMP_DIR)/%/actual
 	diff $^ > /dev/null || (cat $(dir $@)actual.log && code --diff $^ && false)
@@ -52,8 +52,8 @@ $(TMP_DIR)/str/%/expected: | build
 $(base_tests_expected): $(TMP_DIR)/sig/base_test/%/expected: data/res/%
 $(base_tests_actual): $(TMP_DIR)/sig/base_test/%/actual: data/res/% $(DUNE_DIR)/$(DIR)/main.exe
 
-$(signatire_tests_expected): $(TMP_DIR)/sig/%/expected: $(TMP)/deps/syntax/repo/%
-$(signatire_tests_actual): $(TMP_DIR)/sig/%/actual: $(TMP)/deps/syntax/repo/% $(DUNE_DIR)/$(DIR)/main.exe
+$(signature_tests_expected): $(TMP_DIR)/sig/%/expected: $(TMP)/deps/syntax/repo/%
+$(signature_tests_actual): $(TMP_DIR)/sig/%/actual: $(TMP)/deps/syntax/repo/% $(DUNE_DIR)/$(DIR)/main.exe
 
 $(structure_tests_expected): $(TMP_DIR)/str/%/expected: $(TMP)/deps/syntax/repo/%
 $(structure_tests_actual): $(TMP_DIR)/str/%/actual: $(TMP)/deps/syntax/repo/% $(DUNE_DIR)/$(DIR)/main.exe
