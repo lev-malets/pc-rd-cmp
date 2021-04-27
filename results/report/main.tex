@@ -1,17 +1,6 @@
-\input{header.tex}
-\input{header2.tex}
-
-\usepackage{caption}
-\usepackage{listings}
-
-\DeclareCaptionFont{white}{ \color{white} }
-\DeclareCaptionFormat{listing}{
-    \parbox{\textwidth}{\hspace{15pt}#1#2#3}
-}
-\captionsetup[lstlisting]{ format=listing
-  %, labelfont=white, textfont=white
-  , singlelinecheck=false, margin=0pt, font={bf}
-}
+\input{headers/base.tex}
+\input{headers/lst.tex}
+\input{headers/cmds.tex}
 
 \begin{document}
 \input{00_title.tex}
@@ -27,20 +16,25 @@
 \label{sec:task}
 \input{10_task.tex}
 
+\section{Начальные условия}
+\label{sec:basic}
+\input{12_basic.tex}
+
 \section{Выбор библиотеки}
 \label{sec:libs}
-\input{11_libs.tex}
+\input{13_lib.tex}
 
 \section{Реализация}
 \label{sec:approach}
-\input{12_approach.tex}
+\input{14_mod.tex}
+\input{15_parser.tex}
 
-\section{Заключение}
+\section{Результаты}
 \label{sec:conclusion}
 \input{20_conclusion.tex}
 
 \nocite{*}
-\setmonofont[Mapping=tex-text]{CMU Typewriter Text}
+
 \bibliographystyle{ugost2008ls}
 \bibliography{bib}
 \end{document}
