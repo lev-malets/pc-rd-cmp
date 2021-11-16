@@ -1,0 +1,44 @@
+diff --git a/.merlin b/.merlin
+deleted file mode 100644
+index e8cb263..0000000
+--- a/.merlin
++++ /dev/null
+@@ -1,6 +0,0 @@
+-S src
+-B src
+-S +compiler-libs
+-B +compiler-libs
+-
+-FLG -w +a-4-42-40-9-48
+diff --git a/src/dune b/src/dune
+new file mode 100644
+index 0000000..fc40c30
+--- /dev/null
++++ b/src/dune
+@@ -0,0 +1,5 @@
++(library
++ (name syntax)
++ (libraries compiler-libs.common)
++ (wrapped false)
++ (flags :standard -w -9))
+diff --git a/src/res_core.ml b/src/res_core.ml
+index c8532e0..382381a 100644
+--- a/src/res_core.ml
++++ b/src/res_core.ml
+@@ -2731,6 +2731,7 @@ and parseBracedOrRecordExpr  p =
+     Parser.expect Rbrace p;
+     expr
+   | String s ->
++    let s_ = s in
+     let s = if p.mode = ParseForTypeChecker then parseStringLiteral s else s in
+     let field =
+       let loc = mkLoc p.startPos p.endPos in
+@@ -2746,7 +2747,7 @@ and parseBracedOrRecordExpr  p =
+       Parser.expect Rbrace p;
+       expr
+     | _ ->
+-      let constant = Ast_helper.Exp.constant ~loc:field.loc (Parsetree.Pconst_string(s, None)) in
++      let constant = Ast_helper.Exp.constant ~loc:field.loc (Parsetree.Pconst_string(s_, Some "js")) in
+       let a = parsePrimaryExpr ~operand:constant p in
+       let e = parseBinaryExpr ~a p 1 in
+       let e = parseTernaryExpr e p in

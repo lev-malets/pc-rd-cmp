@@ -1,0 +1,4 @@
+(executable
+ (name main)
+ (libraries angstrom_pos extlib)
+ (preprocess (pps ppx_deriving.show)))

@@ -1,4 +1,4 @@
 (library
  (name angstrom_pos)
- (libraries angstrom-mod ast_show)
+ (libraries angstrom-mod ast_show fmt fmt.tty containers)
  (preprocess (pps ppx_jane_fix)))

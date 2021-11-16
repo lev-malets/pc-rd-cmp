@@ -6,7 +6,7 @@ module Res = struct
 end
 
 module Pc = struct
-    module Parser = Pc_syntax.Parser.Make(Pc_syntax.Trace.Stub)
+    module Parser = Pc_syntax.Parser.Make(Angstrom_pos.Trace.Stub(Pc_syntax.Basic.Angstrom))
 
     let unwrap = function
         | Ok x -> x

@@ -1,5 +1,0 @@
-(library
- (name syntax)
- (libraries compiler-libs.common)
- (wrapped false)
- (flags :standard -w -9))

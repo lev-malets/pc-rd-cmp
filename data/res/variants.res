@@ -1,0 +1,5 @@
+Constructore(a, b)
+Constructore(a(), b())
+Constructore(_ => (), _ => ())
+Constructore(_ => copyChecklistItemCB, _ => copyChecklistItemCB)
+Constructore(_ => copyChecklistItemCB(), _ => copyChecklistItemCB())

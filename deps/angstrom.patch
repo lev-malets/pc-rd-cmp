@@ -1,0 +1,27 @@
+diff --git a/lib_test/test_json.ml b/lib_test/test_json.ml
+index 98b8a8c..96d720e 100644
+--- a/lib_test/test_json.ml
++++ b/lib_test/test_json.ml
+@@ -14,6 +14,6 @@ let read f =
+
+ let () =
+   let twitter_big = read Sys.argv.(1) in
+-  match Angstrom.(parse_bigstring RFC7159.json twitter_big) with
++  match Angstrom.(parse_bigstring ~consume:Consume.Prefix RFC7159.json twitter_big) with
+   | Ok _ -> ()
+   | Error err -> failwith err
+diff --git a/lib_test/test_let_syntax_ppx.ml b/lib_test/test_let_syntax_ppx.ml
+index a21173c..e60597a 100644
+--- a/lib_test/test_let_syntax_ppx.ml
++++ b/lib_test/test_let_syntax_ppx.ml
+@@ -11,8 +11,10 @@ let (_ : int t) =
+   in
+   2
+
++(*
+ let (_ : int t) =
+   let%mapn (_ : char) = any_char
+   and (_ : string) = string "foo"
+   in
+   2
++*)

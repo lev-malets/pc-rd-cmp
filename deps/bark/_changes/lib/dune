@@ -1,5 +1,0 @@
-(library
- (name bark)
- (public_name bark)
- (libraries str)
- (preprocess future_syntax))

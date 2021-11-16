@@ -1,21 +1,21 @@
-type t =
+type s =
     {
-        (*
         diagnostics : Res_diagnostics.t list;
+        (*
         scope : (Res_grammar.t * Lexing.position) list;
         attrs : (Lexing.position * Parsetree.attributes) list;
         *)
         comments : Res_comment.t list;
-        trace : Trace_ctx.t;
+        underscore_apply : bool;
     }
 
 let default =
     {
-        (*
         diagnostics = [];
+        (*
         scope = [];
         attrs = [];
         *)
         comments = [];
-        trace = Trace_ctx.default
+        underscore_apply = false;
     }

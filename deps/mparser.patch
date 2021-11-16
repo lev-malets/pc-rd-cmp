@@ -1,0 +1,22 @@
+diff --git a/src/dune b/src/dune
+index 7716c23..89ddc48 100644
+--- a/src/dune
++++ b/src/dune
+@@ -4,17 +4,3 @@
+  (modules_without_implementation MParser_Sig)
+  (modules MParser MParser_Sig MParser_Char_Stream MParser_Utils)
+  (wrapped false))
+-
+-(library
+- (name mparser_pcre)
+- (public_name mparser-pcre)
+- (libraries mparser pcre)
+- (modules MParser_PCRE)
+- (wrapped false))
+-
+-(library
+- (name mparser_re)
+- (libraries mparser re.perl)
+- (public_name mparser-re)
+- (modules MParser_RE)
+- (wrapped false))
