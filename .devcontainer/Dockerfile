@@ -14,3 +14,10 @@ RUN eval $(opam env --switch=4.06.1+rescript --set-switch) && opam install -y \
 RUN eval $(opam env --switch=4.06.1+rescript --set-switch) && opam install -y fix
 RUN eval $(opam env --switch=4.06.1+rescript --set-switch) && opam install -y easy_logging
 RUN eval $(opam env --switch=4.06.1+rescript --set-switch) && opam install -y containers
+
+USER root
+
+RUN dnf install -y npm
+RUN npm install -g sloc
+
+USER user

@@ -1,9 +1,4 @@
 (executable
  (name main)
  (modules main)
- (libraries pc_syntax core syntax core_bench))
-
-(executable
- (name exec)
- (modules exec)
- (libraries pc_syntax core syntax core_bench))
+ (libraries run_common core core_bench))

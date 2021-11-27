@@ -33,3 +33,15 @@ module type NAMED = sig
 
     val p : string -> 'a Parser.t -> 'a Parser.t
 end
+
+module type TRACED = sig
+    include NAMED
+
+    val tt: Exec_info.t
+end
+
+module type PEEK = sig
+    module Parser : Angstrom_mod.Sigs.PARSER
+
+    val char_fail : (char -> 'a Parser.t) -> expected:(char list) -> 'a Parser.t
+end

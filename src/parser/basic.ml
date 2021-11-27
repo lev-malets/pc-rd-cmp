@@ -25,6 +25,7 @@ type 'a helper_fn = p1:Lexing.position -> p2:Lexing.position -> attrs:attributes
 type 'a helper = 'a helper_fn * attributes
 type 'a ahelper_fn = attrs:attributes -> 'a
 type 'a ahelper = 'a ahelper_fn * attributes
+type 'a na_helper = p1:Lexing.position -> p2:Lexing.position -> 'a
 
 let apply : 'a. 'a helper -> Lexing.position -> Lexing.position -> 'a
     = fun (hlp, attrs) p1 p2 -> hlp ~p1 ~p2 ~attrs
@@ -37,7 +38,6 @@ let helper: 'a. 'a helper_fn -> 'a helper
 
 let helper_map: 'a. ('a helper_fn -> 'b helper_fn) -> 'a helper -> 'b helper
     = fun f (hlp, attrs) -> (f hlp, attrs)
-
 
 let ahelper_map: 'a. f:('a ahelper_fn -> 'b helper_fn) -> 'a ahelper -> 'b helper
     = fun ~f (hlp, attrs) -> (f hlp, attrs)
@@ -55,22 +55,22 @@ let mk_helper_fn : 'a 'b. (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) -
     = fun f a -> fun ~p1 ~p2 ~attrs -> f ~loc:(make_location p1 p2) ~attrs a
 
 let mk_helper : 'a 'b.
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) ->
+    f:(?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) ->
     'a -> 'b helper
     =
-    fun f a -> mk_helper_fn f a, []
+    fun ~f a -> mk_helper_fn f a, []
 
 let mk_na_helper : 'a 'b.
     (?loc:Warnings.loc -> 'a -> 'b) ->
-    'a -> 'b helper
+    'a -> 'b na_helper
     =
-    fun f a -> (fun ~p1 ~p2 ~attrs:_ -> f ~loc:(make_location p1 p2) a), []
+    fun f a -> fun ~p1 ~p2 -> f ~loc:(make_location p1 p2) a
 
 let mk_na_helper2 : 'a 'b 'c.
     (?loc:Warnings.loc -> 'a -> 'b -> 'c) ->
-    'a -> 'b -> 'c helper
+    'a -> 'b -> 'c na_helper
     =
-    fun f a b -> (fun ~p1 ~p2 ~attrs:_ -> f ~loc:(make_location p1 p2) a b), []
+    fun f a b -> fun ~p1 ~p2 -> f ~loc:(make_location p1 p2) a b
 
 let mk_helper2 : 'a 'b 'c.
     (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) ->
@@ -130,7 +130,7 @@ let fold_hlp_left_0_n ~f nil p =
 let some x = Some x
 
 let make_list_helper ~constr ~tuple ~get_loc seq ext =
-    mk_helper begin fun ?(loc=Location.none) ?attrs () ->
+    mk_helper () ~f:begin fun ?(loc=Location.none) ?attrs () ->
         let nil_loc = {loc with Location.loc_ghost = true} in
         let nil = Location.mkloc (Longident.Lident "[]") nil_loc in
 
@@ -149,4 +149,4 @@ let make_list_helper ~constr ~tuple ~get_loc seq ext =
         in
 
         loop (fun loc -> constr ?loc:(Some loc) ?attrs) seq
-    end ()
+    end

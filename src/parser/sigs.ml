@@ -3,6 +3,11 @@ open Basic
 
 open Parsetree
 
+module type PARSE = sig
+    val parse_interface : src:string -> filename:string -> (signature, string) result
+    val parse_implementation : src:string -> filename:string -> (structure, string) result
+end
+
 module type CORE = sig
     val attribute : attribute parser
     val extension : extension parser

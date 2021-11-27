@@ -41,10 +41,10 @@ module Make
                 end
 
             let var =
-                mapping (mk_helper Typ.var)
+                mapping (mk_helper ~f:Typ.var)
                 <* s"\'" <*> ident
 
-            let any = s"_" >>$ mk_helper Typ.any ()
+            let any = s"_" >>$ mk_helper ~f:Typ.any ()
 
             let constr =
                 Named.p "typexpr:constr" begin
@@ -61,7 +61,7 @@ module Make
                 end
 
             let tuple =
-                mapping (mk_helper Typ.tuple)
+                mapping (mk_helper ~f:Typ.tuple)
                 <* s"(" <*> seq 2 (_use core_type) ~sep:(_s",") ~trail <* _s")"
 
             let unit =
@@ -173,7 +173,7 @@ module Make
                         <|>
                         variant
                         <|>
-                        (mapping (mk_helper Typ.extension) <*> extension)
+                        (mapping (mk_helper ~f:Typ.extension) <*> extension)
                 end
 
             let alias p =
@@ -189,13 +189,13 @@ module Make
             let aliased_atom = Named.p "typexpr:alias:atom" @@ alias core_type_atom
 
             let arrow =
-                Named.p "typexpr:arrow" begin
-                    let arrow_tail =
-                        s"=>" >>
+                begin
+                    let _arrow_tail =
+                        _s"=>" >>
                         map (_use core_type_arrow) ~f:(fun typ label arg -> mk_helper3 Typ.arrow label arg typ)
                     in
 
-                    let with_args typ tail =
+                    let with_args typ _tail =
                         add_attrs (
                             mapping begin fun tag p1 x p2 opt tail ->
                                 let label = if opt <> None then Optional tag.txt else Labelled tag.txt in
@@ -203,37 +203,41 @@ module Make
                                 let arg = apply x p1 p2 in
                                 tail label arg
                             end
-                            << s_"~" <*> loc l_ident << _s":" << ng <*> pos <*> add_attrs typ <*> pos <*>? (_s"=" << _s"?") << ng <*> tail
+                            << s_"~" <*> loc l_ident << _s":" << ng <*> pos <*> add_attrs typ <*> pos <*>? (_s"=" << _s"?") <*> _tail
                         )
                         <|>
                         (
                             mapping begin fun arg tail ->
                                 tail Nolabel arg
                             end
-                            <*> use typ << ng <*> tail
+                            <*> use typ <*> _tail
                         )
                     in
 
                     let tail = fix @@ fun tail ->
+                        (s")" >> _arrow_tail)
+                        <|>
+                        (s"," >> _s")" >> _arrow_tail)
+                        <|>
                         (s"," >> _s"." >> _use (with_args core_type tail >>| helper_add_attr "bs") >>| fun typ label arg ->
                             mk_helper3 Typ.arrow label arg typ
                         )
                         <|>
                         (s"," >> _use (with_args core_type tail) >>| fun typ label arg -> mk_helper3 Typ.arrow label arg typ)
-                        <|>
-                        (s")" >> ng >> arrow_tail)
                     in
 
                     add_attrs (s"(" >> _s"." >> ng >> with_args core_type tail >>| helper_add_attr "bs")
                     <|>
                     add_attrs (s"(" >> ng >> with_args core_type tail)
                     <|>
-                    Named.p "typexpr:arrow:onearg" (with_args aliased_atom arrow_tail)
+                    Named.p "typexpr:arrow:onearg" (with_args aliased_atom _arrow_tail)
                 end
 
-            let core_type_arrow = arrow <|> core_type_atom
+            let core_type_arrow =
+                Named.p "typexpr:arrow"
+                (arrow <|> core_type_atom)
 
-            let core_type = Named.p "typexpr:alias:arrow" @@ alias core_type_arrow
+            let core_type = Named.p "typexpr" @@ alias core_type_arrow
 
             let core_type_poly =
                 Named.p "typexpr:poly" begin
@@ -273,7 +277,7 @@ module Make
                     Named.p "type_kind:variant" begin
                         let constructor =
                             mapping begin fun name args res ->
-                                mk_helper (Type.constructor ?info:None ?args:(Some args) ?res) name
+                                mk_helper ~f:(Type.constructor ?info:None ?args:(Some args) ?res) name
                             end
                             <*> loc u_ident <*> ((ng >> constr_args) <|> return @@ Pcstr_tuple []) <*>? (_s":" >> _use core_type_atom)
                         in
@@ -288,7 +292,9 @@ module Make
 
                 let open_ = s".." >>$ Ptype_open in
 
-                variant <|> record <|> open_
+                Named.p "type_kind" begin
+                    variant <|> record <|> open_
+                end
 
             let type_decl_params =
                 let variance =
@@ -319,7 +325,7 @@ module Make
                     Named.p "type_declaration:mankind" (
                         mapping begin fun name params manifest priv kind cstrs ->
                             let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            mk_helper (Type.mk
+                            mk_helper ~f:(Type.mk
                                 ?docs:None ?text:None ?params ?cstrs ?kind:(Some kind) ?priv ?manifest:(Some manifest)) name
                         end
                         <*> loc l_ident <*>? (ng >> type_decl_params) << _s"=" <*> _use core_type
@@ -329,7 +335,7 @@ module Make
                     Named.p "type_declaration:manifest" (
                         mapping begin fun name params priv manifest cstrs ->
                             let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            mk_helper (Type.mk
+                            mk_helper ~f:(Type.mk
                                 ?docs:None ?text:None ?params ?cstrs ?kind:None ?priv ?manifest:(Some manifest)) name
                         end
                         <*> loc l_ident <*>? (ng >> type_decl_params) <* _s"=" <*>? _k"private" <*> _use core_type
@@ -339,7 +345,7 @@ module Make
                     Named.p "type_declaration:kind" (
                         mapping begin fun name params priv kind cstrs ->
                             let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            mk_helper (Type.mk
+                            mk_helper ~f:(Type.mk
                                 ?docs:None ?text:None ?params ?cstrs ?kind:(Some kind) ?priv ?manifest:None) name
                         end
                         <*> loc l_ident <*>? (ng >> type_decl_params)
@@ -348,7 +354,7 @@ module Make
                     <|>
                     Named.p "type_declaration:abstract" (
                         mapping begin fun name params ->
-                            mk_helper (Type.mk
+                            mk_helper ~f:(Type.mk
                                 ?docs:None ?text:None ?params ?cstrs:None ?kind:None ?priv:None ?manifest:None) name
                         end
                         <*> loc l_ident <*>? (ng >> type_decl_params)

@@ -62,7 +62,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
 
         let escaped =
             any_char >>= function
-            | '\\' | '\"' | '\'' | ' ' as c -> return c
+            | '\\' | '\'' | ' ' as c -> return c
             | 'n' -> return '\n'
             | 't' -> return '\t'
             | 'b' -> return '\b'
@@ -86,7 +86,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
 
         let p = s"\'" >>
             ((s"\\" >> escaped) <|> satisfy begin function
-                | '\\' | '\"' | '\'' | '\n' | '\t' | '\b' | '\r' -> false
+                | '\\' | '\'' | '\n' | '\t' | '\b' | '\r' -> false
                 | _ -> true
                 end
             )
@@ -108,6 +108,8 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
             (take_while not_escaped >>| Buffer.add_string buf) >>
             (
                 (s"\\" >> (Character.escaped >>| Buffer.add_char buf) >> p)
+                <|>
+                (s"\\\"" >>| (fun _ -> Buffer.add_char buf '\"') >> p)
                 <|>
                 (s"\"" >>| fun _ -> Buffer.contents buf)
             )

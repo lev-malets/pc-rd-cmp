@@ -1,0 +1,9 @@
+(library
+ (name res_parse_string)
+ (modules res_parse_string)
+ (libraries syntax))
+
+(library
+ (name run_common)
+ (modules run_common)
+ (libraries core_kernel res_parse_string pc_syntax))

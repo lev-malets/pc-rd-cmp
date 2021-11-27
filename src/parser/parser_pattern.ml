@@ -31,13 +31,13 @@ module Make
 
             let tuple =
                 Named.p "pattern:tuple" begin
-                    mapping (mk_helper Pat.tuple)
+                    mapping (mk_helper ~f:Pat.tuple)
                     << s_"(" <*> seq 2 ~sep:(_s",") ~trail (_use pattern_constrainted) << _s")"
                 end
 
             let array =
                 Named.p "pattern:array" begin
-                    mapping (mk_helper Pat.array)
+                    mapping (mk_helper ~f:Pat.array)
                     <* s"[" <*> seq 0 ~sep:(_s",") ~trail (_use pattern_constrainted) <* _s"]"
                 end
 
@@ -87,8 +87,9 @@ module Make
                 end
 
             let constructor_arguments =
-                    _use tuple
+                    use tuple
                 <|> (s"(" >> _use pattern_constrainted << opt @@ _s"," << _s")")
+                <|> use (s"(" >> _s")" >>$ mk_helper2 Pat.construct (Location.mknoloc @@ Longident.Lident "()") None)
 
             let construct =
                 mapping @@ mk_helper2 Pat.construct
@@ -104,7 +105,7 @@ module Make
                 <* s"#" <*> tag <*>? constructor_arguments
 
             let typ =
-                mapping (mk_helper Pat.type_)
+                mapping (mk_helper ~f:Pat.type_)
                 <* s"#" <* _s"..." <*> _loc l_longident
 
             let unpack =
@@ -118,7 +119,7 @@ module Make
                     end
                     <|>
                     (
-                        mapping (mk_helper Pat.unpack)
+                        mapping (mk_helper ~f:Pat.unpack)
                         <* s_"module" <* s_"(" <*> loc u_ident <* _s")"
                     )
                 end
@@ -154,7 +155,7 @@ module Make
                     (
                         (s"`" >>| fun _ ->
                             helper_add_attr "res.template" @@
-                            mk_helper Pat.constant (mk_const ())
+                            mk_helper ~f:Pat.constant (mk_const ())
                         )
                         <|>
                         ((new_line >>| Buffer.add_string buf) >> loop)
@@ -171,7 +172,7 @@ module Make
 
             let pattern_atom =
                 Named.p "pattern:atom" begin
-                    (k"_" >>$ mk_helper Pat.any ())
+                    (k"_" >>$ mk_helper ~f:Pat.any ())
                     <|> (
                             mapping @@ mk_helper2 Pat.interval
                             <*> Constant.Character.p << _s".." << ng <*> Constant.Character.p
@@ -185,20 +186,20 @@ module Make
                     <|> tuple <|> (s"(" >> ng >> add_attrs pattern_constrainted << _s")")
                     <|> array
                     <|> record
-                    <|> ((signed_number <|> Constant.p) >>| mk_helper Pat.constant)
+                    <|> ((signed_number <|> Constant.p) >>| mk_helper ~f:Pat.constant)
                     <|> js_string "js"
                     <|> list <|> construct <|> polyvariant <|> typ
                     <|> true_false
-                    <|> (loc ident >>| mk_helper Pat.var)
+                    <|> (loc ident >>| mk_helper ~f:Pat.var)
                 end
 
             let pattern_exception =
-                    (k"exception" >> _use pattern_atom >>| mk_helper Pat.exception_)
-                <|> (extension >>| mk_helper Pat.extension)
+                    (k"exception" >> _use pattern_atom >>| mk_helper ~f:Pat.exception_)
+                <|> (extension >>| mk_helper ~f:Pat.extension)
                 <|> pattern_atom
 
             let primary =
-                    (k"lazy" >> _use pattern_exception >>| mk_helper Pat.lazy_)
+                    (k"lazy" >> _use pattern_exception >>| mk_helper ~f:Pat.lazy_)
                 <|> pattern_exception
 
             let alias =

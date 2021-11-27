@@ -1,0 +1,3 @@
+(library
+ (name exec_info)
+ (libraries containers))

@@ -20,4 +20,6 @@ build: deps
 
 .PHONY: build
 
+dune = @ mkdir -p $$(dir $T/log/$$@.log) && dune $(1) 2> $T/log/$$@.log || (cat $T/log/$$@.log && false)
+
 include make/main.mk

@@ -1,3 +1,9 @@
 (executable
  (name main)
- (libraries pc_syntax extlib syntax))
+ (modules main)
+ (libraries run_common))
+
+(executable
+ (name fast)
+ (modules fast)
+ (libraries run_common))

@@ -5,22 +5,19 @@ open Angstrom.Parser
 open Parsetree
 open Sigs
 
-(* TODO errors position *)
-(* points:
-    number of calls
-    number of state changes
-*)
-
-module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser) = struct
+module Make
+        (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser)
+        (Peek: Angstrom_pos.Sigs.PEEK with module Parser = Angstrom.Parser)
+        = struct
     module Utils = Parser_utils.Make(Named)
     open Utils
 
     type parsers =
         {
-            signature : signature t;
-            structure : structure t;
-            attribute : attribute t;
-            extension : attribute t;
+            signature : signature parser;
+            structure : structure parser;
+            attribute : attribute parser;
+            extension : attribute parser;
 
             modexpr : (module MODEXPR);
         }
@@ -139,6 +136,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
         in
 
         let module_attribute =
+            Named.p "module attribute" @@
             id_payload_pair "@@"
         in
 
@@ -150,18 +148,18 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
                     (k"open" >> override)
                     (ng >> loc u_longident)
                     ~f:(fun override name ->
-                        mk_helper (Opn.mk ?docs:None ?override:(Some override)) name
+                        mk_helper ~f:(Opn.mk ?docs:None ?override:(Some override)) name
                     )
             end
         in
 
-        let exception_sig =
+        let exception_ =
             Named.p "exception" @@
             add_attrs (k"exception" >> ng >> type_extension_constructor)
         in
 
         let include_sig =
-            add_attrs (k"include" >> _use modtype_with >>| mk_helper (Incl.mk ?docs:None))
+            add_attrs (k"include" >> _use modtype_with >>| mk_helper ~f:(Incl.mk ?docs:None))
         in
 
         let value_sig =
@@ -178,7 +176,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
             Named.p "top:modtype" @@
             add_attrs (
                 mapping begin fun name typ ->
-                    mk_helper (Mtd.mk ?docs:None ?text:None ?typ:(Some typ)) name
+                    mk_helper ~f:(Mtd.mk ?docs:None ?text:None ?typ:(Some typ)) name
                 end
                 << k"module" << ng << k"type" << ng <*> loc ident <* _s"=" <*> _use modtype_with
             )
@@ -189,7 +187,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
                 modtype_base
                 <|>
                 add_attrs (
-                    mapping @@ mk_helper @@ Mtd.mk ?docs:None ?text:None ?typ:None
+                    mapping @@ mk_helper ~f:(Mtd.mk ?docs:None ?text:None ?typ:None)
                     <* k"module" <* _k"type" <*> _loc u_ident
                 )
             end
@@ -256,7 +254,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
                 let module_alias =
                     map
                     (loc u_longident)
-                    ~f:(mk_helper Mty.alias)
+                    ~f:(mk_helper ~f:Mty.alias)
                 in
 
                 map2
@@ -285,131 +283,140 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
             end
         in
 
-        let item_helper : 'a 'b.
-            (?loc:Warnings.loc -> 'a -> 'b) ->
-            'a helper parser ->
-            'b helper parser
-            = fun h p ->
-                mapping (mk_na_helper h)
-                <*> use p
+        let import =
+            Named.p "import" begin
+
+                let item =
+                    mapping begin fun name alias typ ->
+                        let alias = Base.Option.value alias ~default:name in
+                        helper_map
+                            (fun hlp ->
+                                fun ~p1 ~p2 ~attrs ->
+                                    fun attr -> hlp ~p1 ~p2 ~attrs:(attr @ attrs)
+                            )
+                            (mk_helper2 (Val.mk ?docs:None ?prim:(Some [name.txt])) alias typ)
+                    end
+                    <*> loc l_ident <*>? (ng >> k"as" >> ng >> loc l_ident) <* _s":" <*> _use core_type_poly
+                in
+
+                let list =
+                    s_"{" >> seq 1 ~sep:(_s",") (_use item) << _s"}"
+                in
+
+                (
+                    mapping begin fun list name ->
+                        let attr = Location.mkloc "genType.import" name.loc, PStr [Str.eval @@ Exp.constant @@ Const.string name.txt] in
+                        let list = List.map (fun x -> x [attr]) list in
+                        let str = List.map Str.primitive list in
+                        let mod_ = Mod.structure str in
+                        helper_add_attr "ns.jsFfi" @@ mk_helper ~f:(Incl.mk ?docs:None) mod_
+                    end
+                    <* k"import" <* ng <*> list <* ng <* k"from" <* ng <*> loc Constant.String.string
+                )
+                <|>
+                (
+                    mapping begin fun item name ->
+                        let attr =
+                            Location.mkloc "genType.import" name.loc,
+                            PStr [Str.eval @@ Exp.tuple [Exp.constant @@ Const.string name.txt; Exp.constant @@ Const.string "default"]]
+                        in
+                        let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
+                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+                    end
+                    <* k"import" <*> _use item <* ng <* k"from" <* ng <*> loc Constant.String.string
+                )
+                <|>
+                (
+                    mapping begin fun list names ->
+                        let attr =
+                            [ Location.mknoloc "val", PStr []
+                            ; Location.mkloc "scope" names.loc,
+                                PStr [Str.eval @@ if List.length names.txt = 1 then List.hd names.txt else Exp.tuple names.txt]
+                            ]
+                        in
+                        let list = list |> List.map @@ fun x -> x attr in
+                        let str = List.map Str.primitive list in
+                        let mod_ = Mod.structure str in
+                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+                    end
+                    <* k"import" <* ng <*> list <* ng <* k"from" <* ng
+                    <*> loc @@ seq 1 ~sep:(_s".") (_use (ident >>| fun x -> mk_helper ~f:Exp.constant (Const.string x)))
+                )
+                <|>
+                (
+                    mapping begin fun item names ->
+                        let attr =
+                            [ Location.mknoloc "val", PStr []
+                            ; Location.mkloc "scope" names.loc,
+                                PStr [Str.eval @@ if List.length names.txt = 1 then List.hd names.txt else Exp.tuple names.txt]
+                            ]
+                        in
+                        let mod_ = Mod.structure [Str.primitive @@ item attr] in
+                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+                    end
+                    <* k"import" <*> _use item <* ng <* k"from" <* ng
+                    <*> loc @@ seq 1 ~sep:(_s".") (_use (ident >>| fun x -> mk_helper ~f:Exp.constant (Const.string x)))
+                )
+                <|>
+                (
+                    mapping begin fun list ->
+                        let attr = Location.mknoloc "val", PStr [] in
+                        let list = List.map (fun x -> x [attr]) list in
+                        let str = List.map Str.primitive list in
+                        let mod_ = Mod.structure str in
+                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+                    end
+                    <* k"import" <* ng <*> list
+                )
+                <|>
+                (
+                    mapping begin fun item ->
+                        let attr = Location.mknoloc "val", PStr [] in
+                        let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
+                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+                    end
+                    <* k"import" <*> _use item
+                )
+            end
         in
 
-        let item_nohelper : 'a.
+        let use_item : 'a 'b.
+            (?loc:Warnings.loc -> 'a -> 'b) ->
+            'a helper parser -> 'b parser
+            = fun h p ->
+                mapping begin fun p1 x p2 ->
+                    h ~loc:(make_location p1 p2) x
+                end
+                <*> pos <*> use @@ add_attrs p <*> del_pos
+        in
+        let _use_item h p = ng >> use_item h p in
+
+        let use_na_item : 'a.
             'a helper t -> 'a helper t
             = fun p ->
                 item_helper (fun ?loc:_ x -> x) p
         in
 
-        let use_item : 'a.
-            'a helper t -> 'a t
-            =
-            fun p ->
-                mapping begin fun p1 hlp p2 ->
-                    apply hlp p1 p2
-                end
-                <*> pos <*> p <*> del_pos
-        in
-
-        let _use_item p = ng >> use_item p in
-
-        let import =
-            let item =
-                mapping begin fun name alias typ ->
-                    let alias = Base.Option.value alias ~default:name in
-                    helper_map
-                        (fun hlp ->
-                            fun ~p1 ~p2 ~attrs ->
-                                fun attr -> hlp ~p1 ~p2 ~attrs:(attr @ attrs)
-                        )
-                        (mk_helper2 (Val.mk ?docs:None ?prim:(Some [name.txt])) alias typ)
-                end
-                <*> loc l_ident <*>? (ng >> k"as" >> ng >> loc l_ident) <* _s":" <*> _use core_type_poly
-            in
-
-            let list =
-                s_"{" >> seq 1 ~sep:(_s",") (_use item) << _s"}"
-            in
-
-            (
-                mapping begin fun list name ->
-                    let attr = Location.mkloc "genType.import" name.loc, PStr [Str.eval @@ Exp.constant @@ Const.string name.txt] in
-                    let list = List.map (fun x -> x [attr]) list in
-                    let str = List.map Str.primitive list in
-                    let mod_ = Mod.structure str in
-                    helper_add_attr "ns.jsFfi" @@ mk_helper (Incl.mk ?docs:None) mod_
-                end
-                <* k"import" <* ng <*> list <* ng <* k"from" <* ng <*> loc Constant.String.string
-            )
-            <|>
-            (
-                mapping begin fun item name ->
-                    let attr =
-                        Location.mkloc "genType.import" name.loc,
-                        PStr [Str.eval @@ Exp.tuple [Exp.constant @@ Const.string name.txt; Exp.constant @@ Const.string "default"]]
-                    in
-                    let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
-                    mk_helper (Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                end
-                <* k"import" <*> _use item <* ng <* k"from" <* ng <*> loc Constant.String.string
-            )
-            <|>
-            (
-                mapping begin fun list names ->
-                    let attr =
-                        [ Location.mknoloc "val", PStr []
-                        ; Location.mkloc "scope" names.loc,
-                            PStr [Str.eval @@ if List.length names.txt = 1 then List.hd names.txt else Exp.tuple names.txt]
-                        ]
-                    in
-                    let list = list |> List.map @@ fun x -> x attr in
-                    let str = List.map Str.primitive list in
-                    let mod_ = Mod.structure str in
-                    mk_helper (Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                end
-                <* k"import" <* ng <*> list <* ng <* k"from" <* ng
-                <*> loc @@ seq 1 ~sep:(_s".") (_use (ident >>| fun x -> mk_helper Exp.constant (Const.string x)))
-            )
-            <|>
-            (
-                mapping begin fun item names ->
-                    let attr =
-                        [ Location.mknoloc "val", PStr []
-                        ; Location.mkloc "scope" names.loc,
-                            PStr [Str.eval @@ if List.length names.txt = 1 then List.hd names.txt else Exp.tuple names.txt]
-                        ]
-                    in
-                    let mod_ = Mod.structure [Str.primitive @@ item attr] in
-                    mk_helper (Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                end
-                <* k"import" <*> _use item <* ng <* k"from" <* ng
-                <*> loc @@ seq 1 ~sep:(_s".") (_use (ident >>| fun x -> mk_helper Exp.constant (Const.string x)))
-            )
-            <|>
-            (
-                mapping begin fun list ->
-                    let attr = Location.mknoloc "val", PStr [] in
-                    let list = List.map (fun x -> x [attr]) list in
-                    let str = List.map Str.primitive list in
-                    let mod_ = Mod.structure str in
-                    mk_helper (Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                end
-                <* k"import" <* ng <*> list
-            )
-            <|>
-            (
-                mapping begin fun item ->
-                    let attr = Location.mknoloc "val", PStr [] in
-                    let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
-                    mk_helper (Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                end
-                <* k"import" <*> _use item
-            )
-        in
 
         let signature =
             Named.p "sig" begin
-                let attribute = module_attribute >>| mk_na_helper Sig.attribute  in
-                let extension = add_attrs (mapping @@ mk_helper Sig.extension <*> module_extension) in
+                let extension = module_extension >>| mk_helper ~f:Sig.extension in
+
+                let no_attrs =
+                    Peek.char_fail ~expected:['%'; 'e'; 'i'; 'l'; 'm'; 'o'; 't'] @@
+                    function
+                    | '%' -> extension
+                    | 'e' -> exception_ <|> external_
+                    | 'i' -> include_
+                    | 'l' -> let_
+                    | 'm' -> modtype <|> module_ <|> module_rec
+                    | 'o' -> open_
+                    | 't' -> type_ext <|> type_ Sig.type_
+                    | _ -> fail "TODO"
+                in
+
+
+                let attribute = module_attribute >>| mk_na_helper Sig.attribute in
                 let exception_ = item_helper Sig.exception_ exception_sig in
                 let external_ = item_helper Sig.value external_ in
                 let include_ = item_helper Sig.include_ include_sig in
@@ -421,15 +428,18 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
                 let type_ext = item_helper Sig.type_extension type_extension in
 
                 let sig_item =
-                    Named.p "sig:item" begin
-                            attribute
-                        <|> extension
-                        <|> exception_ <|> external_
-                        <|> include_ <|> let_
-                        <|> modtype <|> module_ <|> module_rec
-                        <|> open_
-                        <|> type_ext <|> type_ Sig.type_
-                    end
+                    Named.p "sig:item" @@
+                    Peek.char_fail ~expected:['@'; '%'; 'e'; 'i'; 'l'; 'm'; 'o'; 't'] @@
+                    function
+                    | '@' -> attribute
+                    | '%' -> extension
+                    | 'e' -> exception_ <|> external_
+                    | 'i' -> include_
+                    | 'l' -> let_
+                    | 'm' -> modtype <|> module_ <|> module_rec
+                    | 'o' -> open_
+                    | 't' -> type_ext <|> type_ Sig.type_
+                    | _ -> fail "TODO"
                 in
                 many @@ _use_item sig_item
             end
@@ -500,30 +510,28 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
                         )
                 in
 
-                let value_binding_first =
-                        (
-                            export begin
-                                k"let" >> ng >> helper
-                            end
-                        )
+                let first =
+                        export (k"let" >> ng >> helper)
                     <|> (
-                            mapping begin
-                                helper_add_attr_loc "genType"
-                            end
+                            mapping begin helper_add_attr_loc "genType" end
                             <*> loc_of @@ k"export" <* ng <*> helper
                         )
                 in
+                let first_rec = export (k"let" >> _k"rec" >> ng >> helper) in
+                let other = k_"and" >> set_p1 @@ export helper in
 
-                let value_binding_other =
-                    _use @@ add_attrs (
-                        k_"and" >> set_p1 @@ export helper
+                    (
+                        mapping begin fun first others ->
+                            mk_na_helper2 Str.value Recursive (first :: others)
+                        end
+                        <*> use @@ add_attrs first_rec <*>* _use @@ add_attrs other
                     )
-                in
-
-                mapping begin fun first others ->
-                    mk_na_helper2 Str.value Asttypes.Nonrecursive (first :: others)
-                end
-                <*> use @@ add_attrs value_binding_first <*>* value_binding_other
+                <|> (
+                        mapping begin fun first others ->
+                            mk_na_helper2 Str.value Nonrecursive (first :: others)
+                        end
+                        <*> use @@ add_attrs first <*>* _use @@ add_attrs other
+                    )
             end
         in
 
@@ -536,16 +544,21 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
         in
 
         let module_binding =
-            k"module" >> ng >> _module_binding
+            Named.p "str:mb" begin
+                k"module" >> ng >> _module_binding
+            end
         in
 
         let rec_module_binding =
-            mapping cons
-            <*> use @@ add_attrs (k"module" >> ng >> k"rec" >> ng >> _module_binding)
-            <*>* _use @@ add_attrs (k"and" >> ng >> _module_binding)
+            Named.p "str:mb:rec" begin
+                mapping cons
+                <*> use @@ add_attrs (k"module" >> ng >> k"rec" >> ng >> _module_binding)
+                <*>* _use @@ add_attrs (k"and" >> ng >> _module_binding)
+            end
         in
 
         let include_ =
+            Named.p "include" @@
             add_attrs (
                 mapping @@ mk_helper @@ Incl.mk ?docs:None
                 <* k"include" <*> _use modexpr
@@ -556,20 +569,23 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
             Named.p "str" begin
                 let structure_item =
                     Named.p "str:item" begin
-                        value_str
+                        let expr = add_attrs (mapping @@ mk_helper Str.eval <*> use expression_arrow) in
+
+                        Peek.char_fail
+
+                            value_str
                         <|> (rec_module_binding >>| mk_na_helper Str.rec_module)
                         <|> item_helper Str.module_ module_binding
                         <|> (module_attribute >>| mk_na_helper Str.attribute)
                         <|> item_helper Str.modtype modtype_str
                         <|> item_helper Str.type_extension type_extension
-                        <|> type_ Str.type_
+                        <|> Named.p "str:type" @@ type_ Str.type_
                         <|> item_helper Str.primitive external_
                         <|> item_helper Str.include_ import
                         <|> item_helper Str.include_ include_
                         <|> item_helper Str.open_ open_
                         <|> item_helper Str.exception_ exception_sig
                         <|> add_attrs (mapping @@ mk_helper Str.extension <*> module_extension)
-                        <|> add_attrs (mapping @@ mk_helper Str.eval <*> use expression_arrow)
                     end
                 in
                 many @@ _use_item structure_item
@@ -592,9 +608,19 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
         (*Res_diagnostics.printReport state.diagnostics "TODO";*)
         res
 
-    let parse p state filename =
-        parse_string p state ~filename (Res_io.readFile ~filename)
+    let parse p state ~src ~filename =
+        parse_string p state ~filename src
 
-    let parse_interface = parse (with_print @@ signature << ng) State.default
-    let parse_implementation = parse (with_print @@ structure << ng) State.default
+    let parse_interface = parse (signature << ng) State.default
+    let parse_implementation = parse (structure << ng) State.default
 end
+
+let memo_spec =
+    [ "expression"
+    ; "expression:arrow"
+    ; "expression:p0"
+    ; "expression:p8"
+	; "pattern"
+	; "typexpr"
+    ; "typexpr:atom"
+    ]
