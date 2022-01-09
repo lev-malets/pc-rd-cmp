@@ -3,14 +3,15 @@ open Sigs
 open Asttypes
 open Parsetree
 open Ast_helper
-open Basic.Angstrom
 open Basic
+open APos
 
 module Make
-        (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser)
+        (Ext: Ext)
         (Utils: UTILS) (Constant: CONSTANT) (Core: CORE)
         : TYPE = struct
 
+    open Ext
     open Utils
     open Core
 
@@ -24,25 +25,26 @@ module Make
             let core_type_poly = getter.get @@ fun (module M: TYPE) -> M.core_type_poly
             let core_type_package = Named.p "typexpr:package"
                 begin
-                    (
-                        mapping @@ mk_helper2 Typ.package
-                        <*> loc u_longident <* _k"with" <*> (
-                            seq 1 ~sep:(_k"and")
-                            (both
-                                (_k"type" >> _loc l_longident)
-                                (_s"=" >> _use core_type_atom))
+                        (
+                            mapping @@ mk_helper2 Typ.package
+                            <*> loc u_longident << -k"with"
+                            <*> (
+                                    seq 1 ~sep:(-k"and")
+                                        (mapping t2
+                                            << -k"type" <*> -loc l_longident
+                                            << -s"=" <*> -use core_type_atom
+                                        )
+                                )
                         )
-                    )
-                    <|>
-                    (
-                        mapping (fun a -> mk_helper2 Typ.package a [])
-                        <*> loc u_longident
-                    )
+                    <|> (
+                            mapping (fun a -> mk_helper2 Typ.package a [])
+                            <*> loc u_longident
+                        )
                 end
 
             let var =
                 mapping (mk_helper ~f:Typ.var)
-                <* s"\'" <*> ident
+                << s"\'" <*> ident
 
             let any = s"_" >>$ mk_helper ~f:Typ.any ()
 
@@ -50,7 +52,7 @@ module Make
                 Named.p "typexpr:constr" begin
                     (
                         mapping @@ mk_helper2 Typ.constr
-                        <*> loc l_longident <* _s"<" <*> seq 1 (_use core_type) ~sep:(_s",") ~trail <* _s">"
+                        <*> loc l_longident << -s"<" <*> seq 1 (-use core_type) ~sep:(-s",") ~trail << -s">"
                     )
                     <|>
                     (
@@ -62,7 +64,7 @@ module Make
 
             let tuple =
                 mapping (mk_helper ~f:Typ.tuple)
-                <* s"(" <*> seq 2 (_use core_type) ~sep:(_s",") ~trail <* _s")"
+                << s"(" <*> seq 2 (-use core_type) ~sep:(-s",") ~trail << -s")"
 
             let unit =
                 mapping @@ (fun a -> mk_helper2 Typ.constr a [])
@@ -73,36 +75,36 @@ module Make
                     let object_field =
                         (
                             mapping begin fun attrs name typ -> Otag (name, attrs, typ) end
-                            <*> attrs_ <*> loc Constant.String.string <* _s":" <*> _use core_type_poly
+                            <*> attrs_ <*> loc Constant.String.string << -s":" <*> -use core_type_poly
                         )
                         <|>
                         (
                             mapping begin fun typ -> Oinherit typ end
-                            <* s"..." <*> _use core_type
+                            << s"..." <*> -use core_type
                         )
                     in
 
-                    (s"{" >> _s"." >> _s"}" >>$ (mk_helper2 Typ.object_ [] Closed))
+                    (s"{" >> -s"." >> -s"}" >>$ (mk_helper2 Typ.object_ [] Closed))
                     <|>
                     (
                         mapping (fun a -> mk_helper2 Typ.object_ a Closed)
-                        <* s"{"
-                        <*> seq 0 ~sep:(_s",") ~trail (ng >> object_field)
-                        <* _s"}"
+                        << s"{"
+                        <*> seq 0 ~sep:(-s",") ~trail (ng >> object_field)
+                        << -s"}"
                     )
                     <|>
                     (
                         mapping (fun a -> mk_helper2 Typ.object_ a Open)
-                        <* s"{" <* _s".."
-                        <*> seq 0 ~sep:(_s",") ~trail (ng >> object_field)
-                        <* _s"}"
+                        << s"{" << -s".."
+                        <*> seq 0 ~sep:(-s",") ~trail (ng >> object_field)
+                        << -s"}"
                     )
                     <|>
                     (
                         mapping (fun a -> mk_helper2 Typ.object_ a Closed)
-                        <* s"{" <* _s"."
-                        <*> seq 0 ~sep:(_s",") ~trail (ng >> object_field)
-                        <* _s"}"
+                        << s"{" << -s"."
+                        <*> seq 0 ~sep:(-s",") ~trail (ng >> object_field)
+                        << -s"}"
                     )
                 end
 
@@ -110,7 +112,7 @@ module Make
                 Named.p "typexpr:variant" begin
                     let constructor_arguments =
                             use tuple
-                        <|> (s"(" >> _use core_type << _s")")
+                        <|> (s"(" >> -use core_type << -s")")
                     in
 
                     let row_field =
@@ -118,7 +120,7 @@ module Make
                             mapping begin fun attrs tag empty constrs ->
                                 Rtag (tag, attrs, empty <> None, constrs)
                             end
-                            <*> attrs_ <*> loc variant_tag <*>? _s"&" <*> seq 1 (ng >> constructor_arguments) ~sep:(_s"&")
+                            <*> attrs_ <*> loc variant_tag <*>? -s"&" <*> seq 1 (ng >> constructor_arguments) ~sep:(-s"&")
                         )
                         <|>
                         (
@@ -131,15 +133,15 @@ module Make
                         (use core_type >>| fun x -> Rinherit x)
                     in
 
-                    let rows = opt @@ _s"|" >> seq 1 (ng >> row_field) ~sep:(_s"|") in
+                    let rows = opt @@ -s"|" >> seq 1 (-row_field) ~sep:(-s"|") in
 
-                    (s_"[" >> _s">" >> _s"]" >>$ (mk_helper3 Typ.variant [] Open None))
+                    (s"[" >> -s">" >> -s"]" >>$ (mk_helper3 Typ.variant [] Open None))
                     <|>
                     (
                         mapping begin fun list ->
                             mk_helper3 Typ.variant list Open None
                         end
-                        << s_"[" << _s">" <*> rows << _s"]"
+                        << s"[" << -s">" <*> rows << -s"]"
                     )
                     <|>
                     (
@@ -147,39 +149,37 @@ module Make
                             let tags = if tags <> None then tags else Some [] in
                             mk_helper3 Typ.variant list Closed tags
                         end
-                        << s_"[" << _s"<" <*> rows <*>? (_s">" >> seq 1 (ng >> variant_tag)) << _s"]"
+                        << s"[" << -s"<" <*> rows <*>? (-s">" >> seq 1 (ng >> variant_tag)) << -s"]"
                     )
                     <|>
                     (
                         mapping begin fun list ->
                             mk_helper3 Typ.variant list Closed None
                         end
-                        << s_"[" <*> rows << _s"]"
+                        << s"[" <*> rows << -s"]"
                     )
                 end
 
             let core_type_atom =
                 Named.p "typexpr:atom" @@ add_attrs begin
-                    peek_char_fail >>= function
-                    | '_' -> any
-                    | '\'' -> var
-                    | '(' -> unit <|> (s_"(" >> core_type << _s")") <|> tuple
-                    | _ ->
-                        (k"module" >> _s_"(" >> core_type_package << _s")")
-                        <|>
-                        bs_object
-                        <|>
-                        constr
-                        <|>
-                        variant
-                        <|>
-                        (mapping (mk_helper ~f:Typ.extension) <*> extension)
+                    Peek.first
+                    [ any
+                    ; var
+                    ; unit
+                    ; s"(" >> -core_type << -s")"
+                    ; tuple
+                    ; k"module" >> -s"(" >> -core_type_package << -s")"
+                    ; bs_object
+                    ; constr
+                    ; variant
+                    ; mapping (mk_helper ~f:Typ.extension) <*> extension
+                    ]
                 end
 
             let alias p =
                 fold_left_0_1
                     (mapping t3 <*> pos <*> p <*> pos)
-                    (both (_k"as" >> _s"'" >> l_ident >>| fun x prev -> mk_helper2 Typ.alias prev x) pos)
+                    (mapping t2 << -k"as" << -s"'" <*> (l_ident >>| fun x prev -> mk_helper2 Typ.alias prev x) <*> pos)
                     ~f:begin fun (p1, hlp, p2) (x, p3) ->
                         let prev = apply hlp p1 p2 in
                         p1, x prev, p3
@@ -191,8 +191,8 @@ module Make
             let arrow =
                 begin
                     let _arrow_tail =
-                        _s"=>" >>
-                        map (_use core_type_arrow) ~f:(fun typ label arg -> mk_helper3 Typ.arrow label arg typ)
+                        -s"=>" >>
+                        (-use core_type_arrow >>| fun typ label arg -> mk_helper3 Typ.arrow label arg typ)
                     in
 
                     let with_args typ _tail =
@@ -203,7 +203,7 @@ module Make
                                 let arg = apply x p1 p2 in
                                 tail label arg
                             end
-                            << s_"~" <*> loc l_ident << _s":" << ng <*> pos <*> add_attrs typ <*> pos <*>? (_s"=" << _s"?") <*> _tail
+                            << s"~" <*> -loc l_ident << -s":" << ng <*> pos <*> add_attrs typ <*> pos <*>? (-s"=" << -s"?") <*> _tail
                         )
                         <|>
                         (
@@ -215,22 +215,17 @@ module Make
                     in
 
                     let tail = fix @@ fun tail ->
-                        (s")" >> _arrow_tail)
-                        <|>
-                        (s"," >> _s")" >> _arrow_tail)
-                        <|>
-                        (s"," >> _s"." >> _use (with_args core_type tail >>| helper_add_attr "bs") >>| fun typ label arg ->
-                            mk_helper3 Typ.arrow label arg typ
-                        )
-                        <|>
-                        (s"," >> _use (with_args core_type tail) >>| fun typ label arg -> mk_helper3 Typ.arrow label arg typ)
+                            (s")" >> _arrow_tail)
+                        <|> (s"," >> -s")" >> _arrow_tail)
+                        <|> (s"," >> -s"." >> -use (with_args core_type tail >>| helper_add_attr "bs") >>| fun typ label arg ->
+                                mk_helper3 Typ.arrow label arg typ
+                            )
+                        <|> (s"," >> -use (with_args core_type tail) >>| fun typ label arg -> mk_helper3 Typ.arrow label arg typ)
                     in
 
-                    add_attrs (s"(" >> _s"." >> ng >> with_args core_type tail >>| helper_add_attr "bs")
-                    <|>
-                    add_attrs (s"(" >> ng >> with_args core_type tail)
-                    <|>
-                    Named.p "typexpr:arrow:onearg" (with_args aliased_atom _arrow_tail)
+                        add_attrs (s"(" >> -s"." >> ng >> with_args core_type tail >>| helper_add_attr "bs")
+                    <|> add_attrs (s"(" >> ng >> with_args core_type tail)
+                    <|> Named.p "typexpr:arrow:onearg" (with_args aliased_atom _arrow_tail)
                 end
 
             let core_type_arrow =
@@ -244,7 +239,7 @@ module Make
                     (
                         mapping @@ mk_helper2 Typ.poly
                         <*> seq 1 (s"\'" >> loc l_ident) ~sep:ng
-                        << _s"." <*> _use core_type
+                        << -s"." <*> -use core_type
                     )
                     <|>
                     core_type
@@ -262,15 +257,15 @@ module Make
 
                         mk_helper2 (Type.field ?info:None ?mut) name typ
                     end
-                    <*>? (k"mutable" << ng) <*> loc l_ident <*>? (_s":" >> _use core_type_poly)
+                    <*>? (k"mutable" << ng) <*> loc l_ident <*>? (-s":" >> -use core_type_poly)
                 end
 
             let label_declarations =
-                s_"{" >> seq 1 ~sep:(_s",") ~trail @@ _use label_declaration << _s"}"
+                s"{" >> seq 1 ~sep:(-s",") ~trail @@ -use label_declaration << -s"}"
 
             let constr_args =
-                    (s_"(" >> label_declarations << opt @@ _s"," << _s")" >>| fun x -> Pcstr_record x)
-                <|> (s_"(" >> seq 1 (_use core_type) ~sep:(_s",") ~trail << opt @@ _s"," << _s")" >>| fun x -> Pcstr_tuple x)
+                    (s"(" >> -label_declarations << opt @@ -s"," << -s")" >>| fun x -> Pcstr_record x)
+                <|> (s"(" >> seq 1 (-use core_type) ~sep:(-s",") ~trail << opt @@ -s"," << -s")" >>| fun x -> Pcstr_tuple x)
 
             let type_kind =
                 let variant =
@@ -279,10 +274,10 @@ module Make
                             mapping begin fun name args res ->
                                 mk_helper ~f:(Type.constructor ?info:None ?args:(Some args) ?res) name
                             end
-                            <*> loc u_ident <*> ((ng >> constr_args) <|> return @@ Pcstr_tuple []) <*>? (_s":" >> _use core_type_atom)
+                            <*> loc u_ident <*> ((ng >> constr_args) <|> return @@ Pcstr_tuple []) <*>? (-s":" >> -use core_type_atom)
                         in
 
-                        opt @@ s"|" >> seq 1 (_use @@ add_attrs constructor) ~sep:(_s"|") >>| fun x -> Ptype_variant x
+                        opt @@ s"|" >> seq 1 (-use (add_attrs constructor)) ~sep:(-s"|") >>| fun x -> Ptype_variant x
                     end
                 in
 
@@ -310,14 +305,14 @@ module Make
                     <*> variance <*> use (any <|> var)
                 in
 
-                s_"<" >> seq 1 ~sep:(_s",") ~trail (ng >> param) << _s">"
+                s"<" >> seq 1 ~sep:(-s",") ~trail (-param) << -s">"
 
             let type_decl_constraints =
-                many1 (
+                seq 1 (
                     mapping begin fun p1 t1 t2 p2 ->
                         t1, t2, make_location p1 p2
                     end
-                    << ng <*> position << k"constraint" <*> _use core_type_atom << _s"=" <*> _use core_type <*> position
+                    << ng <*> pos << k"constraint" <*> -use core_type_atom << -s"=" <*> -use core_type <*> pos
                 )
 
             let type_declaration =
@@ -328,8 +323,8 @@ module Make
                             mk_helper ~f:(Type.mk
                                 ?docs:None ?text:None ?params ?cstrs ?kind:(Some kind) ?priv ?manifest:(Some manifest)) name
                         end
-                        <*> loc l_ident <*>? (ng >> type_decl_params) << _s"=" <*> _use core_type
-                        << _s"=" <*>? (ng >> k"private") << ng <*> type_kind <*>? type_decl_constraints
+                        <*> loc l_ident <*>? (ng >> type_decl_params) << -s"=" <*> -use core_type
+                        << -s"=" <*>? (ng >> k"private") << ng <*> type_kind <*>? type_decl_constraints
                     )
                     <|>
                     Named.p "type_declaration:manifest" (
@@ -338,7 +333,7 @@ module Make
                             mk_helper ~f:(Type.mk
                                 ?docs:None ?text:None ?params ?cstrs ?kind:None ?priv ?manifest:(Some manifest)) name
                         end
-                        <*> loc l_ident <*>? (ng >> type_decl_params) <* _s"=" <*>? _k"private" <*> _use core_type
+                        <*> loc l_ident <*>? (ng >> type_decl_params) << -s"=" <*>? -k"private" <*> -use core_type
                         <*>? type_decl_constraints
                     )
                     <|>
@@ -349,7 +344,7 @@ module Make
                                 ?docs:None ?text:None ?params ?cstrs ?kind:(Some kind) ?priv ?manifest:None) name
                         end
                         <*> loc l_ident <*>? (ng >> type_decl_params)
-                        << _s"=" <*>? _k"private" << ng <*> type_kind <*>? type_decl_constraints
+                        << -s"=" <*>? -k"private" << ng <*> type_kind <*>? type_decl_constraints
                     )
                     <|>
                     Named.p "type_declaration:abstract" (
@@ -363,17 +358,14 @@ module Make
 
             let _extension_kind =
                 let extension_kind =
-                    (constr_args >>| fun x -> Pext_decl (x, None))
-                    <|>
-                    (s"=" >> _loc u_longident >>| fun x -> Pext_rebind x)
-                    <|>
-                    (s":" >> _use core_type >>| fun x -> Pext_decl (Pcstr_tuple [], Some x))
+                        (constr_args >>| fun x -> Pext_decl (x, None))
+                    <|> (s"=" >> -loc u_longident >>| fun x -> Pext_rebind x)
+                    <|> (s":" >> -use core_type >>| fun x -> Pext_decl (Pcstr_tuple [], Some x))
                 in
 
                 Named.p "typexr:constructor:kind" begin
-                    (ng >> extension_kind)
-                    <|>
-                    return @@ Pext_decl (Pcstr_tuple [], None)
+                        (ng >> extension_kind)
+                    <|> return @@ Pext_decl (Pcstr_tuple [], None)
                 end
 
             let type_extension_constructor =
@@ -389,8 +381,8 @@ module Make
                         helper @@ fun ~p1:_ ~p2:_ ~attrs ->
                             Te.mk ~attrs ?params ?priv name (hd::tail)
                     end
-                    <* k"type" <*> _loc l_longident <*>? type_decl_params <* _s"+=" <*>? _k"private"
-                    <* opt @@ _s"|" <*> _use type_extension_constructor <*>* (_s"|" >> _use type_extension_constructor)
+                    << k"type" <*> -loc l_longident <*>? type_decl_params << -s"+=" <*>? -k"private"
+                    << opt @@ -s"|" <*> -use type_extension_constructor <*>* (-s"|" >> -use type_extension_constructor)
                 end
         end: TYPE)
 

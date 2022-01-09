@@ -6,20 +6,27 @@ module ParseRes: Pc_syntax.Sigs.PARSE = struct
       Ok (Res_parse_string.parse_implementation ~src ~filename)
 end
 
+module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.APos)
+module NotPeek = Angstrom_pos.Peek.MakeNotPeek(Pc_syntax.Basic.APos)
+module type PEEK = module type of Peek
+
 module Parse = Pc_syntax.Parser.Make
-    (Angstrom_pos.Trace.Stub
-        (Pc_syntax.Basic.Angstrom))
+    (struct
+    module Named = Angstrom_pos.Trace.Stub(Pc_syntax.Basic.APos)
+        module Peek = NotPeek
+    end)
+module ParsePeek = Pc_syntax.Parser.Make
+    (struct
+    module Named = Angstrom_pos.Trace.Stub(Pc_syntax.Basic.APos)
+    module Peek = Peek
+end)
 
 let peek = true
-
-module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.Angstrom)
-module NotPeek = Angstrom_pos.Peek.MakeNotPeek(Pc_syntax.Basic.Angstrom)
-module type PEEK = module type of Peek
 
 let mk_traced ?(peek=false) memo_spec: (module Angstrom_pos.Sigs.TRACED) * (module Pc_syntax.Sigs.PARSE) =
     let module Traced =
         Angstrom_pos.Trace.Traced
-            (Pc_syntax.Basic.Angstrom)
+            (Pc_syntax.Basic.APos)
             (struct let memo_spec = memo_spec end)
     in
     let (module Peek: PEEK) =
@@ -27,19 +34,25 @@ let mk_traced ?(peek=false) memo_spec: (module Angstrom_pos.Sigs.TRACED) * (modu
         else (module NotPeek)
     in
 
-    (module Traced), (module Pc_syntax.Parser.Make(Traced)(Peek))
+    (module Traced), (module Pc_syntax.Parser.Make((struct
+        module Named = Traced
+        module Peek = Peek
+    end)))
 
 let mk_memoized ?(peek=false) memo_spec: (module Pc_syntax.Sigs.PARSE) =
     let module Memoized =
         Angstrom_pos.Trace.Memoized
-            (Pc_syntax.Basic.Angstrom)
+            (Pc_syntax.Basic.APos)
             (struct let memo_spec = memo_spec end)
     in
     let (module Peek: PEEK) =
         if peek then (module Peek)
         else (module NotPeek)
     in
-    (module Pc_syntax.Parser.Make(Memoized)(Peek))
+    (module Pc_syntax.Parser.Make((struct
+        module Named = Memoized
+        module Peek = Peek
+    end)))
 
 let input = ref ""
 let output = ref ""

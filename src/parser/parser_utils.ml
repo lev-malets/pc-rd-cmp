@@ -1,5 +1,5 @@
-open Basic.Angstrom
 open Basic
+open APos
 open Core_kernel
 open Sigs
 open Parsetree
@@ -23,7 +23,7 @@ module Hc = struct
     let unit_expr loc = Ast_helper.Exp.construct ~loc (Location.mkloc (Longident.Lident "()") loc) None
 end
 
-module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser): UTILS = struct
+module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Parser): UTILS = struct
     let s =
         Fix.Memoize.String.memoize @@ fun x ->
         Named.p ("\'" ^ x ^ "\'") begin
@@ -37,8 +37,9 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
 
     let single_line_comment =
         let p = s"//" >> take_while (fun c -> c <> '\n' && c <> '\r') in
-        map (loc (consumed p))
-        ~f:begin fun {txt; loc} -> Res_comment.makeSingleLineComment ~loc txt end
+        loc (consumed p)
+        >>|
+        fun {txt; loc} -> Res_comment.makeSingleLineComment ~loc txt
 
     let multi_line_comment =
         let loop = fix @@ fun loop ->
@@ -51,89 +52,85 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
             )
         in
         let p = s"/*" >> loop in
-        map (loc (consumed p))
-        ~f:begin fun {txt; loc} -> Res_comment.makeMultiLineComment ~loc txt end
+        loc (consumed p)
+        >>|
+        fun {txt; loc} -> Res_comment.makeMultiLineComment ~loc txt
 
     let comments =
         let push_comment c =
             c << whitespace >>= fun comment ->
-            state_map (fun s -> {s with comments = comment :: s.comments})
+            (state_map (fun s -> {s with comments = comment :: s.comments})).p
         in
-        many (push_comment single_line_comment <|> push_comment multi_line_comment) >>$ ()
+        seq 0 (push_comment single_line_comment <|> push_comment multi_line_comment) >>$ ()
     let ng = memo
         begin
             whitespace << comments
         end
+
+    let (~-) p = ng >> p
     let ng_no_new_line =
-        position >>= fun pos ->
-        ng >> position >>= fun pos1 ->
-        match pos1.pos_lnum = pos.pos_lnum with
-        | true -> return ()
-        | false -> fail ""
+        (
+            mapping t2
+            <*> pos << ng <*> pos
+        )
+        >>=
+        fun (p1, p2) ->
+            let open Angstrom in
+            match p1.pos_lnum = p2.pos_lnum with
+            | true -> return ()
+            | false -> fail ""
 
     let ng_new_line =
-        position >>= fun pos ->
-        ng >> position >>= fun pos1 ->
-        match pos1.pos_lnum = pos.pos_lnum with
-        | true -> fail ""
-        | false -> return ()
-
-    let del_pos =
-        position >>= fun pos ->
-        ng >> peek_char >>= function
-        | Some '}' -> return pos
-        | Some ')' -> return pos
-        | Some ';' -> advance 1 >> position
-        | None -> return pos
-        | _ ->
-            position >>= fun pos1 ->
-            match pos1.pos_lnum = pos.pos_lnum with
-            | true -> fail ""
-            | false -> return pos
-
-    let del =
-        position >>= fun pos ->
-        ng >> peek_char >>= function
-        | Some '}' -> return ()
-        | Some ')' -> return ()
-        | Some ';' -> advance 1
-        | None -> return ()
-        | _ ->
-            position >>= fun pos1 ->
-            match pos1.pos_lnum = pos.pos_lnum with
+        (
+            mapping t2
+            <*> pos << ng <*> pos
+        )
+        >>=
+        fun (p1, p2) ->
+            let open Angstrom in
+            match p1.pos_lnum = p2.pos_lnum with
             | true -> fail ""
             | false -> return ()
 
-    let _pos = ng >> pos
-    let _loc p = ng >> loc p
-    let _loc_of p = ng >> loc_of p
-    let _set_loc p = ng >> set_loc p
+    let del_pos =
+        (mapping t2 <*> pos << ng <*> peek_char)
+        >>=
+        fun (p1, c) ->
+            let open Angstrom in
+            match c with
+            | Some '}' -> return p1
+            | Some ')' -> return p1
+            | Some ';' -> advance 1 >> APos.pos.p
+            | None -> return p1
+            | _ ->
+                APos.pos.p >>= fun p2 ->
+                match p1.pos_lnum = p2.pos_lnum with
+                | true -> fail ""
+                | false -> return p1
 
-    let _s = Fix.Memoize.String.memoize @@ fun x ->
-        ng >> s x
+    let del =
+        (mapping t2 <*> pos << ng <*> peek_char)
+        >>=
+        fun (p1, c) ->
+            let open Angstrom in
+            match c with
+            | Some '}' -> return ()
+            | Some ')' -> return ()
+            | Some ';' -> advance 1
+            | None -> return ()
+            | _ ->
+                APos.pos.p >>= fun p2 ->
+                match p1.pos_lnum = p2.pos_lnum with
+                | true -> fail ""
+                | false -> return ()
 
-    let s_ = Fix.Memoize.String.memoize @@ fun x ->
-        s x << ng
-
-    let _s_ = Fix.Memoize.String.memoize @@ fun x ->
-        ng >> s x << ng
 
     let identifier's_character = function
         | 'A'..'Z' | 'a'..'z' | '0'..'9' | '_' | '\'' -> true
         | _ -> false
 
     let k = Fix.Memoize.String.memoize @@ fun x ->
-        s x >> peek_char >>= function
-        | Some c when identifier's_character c -> fail ""
-        | _ -> return ()
-    let _k = Fix.Memoize.String.memoize @@ fun x ->
-        ng >> k x
-
-    let k_ = Fix.Memoize.String.memoize @@ fun x ->
-        k x << ng
-
-    let _k_ = Fix.Memoize.String.memoize @@ fun x ->
-        ng >> k x << ng
+        s x >> failed (satisfy identifier's_character)
 
     let operator's_character = function
         | '+' | '-' | '*' | '/' | '=' | '<' | '>' | '.' | '!' -> true
@@ -157,29 +154,27 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
         | _ -> return res
 *)
 
+    let upper = function 'A' .. 'Z' -> true | _ -> false
+    let lower = function 'a' .. 'z' | '_' -> true | _ -> false
+
+
     let ident = Named.p "ident" @@
         take_while1 identifier's_character
     let c_ident first = consumed (skip first >> skip_while identifier's_character)
 
-    let l_ident = Named.p "l_ident" @@ failed @@ k"_" >> c_ident lower
+    let l_ident = Named.p "l_ident" @@ (failed @@ k"_") >> c_ident lower
     let u_ident = Named.p "u_ident" @@ c_ident upper
 
     let u_longident =
-        let rec loop res =
-            (ng >> s"." >> ng >> u_ident >>= fun str -> loop @@ Longident.Ldot (res, str))
-            <|>
-(*
-            (ng >> in_ '(' ')' u_longident >>= fun t -> loop @@ Lapply (res, t))
-            <|>
-*)
-            return res
-
-        in
-        u_ident >>= fun str -> loop @@ Longident.Lident str
+        fold_left_0_n ~f:begin fun lid str -> Longident.Ldot (lid, str) end
+            (u_ident >>| fun str -> Longident.Lident str)
+            (-s"." >> ng >> u_ident)
 
     let l_longident =
-        map2 ~f:(fun a b -> Longident.Ldot (a, b))
-        u_longident (ng >> s"." >> ng >> l_ident)
+        (
+            mapping (fun a b -> Longident.Ldot (a, b))
+            <*> u_longident << -s"." << ng <*> l_ident
+        )
         <|>
         (l_ident >>| fun s -> Longident.Lident s)
 
@@ -188,7 +183,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
     let _longident =
         fold_left_0_n ~f:begin fun acc x -> Longident.Ldot (acc, x) end
             (ident >>| fun x -> Longident.Lident x)
-            (_s"." >> ng >> ident)
+            (-s"." >> ng >> ident)
 
 (*
     let ll_longident =
@@ -202,6 +197,6 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
 *)
     let rec exact_longident = function
         | Longident.Lident x -> s x
-        | Longident.Ldot (lid, x) -> exact_longident lid >> _s"." >> ng >> s x
-        | Longident.Lapply (lid, arg) -> exact_longident lid >> _s"(" >> ng >> exact_longident arg << _s")"
+        | Longident.Ldot (lid, x) -> exact_longident lid >> -s"." >> ng >> s x
+        | Longident.Lapply (lid, arg) -> exact_longident lid >> -s"(" >> ng >> exact_longident arg << -s")"
 end

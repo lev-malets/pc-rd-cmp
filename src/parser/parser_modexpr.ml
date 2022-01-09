@@ -3,13 +3,14 @@ open Sigs
 open Parsetree
 open Ast_helper
 open Basic
-open Basic.Angstrom
+open APos
 
 module Make
-        (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser)
+        (Ext: Ext)
         (Utils: UTILS) (Core: CORE) (Type: TYPE) (Expression: EXPRESSION)
         : MODEXPR = struct
 
+    open Ext
     open Utils
     open Core
     open Type
@@ -24,36 +25,38 @@ module Make
 
             let modtype_atom =
                 Named.p "modtype:atom" begin
-                        (s_"(" >> modtype_with << _s")")
-                    <|> (mapping (mk_helper ~f:Mty.signature) <* s_"{" <*> signature <* _s"}")
-                    <|> (mapping (mk_helper ~f:Mty.extension) <*> extension)
-                    <|> (mapping (mk_helper ~f:Mty.typeof_) <* k"module" <* _k"type" <* _k"of" <*> _use modexpr)
-                    <|> (mapping (mk_helper ~f:Mty.ident) <*> loc longident)
+                    Peek.first
+                    [ s"(" >> -modtype_with << -s")"
+                    ; mapping (mk_helper ~f:Mty.signature) << s"{" <*> -signature << -s"}"
+                    ; mapping (mk_helper ~f:Mty.extension) <*> extension
+                    ; mapping (mk_helper ~f:Mty.typeof_) << k"module" << -k"type" << -k"of" <*> -use modexpr
+                    ; mapping (mk_helper ~f:Mty.ident) <*> loc longident
+                    ]
                 end
 
             let modtype = add_attrs @@ modtype_atom
 
             let modtype_functor =
-                let _tail = _s"=>" >> _use modtype_functor in
+                let _tail = -s"=>" >> -use modtype_functor in
 
                 let with_functor_args = fix @@ fun with_functor_args ->
                     let tail =
                             (s")" >> _tail)
-                        <|> (s"," >> _s")" >> _tail)
-                        <|> (s"," >> _use with_functor_args)
+                        <|> (s"," >> -s")" >> _tail)
+                        <|> (s"," >> -use with_functor_args)
                     in
 
                         add_attrs (
                             mapping (mk_helper3 Mty.functor_)
-                            <*> loc u_ident <* _s":" <*> (_use modtype >>| some) <* ng <*> tail
+                            <*> loc u_ident << -s":" <*> (-use modtype >>| some) << ng <*> tail
                         )
                     <|> add_attrs (
                             mapping (mk_helper3 Mty.functor_)
-                            <*> loc (s"_" >>$ "_") <*>? (_s":" >> _use modtype) <* ng <*> tail
+                            <*> loc (s"_" >>$ "_") <*>? (-s":" >> -use modtype) << ng <*> tail
                         )
                     <|> (
                             mapping (mk_helper3 Mty.functor_ @@ Location.mknoloc "_")
-                            <*> (_use modtype >>| some) <* ng <*> tail
+                            <*> (-use modtype >>| some) << ng <*> tail
                         )
                 in
 
@@ -76,7 +79,7 @@ module Make
                         mk_helper ~f:(Ast_helper.Type.mk
                             ?docs:None ?text:None ?params ?cstrs ?kind:None ?priv:None ?manifest:(Some manifest)) name
                     end
-                    <*>? type_decl_params <* _s eq <*> _use core_type <*>? type_decl_constraints
+                    <*>? type_decl_params << -s eq <*> -use core_type <*>? type_decl_constraints
                 in
 
                 let with_constraint =
@@ -107,12 +110,12 @@ module Make
                         <|>
                         begin
                             mapping begin fun m1 m2 -> Pwith_module (m1, m2) end
-                            << k"module" << ng <*> loc u_longident << _s"=" << ng <*> loc u_longident
+                            << k"module" << ng <*> loc u_longident << -s"=" << ng <*> loc u_longident
                         end
                         <|>
                         begin
                             mapping begin fun m1 m2 -> Pwith_modsubst (m1, m2) end
-                            << k"module" << ng <*> loc u_longident << _s":=" << ng <*> loc u_longident
+                            << k"module" << ng <*> loc u_longident << -s":=" << ng <*> loc u_longident
                         end
                     end
                 in
@@ -121,7 +124,7 @@ module Make
                     let typ = apply typ p1 p2 in
                     mk_helper2 Mty.with_ typ constrs
                 end
-                <*> pos <*> modtype_functor <*> pos <* _k"with" <*> seq 1 ~sep:(_k"and") (ng >> with_constraint)
+                <*> pos <*> modtype_functor <*> pos << -k"with" <*> seq 1 ~sep:(-k"and") (ng >> with_constraint)
 
             let modtype_with =
                 Named.p "modtype:with" @@
@@ -130,22 +133,22 @@ module Make
             let modexpr_constrainted =
                 Named.p "modexpr:constrainted" @@
                 fold_hlp_left_0_1 ~f:(mk_helper2 Mod.constraint_)
-                    modexpr (_s":" >> _use modtype)
+                    modexpr (-s":" >> -use modtype)
 
             let atom =
                 let unpack_constr =
                     fold_hlp_left_0_1 ~f:(mk_helper2 Exp.constraint_)
-                        expression (_s":" >> _use core_type_package)
+                        expression (-s":" >> -use core_type_package)
                 in
-                    (mapping (mk_helper ~f:Mod.unpack) <* k"unpack" <* _s"(" <*> _use unpack_constr <* _s")")
+                    (mapping (mk_helper ~f:Mod.unpack) << k"unpack" << -s"(" <*> -use unpack_constr << -s")")
                 <|> (mapping (mk_helper ~f:Mod.ident) <*> loc u_longident)
-                <|> (s_"(" >> add_attrs modexpr_constrainted << _s")")
+                <|> (s"(" >> -add_attrs modexpr_constrainted << -s")")
                 <|> (mapping (mk_helper ~f:Mod.extension) <*> extension)
 
             let apply =
                 let genarg =
                     mapping (mk_helper ~f:Mod.structure [])
-                    <* s"(" <* _s")"
+                    << s"(" << -s")"
                 in
 
                 let arg = genarg <|> modexpr_constrainted in
@@ -156,7 +159,7 @@ module Make
                             mapping begin fun arg p2 ->
                                 (fun prev -> mk_helper2 Mod.apply prev arg), p2
                             end
-                            <*> _use arg <*> pos
+                            <*> -use arg <*> pos
                         )
                         (
                             mapping begin fun arg p3 (cont, p2) ->
@@ -165,15 +168,15 @@ module Make
                                     mk_helper2 Mod.apply prev arg
                                 end, p3
                             end
-                            <* _s"," <*> _use arg <*> pos
+                            << -s"," <*> -use arg <*> pos
                         )
                     >>| fun (x, _) -> x
                 in
 
                 let args =
-                    (s"(" *> args <* opt (_s",") <* _s")")
+                    (s"(" >> args << opt (-s",") << -s")")
                     <|>
-                    (s"(" >> _s")" >>$ fun prev -> mk_helper2 Mod.apply prev (Mod.structure []))
+                    (s"(" >> -s")" >>$ fun prev -> mk_helper2 Mod.apply prev (Mod.structure []))
                 in
 
                 add_attrs @@ (
@@ -196,20 +199,20 @@ module Make
                     mapping begin fun mt me ->
                         Mod.constraint_ ~loc:me.pmod_loc me mt
                     end
-                    <* _s":" <*> _use modtype <* _s"=>" <*> _use modexpr
+                    << -s":" <*> -use modtype << -s"=>" <*> -use modexpr
                     <|>
-                    (_s"=>" >> _use modexpr)
+                    (-s"=>" >> -use modexpr)
                 in
 
                 let arg_loop = fix @@ fun arg_loop ->
 
                     let _tail =
-                            (opt (s",") >> _s")" >> _tail)
-                        <|> (s"," >> _use arg_loop)
+                            (opt (s",") >> -s")" >> _tail)
+                        <|> (s"," >> -use arg_loop)
                     in
 
                     add_attrs (
-                            (mapping (mk_helper3 Mod.functor_) <*> loc u_ident <*>? (_s":" >> _use modtype) <*> _tail)
+                            (mapping (mk_helper3 Mod.functor_) <*> loc u_ident <*>? (-s":" >> -use modtype) <*> _tail)
                         <|> (mapping (fun a b -> mk_helper3 Mod.functor_ a None b) <*> loc (s"()" >>$ "*") <*> _tail)
                     )
                 in
@@ -223,7 +226,7 @@ module Make
 
             let structure =
                 mapping (mk_helper ~f:Mod.structure)
-                <* s_"{" <*> structure <* _s"}"
+                << s"{" <*> -structure << -s"}"
 
             let modexpr =
                 Named.p "modexpr" begin

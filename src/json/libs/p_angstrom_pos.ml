@@ -1,4 +1,5 @@
 module Angstrom = Angstrom_pos.Make(struct type s = unit end)
+module Peek = Angstrom_pos.Peek.MakePeek(Angstrom)
 
 open Angstrom
 open P_base
@@ -20,6 +21,7 @@ module Json = struct
         | '0'..'9' -> true
         | _ -> false
     let number = _number >>= fun str ->
+        let open Angstrom in
         match int_of_string_opt str with
         | Some a -> return @@ `Int a
         | None -> match float_of_string_opt str with
@@ -28,29 +30,32 @@ module Json = struct
 
     let _string = char '"' >> take_while (fun i -> i <> '"') << advance 1
 
-    let string: json Parser.t = map ~f:(fun s -> `String s)
-        _string
+    let string: json Parser.t = _string >>| fun s -> `String s
 
     let json: json Parser.t = fix (fun json ->
-        let mem = map2 ~f:(fun key value -> (key, value))
-            (_string << ws)
-            (lchar ':' >> json)
+        let mem =
+            mapping (fun key value -> (key, value))
+            <*> _string << ws << lchar ':' <*> json
         in
-        let obj = map ~f:(fun ms -> `Assoc ms)
-            (lchar '{' >> sep_by (lchar ',') mem << lchar '}')
+        let obj =
+            (lchar '{' >> seq 1 ~sep:(lchar ',') mem << lchar '}')
+            >>|
+            fun ms -> `Assoc ms
         in
-        let arr = map ~f:(fun vs -> `List vs)
-            (lchar '[' >> sep_by (lchar ',') json << lchar ']')
+        let arr =
+            (lchar '[' >> seq 1 ~sep:(lchar ',') json << lchar ']')
+            >>|
+            fun vs -> `List vs
         in
-        (peek_char_fail >>= function
-        | 'n' -> null
-        | 't' -> _true
-        | 'f' -> _false
-        | '"' -> string
-        | '{' -> obj
-        | '[' -> arr
-        | '-' | '.' | '0' .. '9' -> number
-        | _ -> fail "inv char") << ws) <?> "json"
+        Peek.first
+        [ null
+        ; _true
+        ; _false
+        ; string
+        ; obj
+        ; arr
+        ; number ] << ws
+    )
 end
 
 let parse f str =

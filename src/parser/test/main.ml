@@ -25,8 +25,8 @@ let print_last_pos () =
     | None -> ()
     | Some (module Trace) ->
         let path, pos = Exec_info.last_pos Trace.tt in
-        Printf.eprintf "%s\n" @@ String.concat " |> " path;
-        Printf.eprintf "%s:%d:%d\n" pos.pos_fname pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
+        Printf.printf "%s\n" @@ String.concat " |> " path;
+        Printf.printf "%s:%d:%d\n" pos.pos_fname pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
 let print_ast ~pp x =
     let och =

@@ -1,4 +1,4 @@
 (library
  (name angstrom_pos)
- (libraries angstrom-mod ast_show exec_info)
+ (libraries angstrom-mod ast_show exec_info fix zarith)
  (preprocess (pps ppx_jane_fix)))

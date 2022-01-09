@@ -16,7 +16,10 @@ module type CORE = sig
 
     val attrs_ : attributes parser
     val use : 'a helper parser -> 'a parser
-    val _use : 'a helper parser -> 'a parser
+    val use_na : 'a na_helper parser -> 'a parser
+
+    val use_del : 'a helper parser -> 'a parser
+    val use_na_del : 'a na_helper parser -> 'a parser
 
     val add_attrs : 'a helper parser -> 'a helper parser
     val set_p1 : 'a helper parser -> 'a helper parser
@@ -49,22 +52,14 @@ module type UTILS = sig
     val ng_no_new_line : unit parser
     val ng_new_line : unit parser
 
-    val _pos : Lexing.position parser
+    val (~-) : 'a parser -> 'a parser
+
     val del_pos : Lexing.position parser
     val del : unit parser
-    val _loc : 'a parser -> 'a Location.loc parser
-    val _loc_of : _ parser -> Location.t parser
-    val _set_loc : 'a helper parser -> 'a ahelper parser
     val s : string -> unit parser
-    val _s : string -> unit parser
 
-    val s_ : string -> unit parser
-    val _s_ : string -> unit parser
     val identifier's_character : char -> bool
     val k : string -> unit parser
-    val _k : string -> unit parser
-    val k_ : string -> unit parser
-    val _k_ : string -> unit parser
     val operator's_character : char -> bool
     val o : string -> Longident.t parser
 

@@ -1,7 +1,7 @@
 (library
  (name p_base)
  (modules p_base)
- (libraries yojson extlib))
+ (libraries yojson core_kernel))
 
 (library
  (name p_test)

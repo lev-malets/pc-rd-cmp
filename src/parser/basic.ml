@@ -1,17 +1,14 @@
-module Angstrom = Angstrom_pos.Make(State)
+module APos = Angstrom_pos.Make(State)
+module Charset = Angstrom_pos.Charset
 
-open Angstrom
-open Core_kernel
+module type Ext = sig
+    module Named: Angstrom_pos.Sigs.NAMED with module Parser = APos.Parser
+    module Peek: Angstrom_pos.Sigs.PEEK with module Parser = APos.Parser
+end
 
-type 'a parser = 'a Angstrom.Parser.t
+type 'a parser = 'a APos.Parser.t
 
-let with_literal p =
-    return () >>= fun _ ->
-    let res = ref None in
-    consumed (p >>| fun v -> res := Some v) >>| fun str ->
-    let [@warning "-8"] Some v = !res in
-    (v, str)
-
+open APos
 open Parsetree
 
 module Opt = struct
@@ -101,6 +98,9 @@ let set_loc : 'a. 'a helper parser -> 'a ahelper parser
         mapping (fun p1 (hlp, attrs) p2 -> hlp ~p1 ~p2, attrs)
         <*> pos <*> p <*> pos
 
+let na : 'a helper parser -> 'a na_helper parser
+    = fun p -> p >>| fun (h, attrs) -> fun ~p1 ~p2 -> h ~p1 ~p2 ~attrs
+
 let fold_hlp_left_0_1 ~f nil tail =
     mapping begin fun p1 n p2 t ->
         match t with
@@ -150,3 +150,30 @@ let make_list_helper ~constr ~tuple ~get_loc seq ext =
 
         loop (fun loc -> constr ?loc:(Some loc) ?attrs) seq
     end
+
+
+let mk_bufs () =
+    let bufs = ref [] in
+    let buf () =
+        let buf = List.hd !bufs in
+        buf
+    in
+    let buf_add = exec @@ fun _ ->
+        bufs := Buffer.create 16 :: !bufs
+    in
+    let buf_contents =
+        exec @@ fun _ -> Buffer.contents @@ buf ()
+    in
+    let buf_reset =
+        exec @@ fun _ -> Buffer.clear @@ buf ()
+    in
+    let buf_drop =
+        exec @@ fun _ ->
+        let buf = buf () in
+        bufs := List.tl !bufs;
+        buf
+    in
+    buf, buf_add, buf_contents, buf_reset, buf_drop
+
+let wrapped start final p =
+    start >> p << final <|> final

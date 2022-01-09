@@ -1,11 +1,11 @@
 open Basic
-open Angstrom
-open Angstrom.Let_syntax
+open APos
 open Parsetree
 open Ast_helper
 open Sigs
 
-module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser) (Utils: UTILS): CONSTANT = struct
+module Make (Ext: Ext) (Utils: UTILS): CONSTANT = struct
+    open Ext
     open Utils
 
     module Number = struct
@@ -13,11 +13,18 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
 
         let value_part digit exp =
             let skip_digits = skip_while (fun c -> digit c || c = '_') in
-            skip digit >> skip_digits >>
-            option false (char '.' >> skip_digits >>$ true) >>= fun is_float ->
+
+            let int = skip digit >> skip_digits in
+            let float = int >> char '.' >> skip_digits in
+
             match exp with
-            | None -> return is_float
-            | Some exp -> option is_float (skip exp >> opt exp_sign >> skip digit >> skip_digits >>$ true)
+            | None -> (float >>$ true) <|> (int >>$ false)
+            | Some exp ->
+                let exp = skip exp >> opt exp_sign >> skip digit >> skip_digits in
+                    (float >> exp >>$ true)
+                <|> (float >>$ true)
+                <|> (int >> exp >>$ true)
+                <|> (int >>$ false)
 
         let value_part_2 = value_part
             (function '0'..'1' -> true | _ -> false)
@@ -53,15 +60,22 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
 
     module Character = struct
         let code offset basic c = (Char.code c - Char.code basic + offset)
-        let octal_code = satisfy (function '0'..'7' -> true | _ -> false) >>| code 0 '0'
-        let decimal_code = satisfy (function '0'..'9' -> true | _ -> false) >>| code 0 '0'
+        let octal_code =
+            let open Angstrom in
+            satisfy (function '0'..'7' -> true | _ -> false) >>| code 0 '0'
+        let decimal_code =
+            let open Angstrom in
+            satisfy (function '0'..'9' -> true | _ -> false) >>| code 0 '0'
         let hexadecimal_code =
+            let open Angstrom in
                 decimal_code
             <|> (satisfy (function 'a'..'f' -> true | _ -> false) >>| code 10 'a')
             <|> (satisfy (function 'A'..'F' -> true | _ -> false) >>| code 10 'A')
 
         let escaped =
-            any_char >>= function
+            any_char >>=
+            let open Angstrom in
+            function
             | '\\' | '\'' | ' ' as c -> return c
             | 'n' -> return '\n'
             | 't' -> return '\t'
@@ -97,6 +111,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
     module String = struct
         let string =
             s"\"" >>= fun _ ->
+            let open Angstrom in
             let buf = Buffer.create 16 in
             fix @@ fun p ->
 
@@ -107,11 +122,9 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
 
             (take_while not_escaped >>| Buffer.add_string buf) >>
             (
-                (s"\\" >> (Character.escaped >>| Buffer.add_char buf) >> p)
-                <|>
-                (s"\\\"" >>| (fun _ -> Buffer.add_char buf '\"') >> p)
-                <|>
-                (s"\"" >>| fun _ -> Buffer.contents buf)
+                    (string "\\" >> (Character.escaped.p >>| Buffer.add_char buf) >> p)
+                <|> ((string "\\\"" >>| fun _ -> Buffer.add_char buf '\"') >> p)
+                <|> (string "\"" >>| fun _ -> Buffer.contents buf)
             )
 
         let p =
@@ -119,9 +132,9 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Angstrom.Parser
     end
 
     let p =
-        match%bind peek_char_fail with
-        | '0'..'9' | '-' | '.' -> Number.p
-        | '\'' -> Character.p
-        | '\"' -> String.p
-        | _ -> fail "TODO"
+        Peek.first
+        [ Number.p
+        ; Character.p
+        ; String.p
+        ]
 end

@@ -7,7 +7,7 @@ module type Parser = sig
     val name: string
 end
 
-let read name = Std.input_all @@ open_in name
+let read name = Core_kernel.In_channel.input_all @@ open_in name
 
 module Files = struct
     type set = {

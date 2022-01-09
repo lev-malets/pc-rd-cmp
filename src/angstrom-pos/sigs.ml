@@ -1,35 +1,112 @@
 
-module type POS = sig
-    include Angstrom_mod.Sigs.ANGSTROM
-
+module type PARSER = sig
     type s
 
-    type 'b getter = { get: 'a. ('b -> 'a Parser.t) -> 'a Parser.t }
+    module Angstrom: Angstrom_mod.Sigs.PARSER with type s = s State.t
 
-    val ( >> ) : _ Parser.t -> 'a Parser.t -> 'a Parser.t
-    val ( << ) : 'a Parser.t -> _ Parser.t -> 'a Parser.t
+    type _ typ =
+        | Parser : _ typ
+        | Return : 'a -> 'a typ
+        | Value :
+            { v: 'a
+            ; p: _ Angstrom.t
+            } -> 'a typ
+        | Lift :
+            { f: 'a -> 'b
+            ; a: 'a Angstrom.t
+            } -> 'b typ
+        | Lift2 :
+            { f: 'a -> 'b -> 'c
+            ; a: 'a Angstrom.t
+            ; b: 'b Angstrom.t
+            } -> 'c typ
+        | Lift3 :
+            { f: 'a -> 'b -> 'c -> 'd
+            ; a: 'a Angstrom.t
+            ; b: 'b Angstrom.t
+            ; c: 'c Angstrom.t
+            } -> 'd typ
 
-    val parse_string : 'a Parser.t -> s -> ?filename:string -> string -> ('a, string) result
+    type info =
+        | Unknown
+        | Empty
+        | Consume of
+            { empty: bool
+            ; first: Charset.t
+            }
 
-    val fix_poly : ('a getter -> 'a) -> 'a
+    type 'a t =
+        { p: 'a Angstrom.t
+        ; info: info
+        ; typ: 'a typ
+        }
+end
 
-    val pos : Lexing.position Parser.t
+module MkParser(T: sig type s end): PARSER with type s = T.s = struct
+    type s = T.s
 
-    val new_line : string Parser.t
+    module Angstrom = Angstrom_mod.Sigs.MkParser(struct type s = T.s State.t end)
 
-    val whitespace : unit Parser.t
+    type _ typ =
+        | Parser : _ typ
+        | Return : 'a -> 'a typ
+        | Value :
+            { v: 'a
+            ; p: _ Angstrom.t
+            } -> 'a typ
+        | Lift :
+            { f: 'a -> 'b
+            ; a: 'a Angstrom.t
+            } -> 'b typ
+        | Lift2 :
+            { f: 'a -> 'b -> 'c
+            ; a: 'a Angstrom.t
+            ; b: 'b Angstrom.t
+            } -> 'c typ
+        | Lift3 :
+            { f: 'a -> 'b -> 'c -> 'd
+            ; a: 'a Angstrom.t
+            ; b: 'b Angstrom.t
+            ; c: 'c Angstrom.t
+            } -> 'd typ
 
-    val state_get : s Parser.t
-    val state_map : (s -> s) -> unit Parser.t
-    val state_set : s -> unit Parser.t
+    type info =
+        | Unknown
+        | Empty
+        | Consume of
+            { empty: bool
+            ; first: Charset.t
+            }
 
-    val failed : _ Parser.t -> unit Parser.t
+    type 'a t =
+        { p: 'a Angstrom.t
+        ; info: info
+        ; typ: 'a typ
+        }
+end
 
-    val memo : 'a Parser.t -> 'a Parser.t
+
+module type POS = sig
+    module Parser: PARSER
+    module Angstrom: Angstrom_mod.Sigs.ANGSTROM with module Parser = Parser.Angstrom
+    open Parser
+
+    type 'b getter = { get: 'a. ('b -> 'a t) -> 'a t }
+
+    val pos : Lexing.position t
+
+    val state_get : s t
+    val state_map : (s -> s) -> unit t
+    val state_set : s -> unit t
+
+    val memo : 'a t -> 'a t
+    val fail : string -> _ t
+
+    val (<|>) : 'a t -> 'a t -> 'a t
 end
 
 module type NAMED = sig
-    module Parser : Angstrom_mod.Sigs.PARSER
+    module Parser : PARSER
 
     val p : string -> 'a Parser.t -> 'a Parser.t
 end
@@ -41,7 +118,7 @@ module type TRACED = sig
 end
 
 module type PEEK = sig
-    module Parser : Angstrom_mod.Sigs.PARSER
+    module Parser : PARSER
 
-    val char_fail : (char -> 'a Parser.t) -> expected:(char list) -> 'a Parser.t
+    val first : 'a Parser.t list -> 'a Parser.t
 end
