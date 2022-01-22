@@ -88,7 +88,10 @@ end
 
 module type POS = sig
     module Parser: PARSER
-    module Angstrom: Angstrom_mod.Sigs.ANGSTROM with module Parser = Parser.Angstrom
+    module Angstrom : sig
+        include Angstrom_mod.Sigs.ANGSTROM with module Parser = Parser.Angstrom
+        val exec : (unit -> 'a) -> 'a Parser.t
+    end
     open Parser
 
     type 'b getter = { get: 'a. ('b -> 'a t) -> 'a t }
@@ -99,10 +102,10 @@ module type POS = sig
     val state_map : (s -> s) -> unit t
     val state_set : s -> unit t
 
-    val memo : 'a t -> 'a t
-    val fail : string -> _ t
+    val fail : _ t
 
     val (<|>) : 'a t -> 'a t -> 'a t
+    val exec : (unit -> 'a) -> 'a t
 end
 
 module type NAMED = sig
@@ -121,4 +124,21 @@ module type PEEK = sig
     module Parser : PARSER
 
     val first : 'a Parser.t list -> 'a Parser.t
+end
+
+module type CHARSET = sig
+    type t
+    val empty : t
+    val full : t
+
+    val add : t -> char -> t
+    val union : t -> t -> t
+    val equal : t -> t -> bool
+
+    val of_list : char list -> t
+
+    val singleton : char -> t
+    val range : char -> char -> t
+
+    val iter_code : (int -> unit) -> t -> unit
 end

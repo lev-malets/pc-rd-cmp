@@ -1,4 +1,4 @@
-
+open Base
 open Sigs
 open Asttypes
 open Parsetree
@@ -7,7 +7,7 @@ open Basic
 open APos
 
 module Make
-        (Ext: Ext)
+        (Ext: EXT)
         (Utils: UTILS) (Constant: CONSTANT) (Core: CORE) (Type: TYPE)
         : PATTERN = struct
     open Ext
@@ -147,28 +147,13 @@ module Make
                 let number = signed_number <|> Constant.Number.p in
 
                 mapping @@ mk_helper2 Pat.interval
-                <*> number << -s".." << ng <*> number
+                <*> number << -s".." <*> -number
 
-            let js_string qtag =
+            let js_string =
                 Named.p "pattern:js_string" begin
-                    s"`" >>= fun _ ->
-                    let open Angstrom in
-                    let buf = Buffer.create 16 in
-                    let mk_const () =
-                        Const.string ~quotation_delimiter:qtag @@ Buffer.contents buf
-                    in
-                    fix @@ fun loop ->
-                    (take_while (function '\n' | '`' | '\\' | '\r' -> false | _ -> true) >>| Buffer.add_string buf)
-                    >>
-                    (
-                            (string "`" >>| fun _ ->
-                                helper_add_attr "res.template" @@
-                                mk_helper ~f:Pat.constant (mk_const ())
-                            )
-                        <|> ((new_line.p >>| Buffer.add_string buf) >> loop)
-                        <|> ((string "\\`" >>| fun _ -> Buffer.add_char buf '`') >> loop)
-                        <|> ((string "\\\\" >>| fun _ -> Buffer.add_char buf '\\') >> loop)
-                    )
+                    Constant.String.multiline ~q:'`' >>| fun c ->
+                        helper_add_attr "res.template" @@
+                        mk_helper ~f:Pat.constant c
                 end
 
             let true_false =
@@ -181,18 +166,18 @@ module Make
                     [ k"_" >>$ mk_helper ~f:Pat.any ()
                     ;
                         mapping @@ mk_helper2 Pat.interval
-                        <*> Constant.Character.p << -s".." << ng <*> Constant.Character.p
+                        <*> Constant.Character.p << -s".." <*> -Constant.Character.p
                     ; number_range
                     ;
-                        mapping @@ (fun a -> mk_helper2 Pat.construct a None)
+                        mapping (fun a -> mk_helper2 Pat.construct a None)
                         <*> loc (s"()" >>$ Longident.Lident "()")
                     ; unpack
                     ; tuple
-                    ; (s"(" >> -add_attrs pattern_constrainted << -s")")
+                    ; s"(" >> -add_attrs pattern_constrainted << -s")"
                     ; array
                     ; record
-                    ; ((signed_number <|> Constant.p) >>| mk_helper ~f:Pat.constant)
-                    ; js_string "js"
+                    ; (signed_number <|> Constant.p) >>| mk_helper ~f:Pat.constant
+                    ; js_string
                     ; list
                     ; construct
                     ; polyvariant

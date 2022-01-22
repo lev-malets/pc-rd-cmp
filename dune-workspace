@@ -4,4 +4,4 @@
  (name default)
  (merlin)
  (env (_
-  (ocamlopt_flags :standard -O3 -inlining-report)))))
+  (ocamlopt_flags :standard -O3)))))

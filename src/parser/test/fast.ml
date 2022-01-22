@@ -12,7 +12,7 @@ let speclist =
 let () =
     Arg.parse speclist anon_fun "";
 
-    let (module Parse) = mk_memoized Pc_syntax.Parser.memo_spec in
+    let (module Parse) = mk_memoized ~peek:true Pc_syntax.Parser.memo_spec in
     let filename = !input in
     let src = read_file ~filename in
 

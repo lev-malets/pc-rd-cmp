@@ -3,8 +3,8 @@ type exit_kind =
     | Error
 
 type stats =
-    { count : float
-    ; time : float
+    { call_count : float
+    ; pos_count : int
     }
 
 type stats_table = (string, stats) Hashtbl.t

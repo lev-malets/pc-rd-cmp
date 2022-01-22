@@ -1,4 +1,4 @@
-
+open Base
 open Sigs
 open Parsetree
 open Ast_helper
@@ -6,7 +6,7 @@ open Basic
 open APos
 
 module Make
-        (Ext: Ext)
+        (Ext: EXT)
         (Utils: UTILS) (Core: CORE) (Type: TYPE) (Expression: EXPRESSION)
         : MODEXPR = struct
 
@@ -124,10 +124,10 @@ module Make
                     let typ = apply typ p1 p2 in
                     mk_helper2 Mty.with_ typ constrs
                 end
-                <*> pos <*> modtype_functor <*> pos << -k"with" <*> seq 1 ~sep:(-k"and") (ng >> with_constraint)
+                <*> pos <*> modtype_functor <*> pos << -k"with" <*> seq 1 ~sep:(-k"and") (-with_constraint)
 
             let modtype_with =
-                Named.p "modtype:with" @@
+                Named.p "modtype:with"
                 (modtype_with <|> modtype_functor)
 
             let modexpr_constrainted =
@@ -136,97 +136,115 @@ module Make
                     modexpr (-s":" >> -use modtype)
 
             let atom =
-                let unpack_constr =
-                    fold_hlp_left_0_1 ~f:(mk_helper2 Exp.constraint_)
-                        expression (-s":" >> -use core_type_package)
-                in
-                    (mapping (mk_helper ~f:Mod.unpack) << k"unpack" << -s"(" <*> -use unpack_constr << -s")")
-                <|> (mapping (mk_helper ~f:Mod.ident) <*> loc u_longident)
-                <|> (s"(" >> -add_attrs modexpr_constrainted << -s")")
-                <|> (mapping (mk_helper ~f:Mod.extension) <*> extension)
-
-            let apply =
-                let genarg =
-                    mapping (mk_helper ~f:Mod.structure [])
-                    << s"(" << -s")"
-                in
-
-                let arg = genarg <|> modexpr_constrainted in
-
-                let args =
-                    fold_left_cont_0_n
-                        (
-                            mapping begin fun arg p2 ->
-                                (fun prev -> mk_helper2 Mod.apply prev arg), p2
-                            end
-                            <*> -use arg <*> pos
-                        )
-                        (
-                            mapping begin fun arg p3 (cont, p2) ->
-                                begin fun prev ->
-                                    let prev = apply (cont prev) prev.pmod_loc.loc_start p2 in
-                                    mk_helper2 Mod.apply prev arg
-                                end, p3
-                            end
-                            << -s"," <*> -use arg <*> pos
-                        )
-                    >>| fun (x, _) -> x
-                in
-
-                let args =
-                    (s"(" >> args << opt (-s",") << -s")")
-                    <|>
-                    (s"(" >> -s")" >>$ fun prev -> mk_helper2 Mod.apply prev (Mod.structure []))
-                in
-
-                add_attrs @@ (
-                        fold_left_cont_0_n
-                        (
-                            mapping t3
-                            <*> pos <*> atom <*> pos
-                        )
-                        (
-                            mapping begin fun cont p3 (p1, expr, p2) ->
-                                p1, cont @@ apply expr p1 p2, p3
-                            end
-                            <*> args <*> pos
-                        )
-                        >>| fun (_, x, _) -> x
-                )
-
-            let functor_ =
-                let _tail =
-                    mapping begin fun mt me ->
-                        Mod.constraint_ ~loc:me.pmod_loc me mt
-                    end
-                    << -s":" <*> -use modtype << -s"=>" <*> -use modexpr
-                    <|>
-                    (-s"=>" >> -use modexpr)
-                in
-
-                let arg_loop = fix @@ fun arg_loop ->
-
-                    let _tail =
-                            (opt (s",") >> -s")" >> _tail)
-                        <|> (s"," >> -use arg_loop)
+                Named.p "modexpr:atom" begin
+                    let unpack_constr =
+                        fold_hlp_left_0_1 ~f:(mk_helper2 Exp.constraint_)
+                            expression (-s":" >> -use core_type_package)
                     in
 
-                    add_attrs (
-                            (mapping (mk_helper3 Mod.functor_) <*> loc u_ident <*>? (-s":" >> -use modtype) <*> _tail)
-                        <|> (mapping (fun a b -> mk_helper3 Mod.functor_ a None b) <*> loc (s"()" >>$ "*") <*> _tail)
-                    )
-                in
+                    Peek.first
+                    [ mapping (mk_helper ~f:Mod.unpack) << k"unpack" << -s"(" <*> -use unpack_constr << -s")"
+                    ; mapping (mk_helper ~f:Mod.ident) <*> loc u_longident
+                    ; s"(" >> -add_attrs modexpr_constrainted << -s")"
+                    ; mapping (mk_helper ~f:Mod.extension) <*> extension
+                    ]
+                end
 
-                add_attrs
-                (
-                    (mapping (fun a b -> mk_helper3 Mod.functor_ a None b) <*> loc (s"()" >>$ "*") <*> _tail)
-                    <|>
-                    (s"(" >> ng >> arg_loop)
-                )
+            let apply =
+                Named.p "modexpr:apply" begin
+                    let genarg =
+                        mapping (mk_helper ~f:Mod.structure [])
+                        << s"(" << -s")"
+                    in
+
+                    let arg = genarg <|> modexpr_constrainted in
+
+                    let args =
+                        fold_left_cont_0_n
+                            (
+                                mapping begin fun arg p2 ->
+                                    (fun prev -> mk_helper2 Mod.apply prev arg), p2
+                                end
+                                <*> -use arg <*> pos
+                            )
+                            (
+                                mapping begin fun arg p3 (cont, p2) ->
+                                    begin fun prev ->
+                                        let prev = apply (cont prev) prev.pmod_loc.loc_start p2 in
+                                        mk_helper2 Mod.apply prev arg
+                                    end, p3
+                                end
+                                << -s"," <*> -use arg <*> pos
+                            )
+                        >>| fun (x, _) -> x
+                    in
+
+                    let args =
+                            (s"(" >> args << opt (-s",") << -s")")
+                        <|> (s"(" >> -s")" >>$ fun prev -> mk_helper2 Mod.apply prev (Mod.structure []))
+                    in
+
+                    add_attrs @@ (
+                            fold_left_cont_0_n
+                            (
+                                mapping t3
+                                <*> pos <*> atom <*> pos
+                            )
+                            (
+                                mapping begin fun cont p3 (p1, expr, p2) ->
+                                    p1, cont @@ apply expr p1 p2, p3
+                                end
+                                <*> args <*> pos
+                            )
+                            >>| fun (_, x, _) -> x
+                    )
+                end
+
+            let functor_ =
+                Named.p "modexpr:functor" begin
+                    let tail =
+                            (
+                                mapping begin fun mt me ->
+                                    Mod.constraint_ ~loc:me.pmod_loc me mt
+                                end
+                                << s":" <*> -use modtype << -s"=>" <*> -use modexpr
+                            )
+                        <|> (s"=>" >> -use modexpr)
+                    in
+
+                    let arg_loop = fix @@ fun arg_loop ->
+                        let tail =
+                                (opt (s",") >> -s")" >> -tail)
+                            <|> (s"," >> -use arg_loop)
+                        in
+
+                        add_attrs (
+                                (
+                                    mapping (mk_helper3 Mod.functor_)
+                                    <*> loc u_ident <*>? (-s":" >> -use modtype) <*> -tail
+                                )
+                            <|> (
+                                    mapping (fun a b -> mk_helper3 Mod.functor_ a None b)
+                                    <*> loc (s"()" >>$ "*") <*> -tail
+                                )
+                        )
+                    in
+
+                    add_attrs
+                    (
+                            (
+                                mapping (fun a b -> mk_helper3 Mod.functor_ a None b)
+                                <*> loc (s"()" >>$ "*") <*> -tail
+                            )
+                        <|> (s"(" >> -arg_loop)
+                    )
+                end
 
             let structure =
-                mapping (mk_helper ~f:Mod.structure)
-                << s"{" <*> -structure << -s"}"
+                Named.p "modexpr:structure" begin
+                    mapping (mk_helper ~f:Mod.structure)
+                    << s"{" <*> -structure << -s"}"
+                end
 
             let modexpr =
                 Named.p "modexpr" begin

@@ -11,9 +11,9 @@ let speclist =
             function
             | "res" -> parser := (module ParseRes)
             | "pc" ->
-                let tm, pm = mk_traced Pc_syntax.Parser.memo_spec in
-                trace := Some tm;
-                parser := pm
+                let t, p = mk_traced ~peek:true Pc_syntax.Parser.memo_spec in
+                trace := Some t;
+                parser := p
             | _ -> failwith "unreachable"
         ),
         ""

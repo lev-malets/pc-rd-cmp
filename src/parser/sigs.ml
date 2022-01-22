@@ -1,7 +1,11 @@
 
 open Basic
-
 open Parsetree
+
+module type EXT = sig
+    module Named: Angstrom_pos.Sigs.NAMED with module Parser = APos.Parser
+    module Peek: Angstrom_pos.Sigs.PEEK with module Parser = APos.Parser
+end
 
 module type PARSE = sig
     val parse_interface : src:string -> filename:string -> (signature, string) result
@@ -15,6 +19,7 @@ module type CORE = sig
     val structure : structure parser
 
     val attrs_ : attributes parser
+    val attrs1_ : attributes parser
     val use : 'a helper parser -> 'a parser
     val use_na : 'a na_helper parser -> 'a parser
 
@@ -38,6 +43,7 @@ module type CONSTANT = sig
 
     module String : sig
         val string : string parser
+        val multiline : q:char -> constant parser
         val p : constant parser
     end
 

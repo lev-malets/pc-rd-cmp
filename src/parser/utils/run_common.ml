@@ -6,22 +6,22 @@ module ParseRes: Pc_syntax.Sigs.PARSE = struct
       Ok (Res_parse_string.parse_implementation ~src ~filename)
 end
 
-module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.APos)
-module NotPeek = Angstrom_pos.Peek.MakeNotPeek(Pc_syntax.Basic.APos)
-module type PEEK = module type of Peek
+let mk_parse ?(peek=false) (): (module Pc_syntax.Sigs.PARSE) =
+    if peek then
+        (module Pc_syntax.Parser.Make(
+            struct
+                module Named = Angstrom_pos.Trace.Stub(Pc_syntax.Basic.APos)
+                module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.APos)
+            end
+        ))
+    else
+        (module Pc_syntax.Parser.Make(
+            struct
+                module Named = Angstrom_pos.Trace.Stub(Pc_syntax.Basic.APos)
+                module Peek = Angstrom_pos.Peek.MakeNotPeek(Pc_syntax.Basic.APos)
+            end
+        ))
 
-module Parse = Pc_syntax.Parser.Make
-    (struct
-    module Named = Angstrom_pos.Trace.Stub(Pc_syntax.Basic.APos)
-        module Peek = NotPeek
-    end)
-module ParsePeek = Pc_syntax.Parser.Make
-    (struct
-    module Named = Angstrom_pos.Trace.Stub(Pc_syntax.Basic.APos)
-    module Peek = Peek
-end)
-
-let peek = true
 
 let mk_traced ?(peek=false) memo_spec: (module Angstrom_pos.Sigs.TRACED) * (module Pc_syntax.Sigs.PARSE) =
     let module Traced =
@@ -29,15 +29,17 @@ let mk_traced ?(peek=false) memo_spec: (module Angstrom_pos.Sigs.TRACED) * (modu
             (Pc_syntax.Basic.APos)
             (struct let memo_spec = memo_spec end)
     in
-    let (module Peek: PEEK) =
-        if peek then (module Peek)
-        else (module NotPeek)
-    in
 
-    (module Traced), (module Pc_syntax.Parser.Make((struct
-        module Named = Traced
-        module Peek = Peek
-    end)))
+    if peek then
+        (module Traced), (module Pc_syntax.Parser.Make((struct
+            module Named = Traced
+            module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.APos)
+        end)))
+    else
+        (module Traced), (module Pc_syntax.Parser.Make((struct
+            module Named = Traced
+            module Peek = Angstrom_pos.Peek.MakeNotPeek(Pc_syntax.Basic.APos)
+        end)))
 
 let mk_memoized ?(peek=false) memo_spec: (module Pc_syntax.Sigs.PARSE) =
     let module Memoized =
@@ -45,14 +47,20 @@ let mk_memoized ?(peek=false) memo_spec: (module Pc_syntax.Sigs.PARSE) =
             (Pc_syntax.Basic.APos)
             (struct let memo_spec = memo_spec end)
     in
-    let (module Peek: PEEK) =
-        if peek then (module Peek)
-        else (module NotPeek)
-    in
-    (module Pc_syntax.Parser.Make((struct
-        module Named = Memoized
-        module Peek = Peek
-    end)))
+    if peek then
+        (module Pc_syntax.Parser.Make(
+            struct
+                module Named = Memoized
+                module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.APos)
+            end
+        ))
+    else
+        (module Pc_syntax.Parser.Make(
+            struct
+                module Named = Memoized
+                module Peek = Angstrom_pos.Peek.MakeNotPeek(Pc_syntax.Basic.APos)
+            end
+        ))
 
 let input = ref ""
 let output = ref ""

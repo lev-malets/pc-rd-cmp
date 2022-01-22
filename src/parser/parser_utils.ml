@@ -2,32 +2,12 @@ open Basic
 open APos
 open Core_kernel
 open Sigs
-open Parsetree
-
-module Attrs = struct
-    let ns_namedArgLoc loc =
-        Location.mkloc "ns.namedArgLoc" loc, PStr []
-
-    let ns_braces = Location.mknoloc "ns.braces", PStr []
-
-    let bs = Location.mknoloc "bs", PStr []
-
-    let jsx = Location.mknoloc "JSX", PStr []
-end
-
-module Hc = struct
-    let attr s = Location.mknoloc s, PStr []
-    let attr_loc s loc = Location.mkloc s loc, PStr []
-
-    let id m f = Ast_helper.Exp.ident @@ Location.mknoloc @@ Longident.Ldot (Longident.Lident m, f)
-    let unit_expr loc = Ast_helper.Exp.construct ~loc (Location.mkloc (Longident.Lident "()") loc) None
-end
 
 module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Parser): UTILS = struct
     let s =
         Fix.Memoize.String.memoize @@ fun x ->
         Named.p ("\'" ^ x ^ "\'") begin
-            memo @@ begin
+            begin
                 match String.length x with
                 | 0 -> return ()
                 | 1 -> (char x.[0] >>$ ())
@@ -62,8 +42,8 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
             (state_map (fun s -> {s with comments = comment :: s.comments})).p
         in
         seq 0 (push_comment single_line_comment <|> push_comment multi_line_comment) >>$ ()
-    let ng = memo
-        begin
+    let ng =
+        Named.p "nongrammar" begin
             whitespace << comments
         end
 
@@ -139,20 +119,10 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
     let o = fun x ->
         let res = Longident.Lident x in
         s x >> return res
-(*
-        >> peek_char >>= function
-        | Some c when operator's_character c -> fail "TODO"
-        | _ -> return res
-*)
 
     let op_alias = fun x res ->
         let res = Longident.Lident res in
         s x >> return res
-(*
-        >> peek_char >>= function
-        | Some c when operator's_character c -> fail "TODO"
-        | _ -> return res
-*)
 
     let upper = function 'A' .. 'Z' -> true | _ -> false
     let lower = function 'a' .. 'z' | '_' -> true | _ -> false

@@ -1,10 +1,7 @@
+open Base
+
 module APos = Angstrom_pos.Make(State)
 module Charset = Angstrom_pos.Charset
-
-module type Ext = sig
-    module Named: Angstrom_pos.Sigs.NAMED with module Parser = APos.Parser
-    module Peek: Angstrom_pos.Sigs.PEEK with module Parser = APos.Parser
-end
 
 type 'a parser = 'a APos.Parser.t
 
@@ -16,6 +13,32 @@ module Opt = struct
         function
         | Some _ -> Some x
         | None -> None
+end
+
+let mkloc ?loc a =
+    match loc with
+    | None -> Location.mknoloc a
+    | Some loc -> Location.mkloc a loc
+
+module Hc = struct
+    let attr ?loc s = mkloc ?loc s, PStr []
+
+    let lid =
+        let rec loop acc =
+            function
+            | [] -> acc
+            | x::xs -> loop (Longident.Ldot (acc, x)) xs
+        in
+
+        function
+        | [] -> failwith ""
+        | x::xs -> loop (Longident.Lident x) xs
+
+    let expr_id ?loc ?attrs xs =
+        let lid = lid xs in
+        Ast_helper.Exp.ident ?loc ?attrs (mkloc ?loc lid)
+
+    let unit_expr loc = Ast_helper.Exp.construct ~loc (Location.mkloc (Longident.Lident "()") loc) None
 end
 
 type 'a helper_fn = p1:Lexing.position -> p2:Lexing.position -> attrs:attributes -> 'a
@@ -39,11 +62,8 @@ let helper_map: 'a. ('a helper_fn -> 'b helper_fn) -> 'a helper -> 'b helper
 let ahelper_map: 'a. f:('a ahelper_fn -> 'b helper_fn) -> 'a ahelper -> 'b helper
     = fun ~f (hlp, attrs) -> (f hlp, attrs)
 
-let helper_add_attr_loc : 'a. string -> Location.t -> 'a * attributes -> 'a * attributes
-    = fun s loc (hlp, attrs) -> hlp, (Location.mkloc s loc, PStr []) :: attrs
-
-let helper_add_attr : 'a. string -> 'a * attributes -> 'a * attributes
-    = fun s (hlp, attrs) -> hlp, (Location.mknoloc s, PStr []) :: attrs
+let helper_add_attr : 'a. ?loc:Location.t -> string -> 'a * attributes -> 'a * attributes
+    = fun ?loc s (hlp, attrs) -> hlp, Hc.attr ?loc s :: attrs
 
 let helper_add_attrs : 'a. attributes -> 'a * attributes -> 'a * attributes
     = fun s (hlp, attrs) -> hlp, s @ attrs
@@ -152,28 +172,25 @@ let make_list_helper ~constr ~tuple ~get_loc seq ext =
     end
 
 
+type buf_ops =
+    { raw : unit -> Buffer.t
+    ; add_char : char -> unit
+    ; add_string : string -> unit
+    ; mk : unit parser
+    ; contents : string parser
+    ; reset : unit parser
+    ; drop : unit parser
+    }
+
+
 let mk_bufs () =
     let bufs = ref [] in
-    let buf () =
-        let buf = List.hd !bufs in
-        buf
-    in
-    let buf_add = exec @@ fun _ ->
-        bufs := Buffer.create 16 :: !bufs
-    in
-    let buf_contents =
-        exec @@ fun _ -> Buffer.contents @@ buf ()
-    in
-    let buf_reset =
-        exec @@ fun _ -> Buffer.clear @@ buf ()
-    in
-    let buf_drop =
-        exec @@ fun _ ->
-        let buf = buf () in
-        bufs := List.tl !bufs;
-        buf
-    in
-    buf, buf_add, buf_contents, buf_reset, buf_drop
 
-let wrapped start final p =
-    start >> p << final <|> final
+    { raw = (fun _ -> List.hd_exn !bufs)
+    ; add_char = (fun c -> Buffer.add_char (List.hd_exn !bufs) c)
+    ; add_string = (fun s -> Buffer.add_string (List.hd_exn !bufs) s)
+    ; mk = exec (fun _ -> bufs := Buffer.create 16 :: !bufs)
+    ; contents = exec (fun _ -> Buffer.contents (List.hd_exn !bufs))
+    ; reset = exec (fun _ -> Buffer.clear (List.hd_exn !bufs))
+    ; drop = exec (fun _ -> bufs := List.tl_exn !bufs)
+    }

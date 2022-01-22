@@ -13,6 +13,12 @@ module Make(T: sig type s end) = struct
                 let succ input pos state more _ = succ input pos state more v in
                 p.run input pos state more fail succ
             }
+
+        let exec f =
+            Angstrom_mod.Parser.
+            { run = fun input pos state more _fail succ ->
+                succ input pos state more (f ())
+            }
     end
 
 
@@ -184,7 +190,6 @@ module Make(T: sig type s end) = struct
         ; typ = Return x
         }
     let advance i =
-
         if i = 0 then
             { p = Angstrom.(advance 0)
             ; info = Empty
@@ -200,8 +205,11 @@ module Make(T: sig type s end) = struct
             ; typ = Value { v = (); p }
             }
 
-    let fail str =
-        { p = Angstrom.(fail str)
+    let fail =
+        { p =
+            { run = fun input pos state more fail _succ ->
+                fail input pos state more [] ""
+            }
         ; info = Unknown
         ; typ = Parser
         }
@@ -394,43 +402,6 @@ module Make(T: sig type s end) = struct
         }
     let state_set custom = state_map (fun _ -> custom)
 
-    let get_input_idx =
-        let table = Hashtbl.create 8 in
-        fun a ->
-            let key = Obj.repr (Obj.magic a) in
-            match Hashtbl.find_opt table key with
-            | Some idx -> idx
-            | None -> 0
-            (*
-                let idx = Hashtbl.length table in
-                Hashtbl.replace table key idx;
-                idx
-            *)
-
-    let memo p =
-        let table = Hashtbl.create 16 in
-        { p with
-            p = { run = fun input pos state more fail succ ->
-                let key = (get_input_idx input, pos) in
-                match Hashtbl.find_opt table key with
-                | Some x ->
-                    (match x with
-                    | Ok (input', pos', state', more', v) -> succ input' pos' state' more' v
-                    | Error (input', pos', state', more', marks', msg') -> fail input' pos' state' more' marks' msg'
-                    )
-                | None ->
-                    let succ' input' pos' state' more' v =
-                        Hashtbl.replace table key (Ok (input', pos', state', more', v));
-                        succ input' pos' state' more' v
-                    in
-                    let fail' input' pos' state' more' marks' msg' =
-                        Hashtbl.replace table key (Error (input', pos', state', more', marks', msg'));
-                        fail input' pos' state' more' marks' msg'
-                    in
-                    p.p.run input pos state more fail' succ'
-            }
-        }
-
     let failed p =
         { p =
             { run = fun input pos state more fail succ ->
@@ -542,11 +513,7 @@ module Make(T: sig type s end) = struct
     let cons x xs = x :: xs
 
     let exec f =
-        { p =
-            Angstrom_mod.Parser.
-            { run = fun input pos state more _fail succ ->
-                succ input pos state more (f ())
-            }
+        { p = Angstrom.exec f
         ; info = Empty
         ; typ = Parser
         }
@@ -608,4 +575,9 @@ module Make(T: sig type s end) = struct
             | Some cont -> cont x
         end
         <*> nil <*>? cont
+
+    let wrapped start final p =
+        { p with p = (start >> p << final <|> (final >> fail)).p }
+
+
 end

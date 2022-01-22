@@ -1,4 +1,4 @@
-
+open Base
 open Sigs
 open Asttypes
 open Parsetree
@@ -6,8 +6,56 @@ open Ast_helper
 open Basic
 open APos
 
+module Mapping = struct
+    let label_declaration =
+        mapping begin fun mut name typ ->
+            let mut = Base.Option.map mut ~f:(fun _ -> Asttypes.Mutable) in
+            let typ =
+                match typ with
+                | Some typ -> typ
+                | None -> Typ.constr Location.{txt = Longident.Lident name.txt; loc = name.loc} []
+            in
+
+            mk_helper2 (Type.field ?info:None ?mut) name typ
+        end
+
+    let type_declaration_kind_manifest =
+        mapping begin fun name params manifest priv kind cstrs ->
+            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+            mk_helper ~f:(Type.mk
+                ?docs:None ?text:None ?params ?cstrs ?kind:(Some kind) ?priv ?manifest:(Some manifest)) name
+        end
+
+    let type_declaration_manifest =
+        mapping begin fun name params priv manifest cstrs ->
+            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+            mk_helper ~f:(Type.mk
+                ?docs:None ?text:None ?params ?cstrs ?kind:None ?priv ?manifest:(Some manifest)) name
+        end
+
+    let type_declaration_kind =
+        mapping begin fun name params priv kind cstrs ->
+            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+            mk_helper ~f:(Type.mk
+                ?docs:None ?text:None ?params ?cstrs ?kind:(Some kind) ?priv ?manifest:None) name
+        end
+
+    let type_declaration_abstract =
+        mapping begin fun name params ->
+            mk_helper ~f:(Type.mk
+                ?docs:None ?text:None ?params ?cstrs:None ?kind:None ?priv:None ?manifest:None) name
+        end
+
+    let type_extension =
+        mapping begin fun name params priv hd tail ->
+            let priv = Opt.set Private priv in
+            helper @@ fun ~p1:_ ~p2:_ ~attrs ->
+                Te.mk ~attrs ?params ?priv name (hd::tail)
+        end
+end
+
 module Make
-        (Ext: Ext)
+        (Ext: EXT)
         (Utils: UTILS) (Constant: CONSTANT) (Core: CORE)
         : TYPE = struct
 
@@ -118,9 +166,9 @@ module Make
                     let row_field =
                         (
                             mapping begin fun attrs tag empty constrs ->
-                                Rtag (tag, attrs, empty <> None, constrs)
+                                Rtag (tag, attrs, Option.is_some empty, constrs)
                             end
-                            <*> attrs_ <*> loc variant_tag <*>? -s"&" <*> seq 1 (ng >> constructor_arguments) ~sep:(-s"&")
+                            <*> attrs_ <*> loc variant_tag <*>? -s"&" <*> seq 1 (-constructor_arguments) ~sep:(-s"&")
                         )
                         <|>
                         (
@@ -146,7 +194,7 @@ module Make
                     <|>
                     (
                         mapping begin fun list tags ->
-                            let tags = if tags <> None then tags else Some [] in
+                            let tags = if Option.is_some tags then tags else Some [] in
                             mk_helper3 Typ.variant list Closed tags
                         end
                         << s"[" << -s"<" <*> rows <*>? (-s">" >> seq 1 (ng >> variant_tag)) << -s"]"
@@ -198,8 +246,8 @@ module Make
                     let with_args typ _tail =
                         add_attrs (
                             mapping begin fun tag p1 x p2 opt tail ->
-                                let label = if opt <> None then Optional tag.txt else Labelled tag.txt in
-                                let x = helper_add_attr_loc "ns.namedArgLoc" tag.loc x in
+                                let label = if Option.is_some opt then Optional tag.txt else Labelled tag.txt in
+                                let x = helper_add_attr "ns.namedArgLoc" ~loc:tag.loc x in
                                 let arg = apply x p1 p2 in
                                 tail label arg
                             end
@@ -223,9 +271,11 @@ module Make
                         <|> (s"," >> -use (with_args core_type tail) >>| fun typ label arg -> mk_helper3 Typ.arrow label arg typ)
                     in
 
-                        add_attrs (s"(" >> -s"." >> ng >> with_args core_type tail >>| helper_add_attr "bs")
-                    <|> add_attrs (s"(" >> ng >> with_args core_type tail)
-                    <|> Named.p "typexpr:arrow:onearg" (with_args aliased_atom _arrow_tail)
+                    Named.p "typexpr:arrow:all" begin
+                            add_attrs (s"(" >> -s"." >> -with_args core_type tail >>| helper_add_attr "bs")
+                        <|> add_attrs (s"(" >> -with_args core_type tail)
+                        <|> Named.p "typexpr:arrow:onearg" (with_args aliased_atom _arrow_tail)
+                    end
                 end
 
             let core_type_arrow =
@@ -247,16 +297,7 @@ module Make
 
             let label_declaration =
                 Named.p "label_declraration" @@ add_attrs begin
-                    mapping begin fun mut name typ ->
-                        let mut = Base.Option.map mut ~f:(fun _ -> Asttypes.Mutable) in
-                        let typ =
-                            match typ with
-                            | Some typ -> typ
-                            | None -> Typ.constr Location.{txt = Longident.Lident name.txt; loc = name.loc} []
-                        in
-
-                        mk_helper2 (Type.field ?info:None ?mut) name typ
-                    end
+                    Mapping.label_declaration
                     <*>? (k"mutable" << ng) <*> loc l_ident <*>? (-s":" >> -use core_type_poly)
                 end
 
@@ -274,7 +315,7 @@ module Make
                             mapping begin fun name args res ->
                                 mk_helper ~f:(Type.constructor ?info:None ?args:(Some args) ?res) name
                             end
-                            <*> loc u_ident <*> ((ng >> constr_args) <|> return @@ Pcstr_tuple []) <*>? (-s":" >> -use core_type_atom)
+                            <*> loc u_ident <*> (-constr_args <|> return @@ Pcstr_tuple []) <*>? (-s":" >> -use core_type_atom)
                         in
 
                         opt @@ s"|" >> seq 1 (-use (add_attrs constructor)) ~sep:(-s"|") >>| fun x -> Ptype_variant x
@@ -293,11 +334,9 @@ module Make
 
             let type_decl_params =
                 let variance =
-                    (s"-" >>$ Contravariant << ng)
-                    <|>
-                    (s"+" >>$ Covariant << ng)
-                    <|>
-                    return Invariant
+                        (s"-" >>$ Contravariant << ng)
+                    <|> (s"+" >>$ Covariant << ng)
+                    <|> return Invariant
                 in
 
                 let param =
@@ -309,50 +348,33 @@ module Make
 
             let type_decl_constraints =
                 seq 1 (
-                    mapping begin fun p1 t1 t2 p2 ->
-                        t1, t2, make_location p1 p2
-                    end
-                    << ng <*> pos << k"constraint" <*> -use core_type_atom << -s"=" <*> -use core_type <*> pos
+                    mapping begin fun p1 t1 t2 p2 -> t1, t2, make_location p1 p2 end
+                    <*> -pos << k"constraint" <*> -use core_type_atom << -s"=" <*> -use core_type <*> pos
                 )
 
             let type_declaration =
                 Named.p "type_declaration" begin
                     Named.p "type_declaration:mankind" (
-                        mapping begin fun name params manifest priv kind cstrs ->
-                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            mk_helper ~f:(Type.mk
-                                ?docs:None ?text:None ?params ?cstrs ?kind:(Some kind) ?priv ?manifest:(Some manifest)) name
-                        end
-                        <*> loc l_ident <*>? (ng >> type_decl_params) << -s"=" <*> -use core_type
-                        << -s"=" <*>? (ng >> k"private") << ng <*> type_kind <*>? type_decl_constraints
+                        Mapping.type_declaration_kind_manifest
+                        <*> loc l_ident <*>? -type_decl_params << -s"=" <*> -use core_type
+                        << -s"=" <*>? -k"private" <*> -type_kind <*>? type_decl_constraints
                     )
                     <|>
                     Named.p "type_declaration:manifest" (
-                        mapping begin fun name params priv manifest cstrs ->
-                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            mk_helper ~f:(Type.mk
-                                ?docs:None ?text:None ?params ?cstrs ?kind:None ?priv ?manifest:(Some manifest)) name
-                        end
-                        <*> loc l_ident <*>? (ng >> type_decl_params) << -s"=" <*>? -k"private" <*> -use core_type
+                        Mapping.type_declaration_manifest
+                        <*> loc l_ident <*>? -type_decl_params << -s"=" <*>? -k"private" <*> -use core_type
                         <*>? type_decl_constraints
                     )
                     <|>
                     Named.p "type_declaration:kind" (
-                        mapping begin fun name params priv kind cstrs ->
-                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            mk_helper ~f:(Type.mk
-                                ?docs:None ?text:None ?params ?cstrs ?kind:(Some kind) ?priv ?manifest:None) name
-                        end
-                        <*> loc l_ident <*>? (ng >> type_decl_params)
-                        << -s"=" <*>? -k"private" << ng <*> type_kind <*>? type_decl_constraints
+                        Mapping.type_declaration_kind
+                        <*> loc l_ident <*>? -type_decl_params
+                        << -s"=" <*>? -k"private" <*> -type_kind <*>? type_decl_constraints
                     )
                     <|>
                     Named.p "type_declaration:abstract" (
-                        mapping begin fun name params ->
-                            mk_helper ~f:(Type.mk
-                                ?docs:None ?text:None ?params ?cstrs:None ?kind:None ?priv:None ?manifest:None) name
-                        end
-                        <*> loc l_ident <*>? (ng >> type_decl_params)
+                        Mapping.type_declaration_abstract
+                        <*> loc l_ident <*>? -type_decl_params
                     )
                 end
 
@@ -364,7 +386,7 @@ module Make
                 in
 
                 Named.p "typexr:constructor:kind" begin
-                        (ng >> extension_kind)
+                        -extension_kind
                     <|> return @@ Pext_decl (Pcstr_tuple [], None)
                 end
 
@@ -376,11 +398,7 @@ module Make
 
             let type_extension =
                 Named.p "typext" @@ add_attrs begin
-                    mapping begin fun name params priv hd tail ->
-                        let priv = Opt.set Private priv in
-                        helper @@ fun ~p1:_ ~p2:_ ~attrs ->
-                            Te.mk ~attrs ?params ?priv name (hd::tail)
-                    end
+                    Mapping.type_extension
                     << k"type" <*> -loc l_longident <*>? type_decl_params << -s"+=" <*>? -k"private"
                     << opt @@ -s"|" <*> -use type_extension_constructor <*>* (-s"|" >> -use type_extension_constructor)
                 end

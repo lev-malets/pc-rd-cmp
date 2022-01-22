@@ -1,11 +1,135 @@
+open Base
 open Basic
 open APos
 open Parsetree
 open Sigs
+open Ast_helper
+open Asttypes
 
-module Make
-        (Ext: Ext)
-        = struct
+module Mapping = struct
+    let type_first =
+        mapping begin fun eflag rec_flag decl ->
+            helper @@ fun ~p1 ~p2 ~attrs ->
+                let decl =
+                    match eflag with
+                    | None -> decl
+                    | Some loc -> helper_add_attr "genType" ~loc decl
+                in
+                rec_flag, apply (helper_add_attrs attrs decl) p1 p2
+        end
+
+    let import_list_item =
+        mapping begin fun name alias typ ->
+            let alias = Base.Option.value alias ~default:name in
+            helper_map
+                (fun hlp ->
+                    fun ~p1 ~p2 ~attrs ->
+                        fun attr -> hlp ~p1 ~p2 ~attrs:(attr @ attrs)
+                )
+                (mk_helper2 (Val.mk ?docs:None ?prim:(Some [name.txt])) alias typ)
+        end
+
+    let import_list_from =
+        mapping begin fun list name ->
+            let attr = Location.mkloc "genType.import" name.loc, PStr [Str.eval @@ Exp.constant @@ Const.string name.txt] in
+            let list = List.map ~f:(fun x -> x [attr]) list in
+            let str = List.map ~f:Str.primitive list in
+            let mod_ = Mod.structure str in
+            helper_add_attr "ns.jsFfi" @@ mk_helper ~f:(Incl.mk ?docs:None) mod_
+        end
+
+    let import_item_from =
+        mapping begin fun item name ->
+            let attr =
+                Location.mkloc "genType.import" name.loc,
+                PStr [Str.eval @@ Exp.tuple [Exp.constant @@ Const.string name.txt; Exp.constant @@ Const.string "default"]]
+            in
+            let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
+            mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+        end
+
+    let import_list_from_scope =
+        mapping begin fun list names ->
+            let attr =
+                [ Location.mknoloc "val", PStr []
+                ; Location.mkloc "scope" names.loc,
+                    PStr [Str.eval @@ match names.txt with [x] -> x | xs -> Exp.tuple xs]
+                ]
+            in
+            let list = List.map list ~f:(fun x -> x attr) in
+            let str = List.map ~f:Str.primitive list in
+            let mod_ = Mod.structure str in
+            mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+        end
+
+    let import_item_from_scope =
+        mapping begin fun item names ->
+            let attr =
+                [ Location.mknoloc "val", PStr []
+                ; Location.mkloc "scope" names.loc,
+                    PStr [Str.eval @@ match names.txt with [x] -> x | xs -> Exp.tuple xs]
+                ]
+            in
+            let mod_ = Mod.structure [Str.primitive @@ item attr] in
+            mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+        end
+
+    let import_list =
+        mapping begin fun list ->
+            let attr = Location.mknoloc "val", PStr [] in
+            let list = List.map ~f:(fun x -> x [attr]) list in
+            let str = List.map ~f:Str.primitive list in
+            let mod_ = Mod.structure str in
+            mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+        end
+
+    let import_item =
+        mapping begin fun item ->
+            let attr = Location.mknoloc "val", PStr [] in
+            let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
+            mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
+        end
+
+    let value_with_lat =
+        mapping begin fun p1 attrs pat p2 types typ p3 expr ->
+            let mapping =
+                { Parsetree_mapping.default with
+                    core_type_desc =
+                        { Parsetree_mapping.default.core_type_desc with
+                            constr = fun t a ->
+                                match a with
+                                | [] ->
+                                    let rec loop =
+                                        function
+                                        | [] -> Ptyp_constr (t, a)
+                                        | x::xs ->
+                                            match t.txt with
+                                            | Longident.Lident t when String.equal t x.txt ->
+                                                Ptyp_var x.txt
+                                            | _ -> loop xs
+                                    in
+                                    loop types
+                                | _ -> Ptyp_constr (t, a)
+                        }
+                }
+            in
+
+            let typ_pat = Parsetree_mapping.core_type mapping typ in
+            let typ_pat = Typ.poly types typ_pat in
+
+            let pat = apply pat p1 p2 in
+            let pat = Pat.constraint_ ~loc:(make_location p1 p3) ~attrs pat typ_pat in
+
+            let expr =
+                List.fold_right types
+                ~f:Exp.newtype
+                ~init:(Exp.constraint_ expr typ)
+            in
+            mk_helper2 (Vb.mk ?docs:None ?text:None) pat expr
+        end
+end
+
+module Make (Ext: EXT) = struct
     module Utils = Parser_utils.Make(Ext.Named)
     open Utils
 
@@ -18,22 +142,14 @@ module Make
             modexpr : (module MODEXPR);
         }
 
-    let
-        {
-            signature;
-            structure;
-            _
-        }
-    = fix_poly @@ fun getter ->
-        let open Ast_helper in
-        let open Asttypes in
+    let parsers = fix_poly @@ fun getter ->
         let open Ext in
 
         let module Constant = Parser_constant.Make(Ext)(Utils) in
         let open Utils in
 
         let payload = getter.get @@ fun x -> x.payload in
-        let attrubute_id = take_while1 Pervasives.(fun x -> identifier's_character x || x = '.') in
+        let attrubute_id = take_while1 (fun x -> identifier's_character x || Char.equal x '.') in
 
         let id_payload_pair start =
             mapping t2
@@ -45,12 +161,15 @@ module Make
                 let signature = getter.get @@ fun x -> x.signature
                 let structure = getter.get @@ fun x -> x.structure
 
-                let attribute = id_payload_pair "@"
-                let extension = id_payload_pair "%"
+                let attribute = Named.p "attribute" @@ id_payload_pair "@"
+                let extension = Named.p "extension" @@ id_payload_pair "%"
 
                 let attrs_ =
                     Named.p "attrs" @@
                     seq 0 ~sep:ng ~trail attribute
+                let attrs1_ =
+                    Named.p "attrs1" @@
+                    seq 1 ~sep:ng ~trail attribute
 
                 let use mk =
                     mapping begin fun p1 hlp p2 -> apply hlp p1 p2 end
@@ -68,13 +187,12 @@ module Make
                     mapping begin fun p1 hlp p2 -> hlp ~p1 ~p2 end
                     <*> pos <*> mk <*> del_pos
 
-                let add_attrs =
-                    fun mk ->
-                        mapping begin fun attrs_tail (hlp, attrs) ->
-                            let attrs_tail = Base.Option.value attrs_tail ~default:[] in
-                            (hlp, attrs @ attrs_tail)
-                        end
-                        <*>? attrs_ <*> mk
+                let add_attrs mk =
+                    mapping begin fun attrs_tail (hlp, attrs) ->
+                        let attrs_tail = Base.Option.value attrs_tail ~default:[] in
+                        (hlp, attrs @ attrs_tail)
+                    end
+                    <*>? attrs_ <*> mk
 
                 let set_p1 p =
                     mapping begin fun p1 (hlp, attrs) ->
@@ -95,6 +213,11 @@ module Make
         let open Core in
         let open Type in
         let open Pattern in
+
+        let add_attrs1 mk =
+            mapping helper_add_attrs
+            <*> attrs1_ <*> mk
+        in
 
         let payload =
             Named.p "payload" begin
@@ -141,46 +264,45 @@ module Make
             Named.p "open" begin
                 let override = s"!" >>$ Override in
 
-                add_attrs (
-                    mapping begin fun override name ->
-                        mk_helper ~f:(Opn.mk ?docs:None ?override) name
-                    end
-                    << k"open" <*>? override <*> -loc u_longident
-                )
+                mapping begin fun override name ->
+                    mk_helper ~f:(Opn.mk ?docs:None ?override) name
+                end
+                << k"open" <*>? override <*> -loc u_longident
             end
         in
 
         let exception_ =
-            Named.p "exception" @@
-            add_attrs (k"exception" >> ng >> type_extension_constructor)
+            Named.p "exception" begin
+                k"exception" >> -type_extension_constructor
+            end
         in
 
         let include_sig =
-            add_attrs (k"include" >> -use modtype_with >>| mk_helper ~f:(Incl.mk ?docs:None))
+            Named.p "sig:include" begin
+                k"include" >> -use modtype_with >>| mk_helper ~f:(Incl.mk ?docs:None)
+            end
         in
 
         let value_sig =
-            Named.p "sig:value" @@
-            add_attrs (
+            Named.p "sig:value" begin
                 mapping (mk_helper2 (Val.mk ?docs:None ?prim:None))
                 << k"let" <*> -loc l_ident << -s":" <*> -use core_type_poly
-            )
+            end
         in
 
         let modtype_base =
-            Named.p "top:modtype" @@
-            add_attrs (
+            Named.p "top:modtype" begin
                 mapping begin fun name typ ->
                     mk_helper ~f:(Mtd.mk ?docs:None ?text:None ~typ) name
                 end
-                << k"module" << ng << k"type" << ng <*> loc ident << -s"=" <*> -use modtype_with
-            )
+                << k"module" << -k"type" <*> -loc ident << -s"=" <*> -use modtype_with
+            end
         in
 
         let modtype_sig =
             Named.p "sig:modtype" begin
                     modtype_base
-                <|> add_attrs (
+                <|> (
                         mapping @@ mk_helper ~f:(Mtd.mk ?docs:None ?text:None ?typ:None)
                         << k"module" << -k"type" <*> -loc u_ident
                     )
@@ -194,10 +316,8 @@ module Make
 
         let export p =
                 (
-                    mapping begin fun loc ->
-                        helper_add_attr_loc "genType" loc
-                    end
-                    <*> loc_of @@ k"export" << ng <*> p
+                    mapping begin fun loc -> helper_add_attr "genType" ~loc end
+                    <*> loc_of @@ k"export" <*> -p
                 )
             <|> p
         in
@@ -205,19 +325,9 @@ module Make
         let type_ mk =
             let first =
                 add_attrs begin
-                    mapping begin fun eflag rec_flag decl ->
-                        helper @@ fun ~p1 ~p2 ~attrs ->
-                            let decl =
-                                match eflag with
-                                | None -> decl
-                                | Some loc -> helper_add_attr_loc "genType" loc decl
-                            in
-
-                            rec_flag,
-                            apply (helper_add_attrs attrs decl) p1 p2
-                    end
-                    <*>? (loc_of @@ k"export" << ng)
-                    << k"type" <*> (((-k"rec" >>$ Recursive) <|> (-k"nonrec" >>$ Nonrecursive) <|> return Nonrecursive))
+                    Mapping.type_first
+                    <*>? (loc_of @@ k"export" << ng) << k"type"
+                    <*> (((-k"rec" >>$ Recursive) <|> (-k"nonrec" >>$ Nonrecursive) <|> return Nonrecursive))
                     <*> -type_declaration
                 end
             in
@@ -233,8 +343,7 @@ module Make
         in
 
         let external_ =
-            Named.p "external" @@
-            add_attrs begin
+            Named.p "external" begin
                 mapping begin fun name typ prim ->
                     mk_helper2 (Val.mk ?docs:None ~prim) name typ
                 end
@@ -250,8 +359,8 @@ module Make
                 in
 
                 mapping (mk_helper2 (Md.mk ?docs:None ?text:None))
-                <*> loc u_ident <*>
-                    (
+                <*> loc u_ident
+                <*> (
                             (-s":" >> -use modtype_with)
                         <|> (-s"=" >> -use module_alias)
                     )
@@ -259,14 +368,15 @@ module Make
         in
 
         let module_ =
-            Named.p "module" @@
-            add_attrs (k"module" >> -set_p1 module_decl)
+            Named.p "module" begin
+                k"module" >> -set_p1 module_decl
+            end
         in
 
         let module_rec =
             Named.p "module rec" begin
-                let first = add_attrs (k"module" >> ng >> k"rec" >> ng >> module_decl) in
-                let other = -use (add_attrs (k"and" >> ng >> module_decl)) in
+                let first = add_attrs (k"module" >> -k"rec" >> -module_decl) in
+                let other = -use (add_attrs (k"and" >> -module_decl)) in
 
                 mapping begin fun hd tail -> mk_na_helper Sig.rec_module (hd :: tail) end
                 <*> use first <*> seq 0 other
@@ -275,98 +385,41 @@ module Make
 
         let import =
             Named.p "import" begin
-
                 let item =
-                    mapping begin fun name alias typ ->
-                        let alias = Base.Option.value alias ~default:name in
-                        helper_map
-                            (fun hlp ->
-                                fun ~p1 ~p2 ~attrs ->
-                                    fun attr -> hlp ~p1 ~p2 ~attrs:(attr @ attrs)
-                            )
-                            (mk_helper2 (Val.mk ?docs:None ?prim:(Some [name.txt])) alias typ)
-                    end
-                    <*> loc l_ident <*>? (ng >> k"as" >> ng >> loc l_ident) << -s":" <*> -use core_type_poly
+                    Mapping.import_list_item
+                    <*> loc l_ident <*>? (-k"as" >> -loc l_ident) << -s":" <*> -use core_type_poly
                 in
 
                 let list =
                     s"{" >> seq 1 ~sep:(-s",") (-use item) << -s"}"
                 in
 
-                (
-                    mapping begin fun list name ->
-                        let attr = Location.mkloc "genType.import" name.loc, PStr [Str.eval @@ Exp.constant @@ Const.string name.txt] in
-                        let list = List.map (fun x -> x [attr]) list in
-                        let str = List.map Str.primitive list in
-                        let mod_ = Mod.structure str in
-                        helper_add_attr "ns.jsFfi" @@ mk_helper ~f:(Incl.mk ?docs:None) mod_
-                    end
-                    << k"import" << ng <*> list << ng << k"from" << ng <*> loc Constant.String.string
-                )
-                <|>
-                (
-                    mapping begin fun item name ->
-                        let attr =
-                            Location.mkloc "genType.import" name.loc,
-                            PStr [Str.eval @@ Exp.tuple [Exp.constant @@ Const.string name.txt; Exp.constant @@ Const.string "default"]]
-                        in
-                        let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
-                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                    end
-                    << k"import" <*> -use item << ng << k"from" << ng <*> loc Constant.String.string
-                )
-                <|>
-                (
-                    mapping begin fun list names ->
-                        let attr =
-                            [ Location.mknoloc "val", PStr []
-                            ; Location.mkloc "scope" names.loc,
-                                PStr [Str.eval @@ if List.length names.txt = 1 then List.hd names.txt else Exp.tuple names.txt]
-                            ]
-                        in
-                        let list = list |> List.map @@ fun x -> x attr in
-                        let str = List.map Str.primitive list in
-                        let mod_ = Mod.structure str in
-                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                    end
-                    << k"import" << ng <*> list << ng << k"from" << ng
-                    <*> loc @@ seq 1 ~sep:(-s".") (-use (ident >>| fun x -> mk_helper ~f:Exp.constant (Const.string x)))
-                )
-                <|>
-                (
-                    mapping begin fun item names ->
-                        let attr =
-                            [ Location.mknoloc "val", PStr []
-                            ; Location.mkloc "scope" names.loc,
-                                PStr [Str.eval @@ if List.length names.txt = 1 then List.hd names.txt else Exp.tuple names.txt]
-                            ]
-                        in
-                        let mod_ = Mod.structure [Str.primitive @@ item attr] in
-                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                    end
-                    << k"import" <*> -use item << ng << k"from" << ng
-                    <*> loc @@ seq 1 ~sep:(-s".") (-use (ident >>| fun x -> mk_helper ~f:Exp.constant (Const.string x)))
-                )
-                <|>
-                (
-                    mapping begin fun list ->
-                        let attr = Location.mknoloc "val", PStr [] in
-                        let list = List.map (fun x -> x [attr]) list in
-                        let str = List.map Str.primitive list in
-                        let mod_ = Mod.structure str in
-                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                    end
-                    << k"import" << ng <*> list
-                )
-                <|>
-                (
-                    mapping begin fun item ->
-                        let attr = Location.mknoloc "val", PStr [] in
-                        let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
-                        mk_helper ~f:(Incl.mk ?docs:None) mod_ |> helper_add_attr "ns.jsFfi"
-                    end
-                    << k"import" <*> -use item
-                )
+                let scope = seq 1 ~sep:(-s".") (-use (ident >>| fun x -> mk_helper ~f:Exp.constant (Const.string x))) in
+
+                    (
+                        Mapping.import_list_from
+                        << k"import" <*> -list << -k"from" <*> -loc Constant.String.string
+                    )
+                <|> (
+                        Mapping.import_item_from
+                        << k"import" <*> -use item << -k"from" <*> -loc Constant.String.string
+                    )
+                <|> (
+                        Mapping.import_list_from_scope
+                        << k"import" <*> -list << -k"from" <*> -loc scope
+                    )
+                <|> (
+                        Mapping.import_item_from_scope
+                        << k"import" <*> -use item << -k"from" <*> -loc scope
+                    )
+                <|> (
+                        Mapping.import_list
+                        << k"import" <*> -list
+                    )
+                <|> (
+                        Mapping.import_item
+                        << k"import" <*> -use item
+                    )
             end
         in
 
@@ -404,8 +457,9 @@ module Make
                             [ module_attribute >>| mk_na_helper Sig.attribute
                             ; type_ Sig.type_
                             ; module_rec
-                            ; na @@ add_attrs @@ Peek.first mb_attributed
-                            ] @ List.map na mb_attributed
+                            ; na @@ add_attrs1 @@ Peek.first mb_attributed
+                            ]
+                            @ List.map ~f:na mb_attributed
                         )
                     )
 
@@ -415,48 +469,11 @@ module Make
 
         let value_str =
             Named.p "str:value" begin
-                let lat =
-                    k"type" >> seq 1 (-loc l_ident) << -s"."
-                in
+                let lat = k"type" >> seq 1 (-loc l_ident) << -s"." in
 
                 let with_lat =
                     Named.p "str:value:vb:lat" begin
-                        mapping begin fun p1 attrs pat p2 types typ p3 expr ->
-                            let mapping =
-                                { Parsetree_mapping.default with
-                                    core_type_desc =
-                                        { Parsetree_mapping.default.core_type_desc with
-                                            constr = fun t a ->
-                                                if a <> [] then Ptyp_constr (t, a) else
-                                                let rec loop =
-                                                    function
-                                                    | [] -> Ptyp_constr (t, a)
-                                                    | x::xs ->
-                                                        if Longident.Lident x.txt = t.txt then
-                                                            Ptyp_var x.txt
-                                                        else
-                                                            loop xs
-                                                in
-                                                loop types
-                                        }
-                                }
-                            in
-
-                            let typ_pat = Parsetree_mapping.core_type mapping typ in
-                            let typ_pat = Typ.poly types typ_pat in
-
-                            let pat = apply pat p1 p2 in
-                            let pat = Pat.constraint_ ~loc:(make_location p1 p3) ~attrs pat typ_pat in
-
-                            let expr = List.fold_right
-                                begin fun x acc ->
-                                    Exp.newtype x acc
-                                end
-                                types
-                                (Exp.constraint_ expr typ)
-                            in
-                            mk_helper2 (Vb.mk ?docs:None ?text:None) pat expr
-                        end
+                        Mapping.value_with_lat
                         <*> pos <*> attrs_ <*> pattern <*> pos << -s":" <*> -lat <*> -use core_type_atom <*> pos
                         << -s"=" <*> -use expression_arrow
                     end
@@ -473,13 +490,13 @@ module Make
                 in
 
                 let first =
-                        export (k"let" >> ng >> helper)
+                        export (k"let" >> -helper)
                     <|> (
-                            mapping begin helper_add_attr_loc "genType" end
-                            <*> loc_of @@ k"export" << ng <*> helper
+                            mapping begin fun loc -> helper_add_attr ~loc "genType" end
+                            <*> loc_of @@ k"export" <*> -helper
                         )
                 in
-                let first_rec = export (k"let" >> -k"rec" >> ng >> helper) in
+                let first_rec = export (k"let" >> -k"rec" >> -helper) in
                 let other = k"and" >> -set_p1 (export helper) in
 
                     (
@@ -502,29 +519,28 @@ module Make
                 let b = Base.Option.value ~default:b (Base.Option.map ~f:(fun t -> Mod.constraint_ b t) t) in
                 mk_helper2 (Mb.mk ?docs:None ?text:None) a b
             end
-            <*> loc u_ident <*>? (-s":" >> -use modtype) << ng << o"=" <*> -use modexpr
+            <*> loc u_ident <*>? (-s":" >> -use modtype) << -o"=" <*> -use modexpr
         in
 
         let module_binding =
             Named.p "str:mb" begin
-                k"module" >> ng >> _module_binding
+                k"module" >> -_module_binding
             end
         in
 
         let rec_module_binding =
             Named.p "str:mb:rec" begin
                 mapping cons
-                <*> use @@ add_attrs (k"module" >> ng >> k"rec" >> ng >> _module_binding)
-                <*>* -use (add_attrs (k"and" >> ng >> _module_binding))
+                <*> use @@ add_attrs (k"module" >> -k"rec" >> -_module_binding)
+                <*>* -use (add_attrs (k"and" >> -_module_binding))
             end
         in
 
         let include_ =
-            Named.p "include" @@
-            add_attrs (
+            Named.p "include" begin
                 mapping @@ mk_helper ~f:(Incl.mk ?docs:None)
                 << k"include" <*> -use modexpr
-            )
+            end
         in
 
         let structure =
@@ -553,16 +569,16 @@ module Make
                             [ module_attribute >>| mk_na_helper Str.attribute
                             ; rec_module_binding >>| mk_na_helper Str.rec_module
                             ; value_str
-                            ; na @@ add_attrs @@ Peek.first mb_attributed
-                            ] @ List.map na mb_attributed
+                            ; na @@ add_attrs1 @@ Peek.first mb_attributed
+                            ]
+                            @ List.map ~f:na mb_attributed
                             @
                             [ type_ Str.type_
                             ; na @@ add_attrs eval
                             ]
                         )
                     )
-                    <|>
-                    -use_del eval
+
                 )
             end
         in
@@ -581,16 +597,24 @@ module Make
     let parse p state ~src ~filename =
         parse_string p state ~filename src
 
-    let parse_interface = parse (signature << ng) State.default
-    let parse_implementation = parse (structure << ng) State.default
+    let parse_interface = parse (parsers.signature << ng) State.default
+    let parse_implementation = parse (parsers.structure << ng) State.default
 end
 
 let memo_spec =
     [ "expression"
     ; "expression:arrow"
+    ; "expression:in_braces"
     ; "expression:p0"
     ; "expression:p8"
-	; "pattern"
-	; "typexpr"
+    ; "expression:sequence"
+    ; "typexpr"
     ; "typexpr:atom"
+    ; "typexpr:arrow"
+    ; "str"
+    ; "nongrammar"
+    ; "attrs"
+    ; "pattern"
+    ; "expression:object:set"
+    ; "const:number"
     ]

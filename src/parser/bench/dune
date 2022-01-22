@@ -2,3 +2,18 @@
  (name main)
  (modules main)
  (libraries run_common core_kernel core_bench))
+
+(executable
+ (name exec_res)
+ (modules exec_res)
+ (libraries syntax))
+
+(executable
+ (name exec_memo)
+ (modules exec_memo)
+ (libraries pc_syntax))
+
+(executable
+ (name exec_memo_peek)
+ (modules exec_memo_peek)
+ (libraries pc_syntax))

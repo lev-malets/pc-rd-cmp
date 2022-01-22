@@ -1,26 +1,40 @@
 open Run_common
 
-let memo_spec = ref []
-let min_count = ref 0.
-let min_time = ref 0.
+module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.APos)
+module Measured =
+    Angstrom_pos.Trace.Measured
+        (Pc_syntax.Basic.APos)
+        (struct let memo_spec = Pc_syntax.Parser.memo_spec end)
+module Traced =
+    Angstrom_pos.Trace.Traced
+        (Pc_syntax.Basic.APos)
+        (struct let memo_spec = Pc_syntax.Parser.memo_spec end)
+
+module ParseMeasured =
+    Pc_syntax.Parser.Make
+        (struct
+            module Named = Measured
+            module Peek = Peek
+        end)
+module ParseTraced =
+    Pc_syntax.Parser.Make
+        (struct
+            module Named = Traced
+            module Peek = Peek
+        end)
+
+
+let input = ref ""
+let output = ref ""
 let anon_fun _ = ()
 
-let speclist = [
-    "--input", Arg.Set_string input, "";
-    "--output", Arg.Set_string output, "";
-
-]
-
 let speclist =
-    [ "--memo",
-        Arg.Unit (fun () -> memo_spec := Pc_syntax.Parser.memo_spec),
-        ""
-    ; "--filter-count", Arg.Set_float min_count, ""
-    ; "--filter-time", Arg.Set_float min_time, ""
-    ] @ speclist
+    [ "--input", Arg.Set_string input, ""
+    ; "--output", Arg.Set_string output, ""
+    ]
 
-let print_stats (module Trace: Angstrom_pos.Sigs.TRACED) =
-    let stats = Exec_info.to_stats Trace.tt in
+let print_stats _ =
+    let stats = Exec_info.to_stats Traced.tt in
     let list = ref [] in
 
     let ch = open_out !output in
@@ -34,11 +48,18 @@ let print_stats (module Trace: Angstrom_pos.Sigs.TRACED) =
 
     let list = List.sort (fun (n1, _) (n2, _) -> compare n1 n2) !list in
 
+    (*Printf.fprintf ch "memo table size: %d\n\n" (Hashtbl.length Measured.table);*)
+    Printf.fprintf ch "%40s | %10s |  | \n\n" "name" "call count";
+
     List.iter
         begin fun (parser, stats) ->
-            if stats.Exec_info.count > !min_count && stats.time > !min_time then
-                Printf.fprintf ch "%s =\n    Count: %.1f\n    Time: %.0fns\n"
-                    parser stats.count (Core_kernel.Float.round_up (stats.time /. 10.) *. 10.)
+            let i = Hashtbl.find Measured.name2id parser in
+
+            Printf.fprintf ch "%40s | %16d | %16.4f | %16d | %16.2f\n"
+                parser
+                Measured.counts.(i) stats.Exec_info.call_count
+                Measured.times.(i)
+                (float_of_int Measured.times.(i) /. float_of_int Measured.counts.(i))
         end
         list;
     close_out ch
@@ -46,16 +67,17 @@ let print_stats (module Trace: Angstrom_pos.Sigs.TRACED) =
 let () =
     Arg.parse speclist anon_fun "";
 
-    let trace, (module Parse) = mk_traced !memo_spec in
     let filename = !input in
     let src = read_file ~filename in
 
-    begin if String.sub filename (String.length filename - 4) 4 = ".res" then
-        let _x = Parse.parse_implementation ~src ~filename in
-        print_stats trace
-    else if String.sub filename (String.length filename - 5) 5 = ".resi" then
-        let _x = Parse.parse_interface ~src ~filename in
-        print_stats trace
-    else
+    match Filename.extension filename with
+    | ".res" ->
+        let _ = ParseTraced.parse_implementation ~src ~filename in
+        let _ = ParseMeasured.parse_implementation ~src ~filename in
+        print_stats ()
+    | ".resi" ->
+        let _ = ParseTraced.parse_interface ~src ~filename in
+        let _ = ParseMeasured.parse_interface ~src ~filename in
+        print_stats ()
+    | _ ->
         failwith filename
-    end;

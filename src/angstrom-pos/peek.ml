@@ -46,5 +46,5 @@ module MakeNotPeek (Pos : Sigs.POS): Sigs.PEEK with module Parser = Pos.Parser =
     open Pos
 
     let first expected =
-        List.fold_right (fun c p -> c <|> p) expected (fail "")
+        List.fold_right (fun c p -> c <|> p) expected fail
 end
