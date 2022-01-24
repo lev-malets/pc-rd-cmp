@@ -7,13 +7,14 @@ type t =
 let empty = { w1 = Int64.zero; w2 = Int64.zero; w3 = Int64.zero; w4 = Int64.zero }
 let full = { w1 = Int64.minus_one; w2 = Int64.minus_one; w3 = Int64.minus_one; w4 = Int64.minus_one }
 
-let add t c =
-    let code = Char.code c in
+let add_code t code =
     match [@warning "-8"] code lsr 6 with
     | 0 -> { t with w1 = Int64.logor t.w1 (Int64.shift_left Int64.one code) }
     | 1 -> { t with w2 = Int64.logor t.w2 (Int64.shift_left Int64.one (code - 64)) }
     | 2 -> { t with w3 = Int64.logor t.w3 (Int64.shift_left Int64.one (code - 128)) }
     | 3 -> { t with w4 = Int64.logor t.w4 (Int64.shift_left Int64.one (code - 192)) }
+
+let add t c = add_code t @@ Char.code c
 
 let union t1 t2 =
     { w1 = Int64.logor t1.w1 t2.w1

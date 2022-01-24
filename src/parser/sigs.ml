@@ -62,7 +62,7 @@ module type UTILS = sig
 
     val del_pos : Lexing.position parser
     val del : unit parser
-    val s : string -> unit parser
+    val s : string -> string parser
 
     val identifier's_character : char -> bool
     val k : string -> unit parser

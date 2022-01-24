@@ -170,27 +170,3 @@ let make_list_helper ~constr ~tuple ~get_loc seq ext =
 
         loop (fun loc -> constr ?loc:(Some loc) ?attrs) seq
     end
-
-
-type buf_ops =
-    { raw : unit -> Buffer.t
-    ; add_char : char -> unit
-    ; add_string : string -> unit
-    ; mk : unit parser
-    ; contents : string parser
-    ; reset : unit parser
-    ; drop : unit parser
-    }
-
-
-let mk_bufs () =
-    let bufs = ref [] in
-
-    { raw = (fun _ -> List.hd_exn !bufs)
-    ; add_char = (fun c -> Buffer.add_char (List.hd_exn !bufs) c)
-    ; add_string = (fun s -> Buffer.add_string (List.hd_exn !bufs) s)
-    ; mk = exec (fun _ -> bufs := Buffer.create 16 :: !bufs)
-    ; contents = exec (fun _ -> Buffer.contents (List.hd_exn !bufs))
-    ; reset = exec (fun _ -> Buffer.clear (List.hd_exn !bufs))
-    ; drop = exec (fun _ -> bufs := List.tl_exn !bufs)
-    }

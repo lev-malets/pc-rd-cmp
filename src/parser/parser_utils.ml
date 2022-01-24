@@ -9,9 +9,9 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
         Named.p ("\'" ^ x ^ "\'") begin
             begin
                 match String.length x with
-                | 0 -> return ()
-                | 1 -> (char x.[0] >>$ ())
-                | _ -> string x >>$ ()
+                | 0 -> return ""
+                | 1 -> char x.[0] >>$ x
+                | _ -> string x
             end
         end
 
@@ -96,7 +96,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
             match c with
             | Some '}' -> return ()
             | Some ')' -> return ()
-            | Some ';' -> advance 1
+            | Some ';' -> advance 1 >>$ ()
             | None -> return ()
             | _ ->
                 APos.pos.p >>= fun p2 ->
@@ -166,7 +166,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
         l_ident >>= fun str -> loop @@ Longident.Lident str
 *)
     let rec exact_longident = function
-        | Longident.Lident x -> s x
-        | Longident.Ldot (lid, x) -> exact_longident lid >> -s"." >> ng >> s x
+        | Longident.Lident x -> s x >>$ ()
+        | Longident.Ldot (lid, x) -> exact_longident lid >> -s"." >> ng << s x
         | Longident.Lapply (lid, arg) -> exact_longident lid >> -s"(" >> ng >> exact_longident arg << -s")"
 end

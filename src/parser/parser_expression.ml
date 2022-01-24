@@ -484,6 +484,7 @@ module Make
                                 let open Angstrom in
                                 string "<" >> ng.p >> string "/" >> ng.p >> (exact_longident tag).p << ng.p << string ">"
                                 >>| fun _ ->
+
                                 let tailargs =
                                     (Labelled "children", children) :: [_unit_arg]
                                 in
@@ -562,32 +563,30 @@ module Make
             let interpolated_string qtag =
                 let op = Exp.ident @@ Location.mknoloc @@ Longident.Lident "^" in
 
-                let buf = mk_bufs () in
+                let cons = mapping cons in
 
-                let mk_const str =
-                    helper_add_attr "res.template" @@
-                    mk_helper ~f:Exp.constant @@
-                    Const.string ~quotation_delimiter:qtag str
+                let parts = fix @@ fun parts ->
+                    cons
+                    <*> take_while (function '\n' | '$' | '`' | '\\' | '\r' -> false | _ -> true)
+                    <*> (
+                                (cons <*> new_line <*> parts)
+                            <|> (cons <*> (s"\\`" >>$ "`") <*> parts)
+                            <|> (cons <*> (s"\\$" >>$ "$") <*> parts)
+                            <|> (cons <*> (s"\\\\" >>$ "\\") <*> parts)
+                            <|> (cons <*> (s"$" << failed (s"{")) <*> parts)
+                            <|> return []
+                        )
                 in
-
-                let variants loop =
-                        ((new_line >>| buf.add_string) >> loop)
-                    <|> ((s"\\`" >>| fun _ -> buf.add_char '`') >> loop)
-                    <|> ((s"\\$" >>| fun _ -> buf.add_char '$') >> loop)
-                    <|> ((s"\\\\" >>| fun _ -> buf.add_char '\\') >> loop)
-                    <|> ((s"$" >>| fun _ -> buf.add_char '$') >> loop)
+                let string =
+                    parts >>| fun l ->
+                        let str = String.concat l in
+                        helper_add_attr "res.template" @@
+                        mk_helper ~f:Exp.constant @@
+                        Const.string ~quotation_delimiter:qtag str
                 in
 
                 let string_part =
-                    let pos_ = ref [] in
-                    let pos_drop =
-                        exec @@ fun _ ->
-                        let pos = List.hd_exn !pos_ in
-                        pos_ := List.tl_exn !pos_;
-                        pos
-                    in
-
-                    fix @@ fun (string_part: (expression -> expression helper) parser) ->
+                    fix @@ fun string_part ->
 
                     let tail =
                         mapping begin fun expr pos tail prev ->
@@ -598,74 +597,60 @@ module Make
                         << s"${" <*> -use expression << -s"}" <*> pos <*> string_part
                     in
 
-                    (pos >>| fun p -> pos_ := p :: !pos_)
-                    >>
-                    buf.reset
-                    >>
-                    fix @@ fun loop ->
-                        (take_while (function '\n' | '$' | '`' | '\\' | '\r' -> false | _ -> true) >>| buf.add_string)
-                        >>
-                        (
-                                (
-                                    s"`" >> pos_drop >> buf.contents
-                                    >>| fun str prev ->
-                                        helper_add_attr "res.template" @@
-                                        helper @@ fun ~p1 ~p2 ~attrs ->
-                                            apply
-                                                (
-                                                    helper_add_attrs attrs @@
-                                                    mk_helper2 Exp.apply op [
-                                                        Nolabel, prev;
-                                                        Nolabel, apply (mk_const str) p1 p2;
-                                                    ]
-                                                )
-                                                p1 p2
-                                )
-                            <|> (
-                                    mapping begin fun str p2 tail p1 prev ->
-                                        let e = apply (mk_const str) p1 p2 in
-                                        tail (
-                                            apply (
-                                                helper_add_attr "res.template" @@
-                                                mk_helper2 Exp.apply op [Nolabel, prev; Nolabel, e]
-                                            ) prev.pexp_loc.loc_start p2
+                    rapply pos @@ rapply string
+                    (
+                            (
+                                s"`" >>$ fun str _p1 prev ->
+                                helper_add_attr "res.template" @@
+                                helper @@ fun ~p1 ~p2 ~attrs ->
+                                    apply
+                                        (
+                                            helper_add_attrs attrs @@
+                                            mk_helper2 Exp.apply op [
+                                                Nolabel, prev;
+                                                Nolabel, apply str p1 p2;
+                                            ]
                                         )
-                                    end
-                                    <*> buf.contents <*> pos <*> tail <*> pos_drop
-                                )
-                            <|> variants loop
-                        )
+                                        p1 p2
+                            )
+                        <|> (
+                                mapping begin fun p2 tail str p1 prev ->
+                                    let e = apply str p1 p2 in
+                                    tail (
+                                        apply (
+                                            helper_add_attr "res.template" @@
+                                            mk_helper2 Exp.apply op [Nolabel, prev; Nolabel, e]
+                                        ) prev.pexp_loc.loc_start p2
+                                    )
+                                end
+                                <*> pos <*> tail
+                            )
+                    )
                 in
 
                 s"`" >>
                 (
-                    wrapped buf.mk buf.drop
+                    rapply string
                     (
-                        fix @@ fun loop ->
-                            (take_while (function '\n' | '$' | '`' | '\\' | '\r' -> false | _ -> true) >>| buf.add_string)
-                            >>
-                            (
-                                    (s"`" >> buf.contents >>| mk_const)
-                                <|> (
-                                        mapping begin fun pos1 expr pos2 str tail ->
-                                            helper begin fun ~p1 ~p2 ~attrs ->
-                                                let e0 =
-                                                    apply (mk_const str) p1 pos1
-                                                in
-                                                let e1 =
-                                                    apply
-                                                        (
-                                                            helper_add_attr "res.template" @@
-                                                            mk_helper2 Exp.apply op [Nolabel, e0; Nolabel, expr]
-                                                        )
-                                                        p1 pos2
-                                                in
-                                                apply (helper_add_attrs attrs @@ tail e1) p1 p2
-                                            end
-                                        end
-                                        <*> pos << s"${" <*> -use expression << -s"}" <*> pos <*> buf.contents <*> string_part
-                                    )
-                                <|> variants loop
+                            (s"`" >>$ fun str -> str)
+                        <|> (
+                                mapping begin fun pos1 expr pos2 tail str ->
+                                    helper begin fun ~p1 ~p2 ~attrs ->
+                                        let e0 =
+                                            apply str p1 pos1
+                                        in
+                                        let e1 =
+                                            apply
+                                                (
+                                                    helper_add_attr "res.template" @@
+                                                    mk_helper2 Exp.apply op [Nolabel, e0; Nolabel, expr]
+                                                )
+                                                p1 pos2
+                                        in
+                                        apply (helper_add_attrs attrs @@ tail e1) p1 p2
+                                    end
+                                end
+                                <*> pos << s"${" <*> -use expression << -s"}" <*> pos <*> string_part
                             )
                     )
                 )
@@ -848,7 +833,7 @@ module Make
 
                             let _arg =
                                 mapping @@ mk_helper ~f:Exp.ident
-                                <*> loc (k"_" >>| fun _ -> List.hd_exn !flags := true; Longident.Lident "__x")
+                                <*> loc (k"_" >> exec @@ fun _ -> List.hd_exn !flags := true; Longident.Lident "__x")
                             in
 
                             let params =

@@ -3,6 +3,8 @@ module Make(T: sig type s end) = struct
     module Parser = Sigs.MkParser(struct type s = T.s end)
     open Parser
 
+    let (!!) = Lazy.force
+
     module Angstrom = struct
         module Angstrom_ = Angstrom_mod.Angstrom.Make(struct type s = Parser.Angstrom.s end)
         include Angstrom_
@@ -579,5 +581,6 @@ module Make(T: sig type s end) = struct
     let wrapped start final p =
         { p with p = (start >> p << final <|> (final >> fail)).p }
 
-
+    let rapply v f =
+        mapping (fun v f -> f v) <*> v <*> f
 end

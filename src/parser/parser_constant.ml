@@ -118,44 +118,46 @@ module Make (Ext: EXT) (Utils: UTILS): CONSTANT = struct
 
     module String = struct
         let string =
-            let buf = mk_bufs () in
+            let parts =
+            s"\"" >>
+            fix @@ fun loop ->
+                let not_escaped = function
+                    | '\\' | '\"' | '\n' | '\t' | '\b' | '\r' -> false
+                    | _ -> true
+                in
 
-            s"\"" >> wrapped buf.mk buf.drop
-            begin
-                fix @@ fun p ->
-                    let not_escaped = function
-                        | '\\' | '\"' | '\n' | '\t' | '\b' | '\r' -> false
-                        | _ -> true
-                    in
-
-                    (take_while not_escaped >>| buf.add_string) >>
-                    (
-                            (string "\\" >> (Character.escaped >>| buf.add_char) >> p)
-                        <|> ((string "\\\"" >>| fun _ -> buf.add_char '\"') >> p)
-                        <|> (string "\"" >> buf.contents)
+                mapping cons
+                <*> take_while not_escaped
+                <*> (
+                            (s"\"" >>$ [])
+                        <|> (
+                                mapping cons
+                                <*> (
+                                            (s"\\" >> Character.escaped >>| String.make 1)
+                                        <|> (s"\\\"" >>$ "\"")
+                                    )
+                                <*> loop
+                            )
                     )
-            end
+            in
+            parts >>| String.concat
 
         let multiline ~q =
-            let buf = mk_bufs () in
-            let mk_const str =
-                Const.string ~quotation_delimiter:"js" str
-            in
-
-            wrapped buf.mk buf.drop
-            (
+            let list =
                 char q >>
                 fix @@ fun loop ->
-                (take_while (function '\n' | '\\' | '\r' -> false | c -> not (Char.equal c q)) >>| buf.add_string)
-                >>
-                (
-                        (char q >> buf.contents >>| mk_const)
-                    <|> ((new_line >>| buf.add_string) >> loop)
-                    <|> ((s"\\\"" >>| fun _ -> buf.add_string "\\\"") >> loop)
-                    <|> ((s"\\\\" >>| fun _ -> buf.add_string "\\\\") >> loop)
-                    <|> ((s"\\" >>| fun _ -> buf.add_char '\\') >> loop)
-                )
-            )
+                mapping cons
+                <*> take_while (function '\n' | '\\' | '\r' -> false | c -> not (Char.equal c q))
+                <*> (
+                            (char q >>$ [])
+                        <|> (
+                                mapping cons
+                                <*> (new_line <|> s"\\\"" <|> s"\\\\" <|> s"\\")
+                                <*> loop
+                            )
+                    )
+            in
+            list >>| fun l -> Const.string ~quotation_delimiter:"js" @@ String.concat l
 
         let p =
             Named.p "const:string" begin
