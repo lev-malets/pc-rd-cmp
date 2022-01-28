@@ -6,17 +6,15 @@ module MemoSpec = struct
     let memo_spec = ["ret"]
 end
 
-open Pos
-
 let parse parser contents =
     fun () ->
-        match parse_string (parser ()) () contents with
+        match Pos.parse_string (parser ()) () contents with
         | Ok _ -> ()
         | _ -> failwith "fail to parse"
 
 let parse_nc parser contents =
     fun () ->
-        match parse_string parser () contents with
+        match Pos.parse_string parser () contents with
         | Ok _ -> ()
         | _ -> failwith "fail to parse"
 
@@ -43,7 +41,7 @@ let returns =
         Bench.Test.create ~name:"named-return128"
             begin
                 let ret = mk_ret [] in
-                parse_nc (Array.make 127 ret |> Array.fold_left (>>) ret) ""
+                parse_nc (Array.make 127 ret |> Array.fold_left Pos.(>>) ret) ""
             end;
 
         Bench.Test.create ~name:"memo-named-return"
@@ -54,7 +52,7 @@ let returns =
         Bench.Test.create ~name:"memo-named-return128"
             begin
                 let ret = mk_ret ["n"] in
-                parse_nc (Array.make 127 ret |> Array.fold_left (>>) ret) ""
+                parse_nc (Array.make 127 ret |> Array.fold_left Pos.(>>) ret) ""
             end;
     ]
 

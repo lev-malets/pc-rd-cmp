@@ -65,10 +65,10 @@ module Make (Ext: EXT) = struct
 
                 let attrs_ =
                     Named.p "attrs" @@
-                    seq 0 ~sep:ng ~trail attribute
+                    seq ~sep:ng ~trail attribute
                 let attrs1_ =
                     Named.p "attrs1" @@
-                    seq 1 ~sep:ng ~trail attribute
+                    seq ~n:1 ~sep:ng ~trail attribute
 
                 let pat_attrs p =
                     mapping begin fun loc_start attrs x ->
@@ -80,7 +80,7 @@ module Make (Ext: EXT) = struct
                                 ppat_loc = {x.ppat_loc with loc_start}
                             }
                     end
-                    >$pos >$attrs_ >$p
+                    +pos +attrs_ +p
 
                 let exp_attrs p =
                     mapping begin fun loc_start attrs x ->
@@ -92,7 +92,7 @@ module Make (Ext: EXT) = struct
                                 pexp_loc = {x.pexp_loc with loc_start}
                             }
                     end
-                    >$pos >$attrs_ >$p
+                    +pos +attrs_ +p
 
                 let mod_attrs p =
                     mapping begin fun loc_start attrs x ->
@@ -104,7 +104,7 @@ module Make (Ext: EXT) = struct
                                 pmod_loc = {x.pmod_loc with loc_start}
                             }
                     end
-                    >$pos >$attrs_ >$p
+                    +pos +attrs_ +p
 
                 let mty_attrs p =
                     mapping begin fun loc_start attrs x ->
@@ -116,7 +116,7 @@ module Make (Ext: EXT) = struct
                                 pmty_loc = {x.pmty_loc with loc_start}
                             }
                     end
-                    >$pos >$attrs_ >$p
+                    +pos +attrs_ +p
 
                 let typ_attrs p =
                     mapping begin fun loc_start attrs x ->
@@ -128,7 +128,7 @@ module Make (Ext: EXT) = struct
                                 ptyp_loc = {x.ptyp_loc with loc_start}
                             }
                     end
-                    >$pos >$attrs_ >$p
+                    +pos +attrs_ +p
 
                 let variant_tag =
                     s"#"
@@ -147,16 +147,16 @@ module Make (Ext: EXT) = struct
         let payload =
             Named.p "payload" begin
                     parens & mapping (fun x -> PPat (x, None))
-                    >s"?" >ng >$pattern
+                    -s"?" -ng +pattern
 
                 ||  parens & mapping (fun x -> PSig x)
-                    >s":" >ng >k"sig" >$signature
+                    -s":" -ng -k"sig" +signature
 
                 ||  parens & mapping (fun x -> PTyp x)
-                    >s":" >ng >$core_type
+                    -s":" -ng +core_type
 
                 ||  parens & mapping (fun x -> PStr x)
-                    >$structure
+                    +structure
 
                 ||  return @@ PStr []
             end
@@ -199,43 +199,43 @@ module Make (Ext: EXT) = struct
             with_loc & mapping begin fun attrs override name loc ->
                 Opn.mk ~loc ~attrs ?docs:None ?override name
             end
-            >$attrs_ >k"open" >?(s"!" >>$ Override) >ng >$loc u_longident
+            +attrs_ -k"open" +opt(s"!" >>$ Override) -ng +loc u_longident
         in
 
         let exception_ =
             Named.p "top:exception" &
             mapping (fun attrs constr -> {constr with pext_attributes = constr.pext_attributes @ attrs} )
-            >$attrs_ >k"exception" >ng >$type_extension_constructor
+            +attrs_ -k"exception" -ng +type_extension_constructor
         in
 
         let include_ x =
             with_loc & hlp_a (Incl.mk ?docs:None)
-            >$attrs_ >k"include" >ng >$x
+            +attrs_ -k"include" -ng +x
         in
 
         let modtype_base =
             Named.p "top:modtype" & with_loc & mapping
                 (fun attrs name typ loc -> Mtd.mk ~attrs ~loc ~typ name)
-            >$attrs_ >k"module" >ng >k"type" >ng >$loc ident >ng >s"=" >ng >$modtype_with
+            +attrs_ -k"module" -ng -k"type" -ng +loc ident -ng -s"=" -ng +modtype_with
         in
 
         let type_ mk =
             let first =
                 Mapping.type_first
-                >$attrs_ >?(loc_of @@ k"export" << ng) >k"type" >ng
-                >$(((k"rec" >> ng >>$ Recursive) <|> (k"nonrec" >> ng >>$ Nonrecursive) <|> return Nonrecursive))
-                >$type_declaration
+                +attrs_ +opt(loc_of @@ k"export" << ng) -k"type" -ng
+                +(((k"rec" >> ng >>$ Recursive) <|> (k"nonrec" >> ng >>$ Nonrecursive) <|> return Nonrecursive))
+                +type_declaration
             in
 
             let other =
                 Mapping.type_other
-                >$attrs_ >k"and" >ng >?(loc_of @@ k"export" << ng) >$type_declaration
+                +attrs_ -k"and" -ng +opt(loc_of @@ k"export" << ng) +type_declaration
             in
 
             with_del & mapping begin fun (rec_flag, hd) tail loc ->
                 mk ?loc:(Some loc) rec_flag (hd :: tail)
             end
-            >$first >*(ng >> other)
+            +first +seq (ng >> other)
         in
 
         let external_ =
@@ -243,8 +243,8 @@ module Make (Ext: EXT) = struct
                 with_loc & mapping begin fun attrs name typ prim loc ->
                     Val.mk ~loc ~attrs ?docs:None ~prim name typ
                 end
-                >$attrs_ >k"external" >ng >$loc l_ident >ng >s":" >ng >$core_type_poly
-                >ng >s"=" >+(ng >> Constant.String.string)
+                +attrs_ -k"external" -ng +loc l_ident -ng -s":" -ng +core_type_poly
+                -ng -s"=" +seq ~n:1 (ng >> Constant.String.string)
             end
         in
 
@@ -252,12 +252,12 @@ module Make (Ext: EXT) = struct
             Named.p "module decl" begin
                 let module_alias =
                     with_loc & hlp Mty.alias
-                    >$loc u_longident
+                    +loc u_longident
                 in
 
                 mapping (fun n t attrs loc -> Md.mk ~loc ~attrs n t)
-                >$loc u_ident >ng
-                >$(
+                +loc u_ident -ng
+                +(
                         s":" >> ng >> modtype_with
                     ||  s"=" >> ng >> module_alias
                 )
@@ -266,22 +266,22 @@ module Make (Ext: EXT) = struct
 
         let module_ =
             Named.p "module" & with_loc &
-            rapply attrs_ & k"module" >> ng >> module_decl
+            attrs_ && k"module" >> ng >> module_decl
         in
 
         let module_rec =
             Named.p "module rec" begin
                 let first =
-                    with_loc & rapply attrs_ &
+                    with_loc & attrs_ &&
                     k"module" >> ng >> k"rec" >> ng >> module_decl
                 in
                 let other =
-                    with_loc & rapply attrs_ &
+                    with_loc & attrs_ &&
                     k"and" >> ng >> module_decl
                 in
 
                 with_loc & mapping (fun hd tail loc -> Sig.rec_module ~loc (hd :: tail))
-                >$first >*(ng >> other)
+                +first +seq (ng >> other)
             end
         in
 
@@ -292,16 +292,16 @@ module Make (Ext: EXT) = struct
                         let alias = Option.value alias ~default:name in
                         Val.mk ~loc ~attrs ~prim:[name.txt] alias typ
                     end
-                    >$loc l_ident >ng >?(k"as" >> ng >> loc l_ident << ng) >s":" >ng >$core_type_poly
+                    +loc l_ident -ng +opt(k"as" >> ng >> loc l_ident << ng) -s":" -ng +core_type_poly
                 in
 
-                let list = braces & seq 1 item ~sep in
+                let list = braces & seq ~n:1 item ~sep in
 
                 let scope =
-                    seq 1 ~sep:(ng>s".">ng)
+                    seq ~n:1 ~sep:(ng-s"."-ng)
                     (
                         with_loc & mapping (fun x loc -> Exp.constant ~loc (Const.string x))
-                        >$ident
+                        +ident
                     )
                 in
 
@@ -313,7 +313,7 @@ module Make (Ext: EXT) = struct
 
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    >$attrs_ >k"import" >ng >$list >ng >k"from" >ng >$loc Constant.String.string
+                    +attrs_ -k"import" -ng +list -ng -k"from" -ng +loc Constant.String.string
 
                 ||  with_loc & mapping begin fun attrs item name loc ->
                         let attr =
@@ -323,7 +323,7 @@ module Make (Ext: EXT) = struct
                         let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    >$attrs_ >k"import" >ng >$item >ng >k"from" >ng >$loc Constant.String.string
+                    +attrs_ -k"import" -ng +item -ng -k"from" -ng +loc Constant.String.string
 
                 ||  with_loc & mapping begin fun attrs list names loc ->
                         let attr =
@@ -337,7 +337,7 @@ module Make (Ext: EXT) = struct
                         let mod_ = Mod.structure str in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    >$attrs_ >k"import" >ng >$list >ng >k"from" >ng >$loc scope
+                    +attrs_ -k"import" -ng +list -ng -k"from" -ng +loc scope
 
                 ||  with_loc & mapping begin fun attrs item names loc ->
                         let attr =
@@ -349,7 +349,7 @@ module Make (Ext: EXT) = struct
                         let mod_ = Mod.structure [Str.primitive @@ item attr] in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    >$attrs_ >k"import" >ng >$item >ng >k"from" >ng >$loc scope
+                    +attrs_ -k"import" -ng +item -ng -k"from" -ng +loc scope
 
                 ||  with_loc & mapping begin fun attrs list loc ->
                         let attr = Location.mknoloc "val", PStr [] in
@@ -358,62 +358,62 @@ module Make (Ext: EXT) = struct
                         let mod_ = Mod.structure str in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    >$attrs_ >k"import" >ng >$list
+                    +attrs_ -k"import" -ng +list
 
                 ||  with_loc & mapping begin fun attrs item loc ->
                         let attr = Location.mknoloc "val", PStr [] in
                         let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    >$attrs_ >k"import" >ng >$item
+                    +attrs_ -k"import" -ng +item
             end
         in
 
         let signature =
             Named.p "sig" begin
-                seq 0 ~sep:ng
+                seq ~sep:ng
                 (
                     Peek.first
                     [
                         with_del & na_hlp Sig.attribute
-                        >$module_attribute
+                        +module_attribute
                     ; type_ Sig.type_
                     ; module_rec
                     ;
                         with_del & hlp_a Sig.extension
-                        >$attrs_ >$module_extension
+                        +attrs_ +module_extension
                     ;
                         Named.p "sig:exception" & with_del & na_hlp Sig.exception_
-                        >$exception_
+                        +exception_
                     ;
                         with_del & na_hlp Sig.value
-                        >$external_
+                        +external_
                     ;
                         Named.p "sig:include" & with_del & na_hlp Sig.include_
-                        >$include_ modtype_with
+                        +include_ modtype_with
                     ;
                         Named.p "sig:value" & with_del & na_hlp Sig.value
-                        >$(
+                        +(
                             with_loc & hlp2_a (Val.mk ?docs:None ?prim:None)
-                            >$attrs_ >k"let" >ng >$loc l_ident >ng >s":" >ng >$core_type_poly
+                            +attrs_ -k"let" -ng +loc l_ident -ng -s":" -ng +core_type_poly
                         )
                     ;
                         Named.p "sig:modtype" & with_del & na_hlp Sig.modtype
-                        >$(
+                        +(
                                 modtype_base
 
                             ||  with_loc & hlp_a (Mtd.mk ?docs:None ?text:None ?typ:None)
-                                >$attrs_ >k"module" >ng >k"type" >ng >$loc u_ident
+                                +attrs_ -k"module" -ng -k"type" -ng +loc u_ident
                         )
                     ;
                         with_del & na_hlp Sig.module_
-                        >$module_
+                        +module_
                     ;
                         with_del & na_hlp Sig.open_
-                        >$open_
+                        +open_
                     ;
                         with_del & na_hlp Sig.type_extension
-                        >$type_extension
+                        +type_extension
                     ]
                 )
             end
@@ -421,7 +421,7 @@ module Make (Ext: EXT) = struct
 
         let value_str =
             Named.p "str:value" begin
-                let lat = k"type" >> seq 1 (ng >> loc l_ident) << ng << s"." in
+                let lat = k"type" >> seq ~n:1 (ng >> loc l_ident) << ng << s"." in
 
                 let with_lat =
                     Named.p "str:value:vb:lat" begin
@@ -460,8 +460,8 @@ module Make (Ext: EXT) = struct
                             in
                             Vb.mk ~loc:vb_loc ~attrs:vb_attrs pat expr
                         end
-                        >$pos >$attrs_ >$pattern >ng >s":" >ng >$lat >ng >$core_type_atom
-                        >ng >s"=" >ng >$expression_arrow
+                        +pos +attrs_ +pattern -ng -s":" -ng +lat -ng +core_type_atom
+                        -ng -s"=" -ng +expression_arrow
                     end
                 in
 
@@ -471,7 +471,7 @@ module Make (Ext: EXT) = struct
                     ||  mapping begin fun pattern expr attrs loc ->
                             Vb.mk ~loc ~attrs pattern expr
                         end
-                        >$pattern_poly_constrainted >ng >s"=" >ng >$expression_arrow
+                        +pattern_poly_constrainted -ng -s"=" -ng +expression_arrow
                 in
 
                 let first =
@@ -485,12 +485,12 @@ module Make (Ext: EXT) = struct
                             | None -> Nonrecursive, decl loc
                             | _ -> Recursive, decl loc
                         end
-                        >$attrs_ >?(loc_of(k"export")>ng) >k"let" >ng >?(k"rec">ng) >$helper
+                        +attrs_ +opt(loc_of(k"export")-ng) -k"let" -ng +opt(k"rec"-ng) +helper
 
                     ||  with_loc & mapping begin fun attrs loc decl decl_loc ->
                             Nonrecursive, decl (Hc.attr "genType" ~loc :: attrs) decl_loc
                         end
-                        >$attrs_ >$loc_of(k"export") >ng >$helper
+                        +attrs_ +loc_of(k"export") -ng +helper
                 in
                 let other =
                     mapping begin fun attrs p1 eflag x p2 ->
@@ -501,13 +501,13 @@ module Make (Ext: EXT) = struct
                         in
                         decl @@ make_location p1 p2
                     end
-                    >$attrs_ >k"and" >ng >$pos >?(loc_of(k"export")>ng) >$helper >$pos
+                    +attrs_ -k"and" -ng +pos +opt(loc_of(k"export")-ng) +helper +pos
                 in
 
                 with_del & mapping begin fun (rec_flag, first) others loc ->
                     Str.value ~loc rec_flag (first :: others)
                 end
-                >$first >*(ng >> other)
+                +first +seq (ng >> other)
             end
         in
 
@@ -516,75 +516,75 @@ module Make (Ext: EXT) = struct
                 let b = Option.value ~default:b (Option.map ~f:(fun t -> Mod.constraint_ b t) t) in
                 Mb.mk ~loc ~attrs a b
             end
-            >$loc u_ident >ng >?(s":" >> ng >> modtype << ng) >o"=" >ng >$modexpr
+            +loc u_ident -ng +opt(s":" >> ng >> modtype << ng) -o"=" -ng +modexpr
         in
 
         let module_binding =
             Named.p "str:mb" begin
                 with_loc &
-                rapply attrs_ & k"module" >> ng >> module_binding_helper
+                attrs_ && k"module" >> ng >> module_binding_helper
             end
         in
 
         let rec_module_binding =
             let first =
                 with_loc &
-                rapply attrs_ & k"module" >> ng >> k"rec" >> ng >> module_binding_helper
+                attrs_ && k"module" >> ng >> k"rec" >> ng >> module_binding_helper
             in
             let other =
                 with_loc &
-                rapply attrs_ & k"and" >> ng >> module_binding_helper
+                attrs_ && k"and" >> ng >> module_binding_helper
             in
 
             Named.p "str:mb:rec" begin
                 mapping cons
-                >$first >*(ng >> other)
+                +first +seq (ng >> other)
             end
         in
 
         let structure =
             Named.p "str" begin
-                seq 0 ~sep:ng
+                seq ~sep:ng
                 (
                     Peek.first
                     [
                         with_del & na_hlp Str.attribute
-                        >$module_attribute
+                        +module_attribute
                     ;
                         with_del & na_hlp Str.rec_module
-                        >$rec_module_binding
+                        +rec_module_binding
                     ; value_str
                     ;
                         with_del & hlp_a Str.extension
-                        >$attrs_ >$module_extension
+                        +attrs_ +module_extension
                     ;
                         Named.p "str:exception" & with_del & na_hlp Str.exception_
-                        >$exception_
+                        +exception_
                     ;
                         with_del & na_hlp Str.primitive
-                        >$external_
+                        +external_
                     ;
                         with_del & na_hlp Str.include_
-                        >$import
+                        +import
                     ;
                         Named.p "str:include" & with_del & na_hlp Str.include_
-                        >$include_ modexpr
+                        +include_ modexpr
                     ;
                         with_del & na_hlp Str.module_
-                        >$module_binding
+                        +module_binding
                     ;
                         Named.p "str:modtype" & with_del & na_hlp Str.modtype
-                        >$modtype_base
+                        +modtype_base
                     ;
                         with_del & na_hlp Str.open_
-                        >$open_
+                        +open_
                     ;
                         with_del & na_hlp Str.type_extension
-                        >$type_extension
+                        +type_extension
                     ; type_ Str.type_
                     ;
                         with_del & hlp_a Str.eval
-                        >$attrs_ >$expression_arrow
+                        +attrs_ +expression_arrow
                     ]
                 )
             end

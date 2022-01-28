@@ -1,6 +1,6 @@
+open Base
 open Basic
 open APos
-open Core_kernel
 open Sigs
 
 module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Parser): UTILS = struct
@@ -16,7 +16,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
         end
 
     let single_line_comment =
-        let p = s"//" >> take_while (fun c -> c <> '\n' && c <> '\r') in
+        let p = s"//" >> take_while (function '\n' | '\r' -> false | _ -> true) in
         loc (consumed p)
         >>|
         fun {txt; loc} -> Res_comment.makeSingleLineComment ~loc txt
@@ -41,7 +41,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
             c << whitespace >>= fun comment ->
             (state_map (fun s -> {s with comments = comment :: s.comments})).p
         in
-        seq 0 (push_comment single_line_comment <|> push_comment multi_line_comment) >>$ ()
+        seq (push_comment single_line_comment <|> push_comment multi_line_comment) >>$ ()
     let ng =
         Named.p "nongrammar" begin
             whitespace << comments
@@ -105,7 +105,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
 
     let with_del p =
         mapping (fun p1 f p2 -> f (make_location p1 p2))
-        >$pos >$p >$del_pos
+        +pos +p +del_pos
 
     let identifier's_character = function
         | 'A'..'Z' | 'a'..'z' | '0'..'9' | '_' | '\'' -> true
@@ -129,7 +129,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
     let upper = function 'A' .. 'Z' -> true | _ -> false
     let lower = function 'a' .. 'z' | '_' -> true | _ -> false
 
-    let sep = ng>>s",">>ng
+    let sep = ng >> s"," >> ng
 
     let ident = Named.p "ident" @@
         take_while1 identifier's_character
@@ -144,12 +144,10 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
             (ng >> s"." >> ng >> u_ident)
 
     let l_longident =
-        (
             mapping (fun a b -> Longident.Ldot (a, b))
             <*> u_longident << ng << s"." << ng <*> l_ident
-        )
-        <|>
-        (l_ident >>| fun s -> Longident.Lident s)
+
+        || l_ident >>| fun s -> Longident.Lident s
 
     let longident = l_longident <|> u_longident
 

@@ -58,66 +58,66 @@ module Make
             let core_type_package =
                 Named.p "typexpr:package" begin
                         with_loc & hlp2 Typ.package
-                        >$loc u_longident >ng >k"with"
-                        >$(
-                            seq 1 ~sep:(ng >> k"and")
+                        +loc u_longident -ng -k"with"
+                        +(
+                            seq ~n:1 ~sep:(ng >> k"and")
                                 (
                                     mapping t2
-                                    >ng >k"type" >ng >$loc l_longident
-                                    >ng >s"=" >ng >$core_type_atom
+                                    -ng -k"type" -ng +loc l_longident
+                                    -ng -s"=" -ng +core_type_atom
                                 )
                         )
 
                     ||  with_loc & mapping (fun a loc -> Typ.package ~loc a [])
-                        >$loc u_longident
+                        +loc u_longident
                 end
 
             let var =
                 with_loc & hlp Typ.var
-                >s"\'" >$ident
+                -s"\'" +ident
 
             let any =
                 with_loc & mapping (fun loc -> Typ.any ~loc ())
-                >s"_"
+                -s"_"
 
             let constr =
                 Named.p "typexpr:constr" begin
                         with_loc & hlp2 Typ.constr
-                        >$loc l_longident >ng >s"<" >ng >$(seq 1 core_type ~sep ~trail) >ng >s">"
+                        +loc l_longident -ng -s"<" -ng +(seq ~n:1 core_type ~sep ~trail) -ng -s">"
 
                     ||  with_loc & mapping (fun a loc -> Typ.constr ~loc a [])
-                        >$loc l_longident
+                        +loc l_longident
                 end
 
             let tuple =
                 with_loc & parens & hlp Typ.tuple
-                >$(seq 2 core_type ~sep ~trail)
+                +(seq ~n:2 core_type ~sep ~trail)
 
             let unit =
                 with_loc & mapping (fun a loc -> Typ.constr ~loc a [])
-                >$loc (s"()" >>$ Longident.Lident "unit")
+                +loc (s"()" >>$ Longident.Lident "unit")
 
             let bs_object =
                 Named.p "typexpr:bso" begin
                     let object_field =
                             mapping begin fun attrs name typ -> Otag (name, attrs, typ) end
-                            >$attrs_ >$loc Constant.String.string >ng >s":" >ng >$core_type_poly
+                            +attrs_ +loc Constant.String.string -ng -s":" -ng +core_type_poly
 
                         ||  mapping begin fun typ -> Oinherit typ end
-                            >s"..." >ng >$core_type
+                            -s"..." -ng +core_type
                     in
 
                         with_loc & mapping (fun loc -> Typ.object_ ~loc [] Closed)
-                        >s"{" >ng >s"." >ng >s"}"
+                        -s"{" -ng -s"." -ng -s"}"
 
                     ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
-                        >s"{" >ng >$(seq 0 object_field ~sep ~trail) >ng >s"}"
+                        -s"{" -ng +(seq object_field ~sep ~trail) -ng -s"}"
 
                     ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Open)
-                        >s"{" >ng >s".." >ng >$(seq 0 object_field ~sep ~trail) >ng >s"}"
+                        -s"{" -ng -s".." -ng +(seq object_field ~sep ~trail) -ng -s"}"
 
                     ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
-                        >s"{" >ng >s"." >ng >$(seq 0 object_field ~sep ~trail) >ng >s"}"
+                        -s"{" -ng -s"." -ng +(seq object_field ~sep ~trail) -ng -s"}"
                 end
 
             let variant =
@@ -131,36 +131,36 @@ module Make
                             mapping begin fun attrs tag empty constrs ->
                                 Rtag (tag, attrs, Option.is_some empty, constrs)
                             end
-                            >$attrs_ >$loc variant_tag >ng >?(s"&">ng) >$(seq 1 constructor_arguments ~sep:(ng>s"&">ng))
+                            +attrs_ +loc variant_tag -ng +opt(s"&"-ng) +(seq ~n:1 constructor_arguments ~sep:(ng-s"&"-ng))
 
                         ||  mapping begin fun attrs tag ->
                                 Rtag (tag, attrs, true, [])
                             end
-                            >$attrs_ >$loc variant_tag
+                            +attrs_ +loc variant_tag
 
                         || core_type >>| (fun x -> Rinherit x)
                     in
 
-                    let rows = opt (s"|" << ng) >> seq 1 row_field ~sep:(ng>s"|">ng) in
+                    let rows = opt (s"|" << ng) >> seq ~n:1 row_field ~sep:(ng-s"|"-ng) in
 
                         with_loc & mapping (fun loc -> Typ.variant ~loc [] Open None)
-                        >s"[" >ng >s">" >ng >s"]"
+                        -s"[" -ng -s">" -ng -s"]"
 
                     ||  with_loc & mapping begin fun list loc ->
                             Typ.variant ~loc list Open None
                         end
-                        >s"[" >ng >s">" >ng >$rows >ng >s"]"
+                        -s"[" -ng -s">" -ng +rows -ng -s"]"
 
                     ||  with_loc & mapping begin fun list tags loc ->
                             let tags = if Option.is_some tags then tags else Some [] in
                             Typ.variant ~loc list Closed tags
                         end
-                        >s"[" >ng >s"<" >ng >$rows >?(ng >> s">" >> seq 1 (ng >> variant_tag)) >ng >s"]"
+                        -s"[" -ng -s"<" -ng +rows +opt(ng >> s">" >> seq ~n:1 (ng >> variant_tag)) -ng -s"]"
 
                     ||  with_loc & mapping begin fun list loc ->
                             Typ.variant ~loc list Closed None
                         end
-                        >s"[" >ng >$rows >ng >s"]"
+                        -s"[" -ng +rows -ng -s"]"
                 end
 
             let core_type_atom =
@@ -171,17 +171,17 @@ module Make
                     ; unit
                     ;
                         with_loc & parens & mapping typ_loc
-                        >$core_type
+                        +core_type
                     ; tuple
                     ;
                         with_loc & mapping typ_loc
-                        >k"module" >$parens(core_type_package)
+                        -k"module" +parens(core_type_package)
                     ; bs_object
                     ; constr
                     ; variant
                     ;
                         with_loc & hlp Typ.extension
-                        >$extension
+                        +extension
                     ]
                 end
 
@@ -192,7 +192,7 @@ module Make
                         mapping begin fun x loc_end prev ->
                             Typ.alias ~loc:{prev.ptyp_loc with loc_end} prev x
                         end
-                        >ng >k"as" >ng >s"'" >$l_ident >$pos
+                        -ng -k"as" -ng -s"'" +l_ident +pos
                     )
 
             let aliased_atom = Named.p "typexpr:alias:atom" @@ alias core_type_atom
@@ -203,7 +203,7 @@ module Make
                         mapping begin fun typ label arg ->
                             Typ.arrow ~loc:(comb_location arg.ptyp_loc typ.ptyp_loc) label arg typ
                         end
-                        >s"=>" >ng >$core_type_arrow
+                        -s"=>" -ng +core_type_arrow
                     in
 
                     let with_args typ tail =
@@ -212,12 +212,12 @@ module Make
                                 let x = typ_add_attr "ns.namedArgLoc" ~loc:tag.loc x in
                                 tail label x
                             end
-                            >s"~" >ng >$loc l_ident >ng >s":" >ng >$typ_attrs typ >?(ng>s"=">ng>s"?") >ng >$tail
+                            -s"~" -ng +loc l_ident -ng -s":" -ng +typ_attrs typ +opt(ng-s"="-ng-s"?") -ng +tail
 
                         ||  mapping begin fun arg tail ->
                                 tail Nolabel arg
                             end
-                            >$typ >ng >$tail
+                            +typ -ng +tail
                     in
 
                     let tail = fix @@ fun tail ->
@@ -229,12 +229,12 @@ module Make
                                 let typ = typ_add_attr "bs" typ in
                                 Typ.arrow label arg typ
                             end
-                            >s"," >ng >s"." >ng >$with_args core_type tail
+                            -s"," -ng -s"." -ng +with_args core_type tail
 
                         ||  mapping begin fun typ label arg ->
                                 Typ.arrow label arg typ
                             end
-                            >s"," >ng >$with_args core_type tail
+                            -s"," -ng +with_args core_type tail
                     in
 
                     Named.p "typexpr:arrow:all" begin
@@ -253,7 +253,7 @@ module Make
             let core_type_poly =
                 Named.p "typexpr:poly" begin
                         with_loc & hlp2 Typ.poly
-                        >$seq 1 (s"\'" >> loc l_ident) ~sep:ng >ng >s"." >ng >$core_type
+                        +seq ~n:1 (s"\'" >> loc l_ident) ~sep:ng -ng -s"." -ng +core_type
 
                     ||  core_type
                 end
@@ -270,17 +270,17 @@ module Make
 
                         Type.field ~loc ~attrs ?info:None ?mut name typ
                     end
-                    >$attrs_ >?(k"mutable">ng) >$loc l_ident >?(ng >> s":" >> ng >> core_type_poly)
+                    +attrs_ +opt(k"mutable"-ng) +loc l_ident +opt(ng >> s":" >> ng >> core_type_poly)
                 end
 
             let label_declarations =
-                braces & seq 1 label_declaration ~sep ~trail
+                braces & seq ~n:1 label_declaration ~sep ~trail
 
             let constr_args =
                     parens & mapping (fun x -> Pcstr_record x)
-                    >$label_declarations >opt sep
+                    +label_declarations -opt sep
                 ||  parens & mapping (fun x -> Pcstr_tuple x)
-                    >$seq 1 core_type ~sep ~trail
+                    +seq ~n:1 core_type ~sep ~trail
 
             let type_kind =
                 let variant =
@@ -289,10 +289,10 @@ module Make
                             with_loc & mapping begin fun attrs name args res loc ->
                                 Type.constructor ~loc ~attrs ?info:None ?args:(Some args) ?res name
                             end
-                            >$attrs_ >$loc u_ident >$((ng >> constr_args) <|> return @@ Pcstr_tuple []) >?(ng >> s":" >> ng >> core_type_atom)
+                            +attrs_ +loc u_ident +((ng >> constr_args) <|> return @@ Pcstr_tuple []) +opt(ng >> s":" >> ng >> core_type_atom)
                         in
 
-                        opt @@ s"|" >> seq 1 (ng >> constructor) ~sep:(ng >> s"|") >>| fun x -> Ptype_variant x
+                        opt @@ s"|" >> seq ~n:1 (ng >> constructor) ~sep:(ng >> s"|") >>| fun x -> Ptype_variant x
                     end
                 in
 
@@ -315,16 +315,16 @@ module Make
 
                 let param =
                     mapping (fun v t -> (t, v))
-                    >$variance >$(any <|> var)
+                    +variance +(any <|> var)
                 in
 
-                chevrons & seq 1 param ~sep ~trail
+                chevrons & seq ~n:1 param ~sep ~trail
 
             let type_decl_constraints =
-                seq 1 ~sep:ng
+                seq ~n:1 ~sep:ng
                 (
                     with_loc & mapping t3
-                    >k"constraint" >ng >$core_type_atom >ng >s"=" >ng >$core_type
+                    -k"constraint" -ng +core_type_atom -ng -s"=" -ng +core_type
                 )
 
 
@@ -332,22 +332,22 @@ module Make
                 Named.p "type_declaration" begin
                         Named.p "type_declaration:mankind" &
                         with_loc & Mapping.type_declaration_kind_manifest
-                        >$loc l_ident >ng >?(type_decl_params>ng) >s"=" >ng >$core_type
-                        >ng >s"=" >ng >?(k"private">ng) >$type_kind >?(ng >> type_decl_constraints)
+                        +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +core_type
+                        -ng -s"=" -ng +opt(k"private"-ng) +type_kind +opt(ng >> type_decl_constraints)
 
                     ||  Named.p "type_declaration:manifest" &
                         with_loc & Mapping.type_declaration_manifest
-                        >$loc l_ident >ng >?(type_decl_params>ng) >s"=" >ng >?(k"private">ng) >$core_type
-                        >?(ng >> type_decl_constraints)
+                        +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +opt(k"private"-ng) +core_type
+                        +opt(ng >> type_decl_constraints)
 
                     ||  Named.p "type_declaration:kind" &
                         with_loc & Mapping.type_declaration_kind
-                        >$loc l_ident >ng >?(type_decl_params>ng) >s"=" >ng >?(k"private">ng)
-                        >$type_kind >?(ng >> type_decl_constraints)
+                        +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +opt(k"private"-ng)
+                        +type_kind +opt(ng >> type_decl_constraints)
 
                     ||  Named.p "type_declaration:abstract" &
                         with_loc & Mapping.type_declaration_abstract
-                        >$loc l_ident >?(ng >> type_decl_params)
+                        +loc l_ident +opt(ng >> type_decl_params)
                 end
 
             let _extension_kind =
@@ -365,14 +365,14 @@ module Make
             let type_extension_constructor =
                 Named.p "typext:constructor" begin
                     with_loc & hlp2_a (Te.constructor ?docs:None ?info:None)
-                    >$attrs_ >$loc u_ident >$_extension_kind
+                    +attrs_ +loc u_ident +_extension_kind
                 end
 
             let type_extension =
                 Named.p "typext" &
                 Mapping.type_extension
-                >$attrs_ >k"type" >ng >$loc l_longident >ng <*>?(type_decl_params>ng) >s"+=" >ng >?(k"private">ng)
-                >opt(s"|">ng) >$type_extension_constructor >*(ng >> s"|" >> ng >> type_extension_constructor)
+                +attrs_ -k"type" -ng +loc l_longident -ng +opt(type_decl_params-ng) -s"+=" -ng +opt(k"private"-ng)
+                -opt(s"|"-ng) +type_extension_constructor +seq (ng >> s"|" >> ng >> type_extension_constructor)
         end: TYPE)
 
     let core_type_atom = let (module M) = x in M.core_type_atom

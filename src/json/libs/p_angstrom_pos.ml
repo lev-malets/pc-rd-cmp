@@ -38,12 +38,12 @@ module Json = struct
             <*> _string << ws << lchar ':' <*> json
         in
         let obj =
-            (lchar '{' >> seq 1 ~sep:(lchar ',') mem << lchar '}')
+            (lchar '{' >> seq ~n:1 ~sep:(lchar ',') mem << lchar '}')
             >>|
             fun ms -> `Assoc ms
         in
         let arr =
-            (lchar '[' >> seq 1 ~sep:(lchar ',') json << lchar ']')
+            (lchar '[' >> seq ~n:1 ~sep:(lchar ',') json << lchar ']')
             >>|
             fun vs -> `List vs
         in

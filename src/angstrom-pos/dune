@@ -1,4 +1,3 @@
 (library
  (name angstrom_pos)
- (libraries angstrom-mod ast_show exec_info fix base)
- (preprocess (pps ppx_jane_fix)))
+ (libraries angstrom-mod ast_show exec_info fix base))

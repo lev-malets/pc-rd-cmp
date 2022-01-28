@@ -432,7 +432,7 @@ module Make(T: sig type s end) = struct
         ; typ = Parser
         }
 
-    let seq min_n ?sep ?(trail = false) p =
+    let seq ?(n=0) ?sep ?(trail = false) p =
         let pi, si, tail =
             match sep with
             | None -> p.info, Empty, Angstrom.many p.p
@@ -454,21 +454,21 @@ module Make(T: sig type s end) = struct
             | Empty, Consume {empty = true; _} -> failwith "Endless sequence"
             | Empty, Consume p2 ->
                 Consume
-                { p2 with empty = min_n < 2 }
+                { p2 with empty = n < 2 }
             | Consume {empty = true; _}, Empty -> failwith "Endless sequence"
             | Consume p1, Empty ->
                 Consume
-                { p1 with empty = min_n = 0 }
+                { p1 with empty = n = 0 }
             | Consume {empty = true; _}, Consume {empty = true; _} -> failwith "Endless sequence"
             | Consume p1, Consume p2 ->
                 if p1.empty then
                     Consume
-                    { empty = p1.empty && min_n = 1
+                    { empty = p1.empty && n = 1
                     ; first = Charset.union p1.first p2.first
                     }
                 else
                     Consume
-                    { p1 with empty = min_n = 0 }
+                    { p1 with empty = n = 0 }
         in
 
         { p =
@@ -481,7 +481,7 @@ module Make(T: sig type s end) = struct
                     return []
                 in
                 list >>= fun list ->
-                if List.length list < min_n then
+                if List.length list < n then
                     fail ""
                 else
                     return list
@@ -496,14 +496,8 @@ module Make(T: sig type s end) = struct
     let comb_location loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
     let loc_comb loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
 
-    let (>$) = (<*>)
-    let (>) = (<<)
-    let ( <*>* ) a b = a <*> seq 0 b
-    let (>*) = (<*>*)
-    let ( <*>+ ) a b = a <*> seq 1 b
-    let (>+) = (<*>+)
-    let ( <*>? ) a b = a <*> opt b
-    let (>?) = (<*>?)
+    let (+) = (<*>)
+    let (-) = (<<)
 
     let mapping = return
 
@@ -527,7 +521,7 @@ module Make(T: sig type s end) = struct
         }
 
     let fold_left_0_n ~f nil p =
-        let info = (nil >> seq 0 p).info in
+        let info = (nil >> seq p).info in
 
         { p =
             begin
@@ -566,7 +560,7 @@ module Make(T: sig type s end) = struct
                     | None -> cont prev
                     | Some tail -> tail (cont prev)
             end
-            <*> cont <*>? tail
+            +cont +opt(tail)
         in
 
         mapping begin fun x tail ->
@@ -574,7 +568,7 @@ module Make(T: sig type s end) = struct
             | None -> x
             | Some tail -> tail x
         end
-        <*> nil <*>? tail
+        +nil +opt(tail)
 
     let fold_left_cont_0_1 nil cont =
         mapping begin fun x cont ->
@@ -582,12 +576,12 @@ module Make(T: sig type s end) = struct
             | None -> x
             | Some cont -> cont x
         end
-        <*> nil <*>? cont
+        +nil +opt(cont)
 
     let wrapped start final p =
         { p with p = (start >> p << final <|> (final >> fail)).p }
 
-    let rapply v f =
+    let (&&) v f =
         mapping (fun v f -> f v) <*> v <*> f
 
     let alt xs = List.fold_right (<|>) xs fail
@@ -596,5 +590,5 @@ module Make(T: sig type s end) = struct
 
     let with_loc p =
         mapping begin fun p1 f p2 -> f (make_location p1 p2) end
-        >$pos >$p >$pos
+        +pos +p +pos
 end

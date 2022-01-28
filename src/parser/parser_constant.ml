@@ -65,12 +65,12 @@ module Make (Ext: EXT) (Utils: UTILS): CONSTANT = struct
                     | true -> Pconst_float (value, suffix)
                     | false -> Pconst_integer (value, suffix)
                 end
-                <*> with_literal value_part <*> suffix_part
+                +with_literal(value_part) +suffix_part
             end
     end
 
     module Character = struct
-        let code offset basic c = (Char.to_int c - Char.to_int basic + offset)
+        let code offset basic c = Int.(Char.to_int c - Char.to_int basic + offset)
         let octal_code =
             satisfy (function '0'..'7' -> true | _ -> false) >>| code 0 '0'
         let decimal_code =
@@ -82,18 +82,18 @@ module Make (Ext: EXT) (Utils: UTILS): CONSTANT = struct
 
         let escaped =
             let hex_cc =
-                mapping (fun _1 _2 -> Char.of_int_exn @@ _1 * 16 + _2)
+                mapping Int.(fun _1 _2 -> Char.of_int_exn @@ _1 * 16 + _2)
                 << s"x" <*> hexadecimal_code <*> hexadecimal_code
             in
 
             let dec_cc =
-                mapping (fun _1 _2 _3 -> Char.of_int_exn @@ _1 * 100 + _2 * 10 + _3)
+                mapping Int.(fun _1 _2 _3 -> Char.of_int_exn @@ _1 * 100 + _2 * 10 + _3)
                 <*> (satisfy (function '0'..'2' -> true | _ -> false) >>| code 0 '0')
                 <*> decimal_code <*> decimal_code
             in
 
             let oct_cc =
-                mapping (fun _1 _2 _3 -> Char.of_int_exn @@ _1 * 64 + _2 * 8 + _3)
+                mapping Int.(fun _1 _2 _3 -> Char.of_int_exn @@ _1 * 64 + _2 * 8 + _3)
                 << s"o" <*> (satisfy (function '0'..'3' -> true | _ -> false) >>| code 0 '0')
                 <*> octal_code <*> octal_code
             in

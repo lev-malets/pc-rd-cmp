@@ -29,7 +29,7 @@ module Make
                         mapping begin fun typ prev ->
                             Mod.constraint_ ~loc:(comb_location prev.pmod_loc typ.pmty_loc) prev typ
                         end
-                        >ng >s":" >ng >$modtype
+                        -ng -s":" -ng +modtype
                     )
 
             let atom =
@@ -41,23 +41,23 @@ module Make
                                 mapping begin fun typ prev ->
                                     Exp.constraint_ ~loc:(comb_location prev.pexp_loc typ.ptyp_loc) prev typ
                                 end
-                                >ng >s":" >ng >$core_type_package
+                                -ng -s":" -ng +core_type_package
                             )
                     in
 
                     Peek.first
                     [
                         with_loc & hlp Mod.unpack
-                        >k"unpack" >ng >s"(" >ng >$unpack_constr >ng >s")"
+                        -k"unpack" -ng -s"(" -ng +unpack_constr -ng -s")"
                     ;
                         with_loc & hlp Mod.ident
-                        >$loc u_longident
+                        +loc u_longident
                     ;
                         with_loc & parens & mapping mod_loc
-                        >$mod_attrs modexpr_constrainted
+                        +mod_attrs modexpr_constrainted
                     ;
                         with_loc & hlp Mod.extension
-                        >$ extension
+                        +extension
                     ]
                 end
 
@@ -65,7 +65,7 @@ module Make
                 Named.p "modexpr:apply" begin
                     let genarg =
                         with_loc & mapping (fun loc -> Mod.structure ~loc [])
-                        >s"(" >ng >s")"
+                        -s"(" -ng -s")"
                     in
 
                     let arg = genarg <|> modexpr_constrainted in
@@ -78,7 +78,7 @@ module Make
                                         ~loc:(comb_location prev.pmod_loc arg.pmod_loc)
                                         prev arg
                                 end
-                                >$arg
+                                +arg
                             )
                             (
                                 mapping begin fun arg cont prev ->
@@ -87,7 +87,7 @@ module Make
                                         ~loc:(comb_location prev.pmod_loc arg.pmod_loc)
                                         prev arg
                                 end
-                                >ng >s"," >ng >$arg
+                                -ng -s"," -ng +arg
                             )
                     in
 
@@ -97,7 +97,7 @@ module Make
                         ||  mapping begin fun loc_end prev ->
                                 Mod.apply ~loc:{prev.pmod_loc with loc_end} prev (Mod.structure [])
                             end
-                            >s"(" >ng >s")" >$pos
+                            -s"(" -ng -s")" +pos
                     in
 
                     mod_attrs & fold_left_cont_0_n atom args
@@ -109,7 +109,7 @@ module Make
                             mapping begin fun mt me ->
                                 Mod.constraint_ ~loc:me.pmod_loc me mt
                             end
-                            >s":" >ng >$modtype >ng >s"=>" >ng >$modexpr
+                            -s":" -ng +modtype -ng -s"=>" -ng +modexpr
 
                         ||  s"=>" >> ng >> modexpr
                     in
@@ -121,14 +121,14 @@ module Make
                         in
 
                             mod_attrs & with_loc & hlp3 Mod.functor_
-                            >$loc u_ident >?(ng >> s":" >> ng >> modtype) >ng >$tail
+                            +loc u_ident +opt(ng >> s":" >> ng >> modtype) -ng +tail
 
                         ||  mod_attrs & with_loc & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
-                            >$loc (s"()" >>$ "*") >ng >$tail
+                            +loc (s"()" >>$ "*") -ng +tail
                     in
 
                         mod_attrs & with_loc & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
-                        >$loc (s"()" >>$ "*") >ng >$tail
+                        +loc (s"()" >>$ "*") -ng +tail
 
                     ||  mod_attrs &
                         s"(" >> ng >> arg_loop
@@ -137,7 +137,7 @@ module Make
             let structure =
                 Named.p "modexpr:structure" begin
                     with_loc & hlp Mod.structure
-                    >s"{" >ng >$structure >ng >s"}"
+                    -s"{" -ng +structure -ng -s"}"
                 end
 
             let modexpr =
