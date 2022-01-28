@@ -13,7 +13,7 @@ module Make (Ext: EXT) (Utils: UTILS): CONSTANT = struct
         let exp_sign = skip @@ function '-' | '+' -> true | _ -> false
 
         let value_part digit exp =
-            let skip_digits = skip_while (fun c -> digit c || Char.equal c '_') in
+            let skip_digits = skip_while (fun c -> Caml.(||) (digit c) (Char.equal c '_')) in
 
             let int = skip digit >> skip_digits in
             let float = int >> char '.' >> skip_digits in
@@ -22,10 +22,11 @@ module Make (Ext: EXT) (Utils: UTILS): CONSTANT = struct
             | None -> (float >>$ true) <|> (int >>$ false)
             | Some exp ->
                 let exp = skip exp >> opt exp_sign >> skip digit >> skip_digits in
-                    (float >> exp >>$ true)
-                <|> (float >>$ true)
-                <|> (int >> exp >>$ true)
-                <|> (int >>$ false)
+
+                    float >> exp >>$ true
+                ||  float >>$ true
+                ||  int >> exp >>$ true
+                ||  int >>$ false
 
         let value_part_2 = value_part
             (function '0'..'1' -> true | _ -> false)

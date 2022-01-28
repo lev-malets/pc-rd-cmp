@@ -20,16 +20,14 @@ module type CORE = sig
 
     val attrs_ : attributes parser
     val attrs1_ : attributes parser
-    val use : 'a helper parser -> 'a parser
-    val use_na : 'a na_helper parser -> 'a parser
-
-    val use_del : 'a helper parser -> 'a parser
-    val use_na_del : 'a na_helper parser -> 'a parser
-
-    val add_attrs : 'a helper parser -> 'a helper parser
-    val set_p1 : 'a helper parser -> 'a helper parser
 
     val variant_tag : string parser
+
+    val pat_attrs : pattern parser -> pattern parser
+    val exp_attrs : expression parser -> expression parser
+    val mod_attrs : module_expr parser -> module_expr parser
+    val mty_attrs : module_type parser -> module_type parser
+    val typ_attrs : core_type parser -> core_type parser
 end
 
 module type CONSTANT = sig
@@ -57,11 +55,15 @@ module type UTILS = sig
     val ng : unit parser
     val ng_no_new_line : unit parser
     val ng_new_line : unit parser
-
-    val (~-) : 'a parser -> 'a parser
+    val sep : unit parser
+    val parens : 'a parser -> 'a parser
+    val brackets : 'a parser -> 'a parser
+    val braces : 'a parser -> 'a parser
+    val chevrons : 'a parser -> 'a parser
 
     val del_pos : Lexing.position parser
     val del : unit parser
+    val with_del : (Location.t -> 'a) parser -> 'a parser
     val s : string -> string parser
 
     val identifier's_character : char -> bool
@@ -82,42 +84,46 @@ module type UTILS = sig
     val exact_longident : Longident.t -> unit parser
 end
 
+module type MODTYPE = sig
+    open Parsetree
+
+    val modtype : module_type parser
+    val modtype_functor : module_type parser
+    val modtype_with : module_type parser
+end
 
 module type MODEXPR = sig
     open Parsetree
 
-    val modexpr : module_expr helper parser
-    val modexpr_constrainted : module_expr helper parser
-    val modtype : module_type helper parser
-    val modtype_functor : module_type helper parser
-    val modtype_with : module_type helper parser
+    val modexpr : module_expr parser
+    val modexpr_constrainted : module_expr parser
 end
 
 module type TYPE = sig
-    val core_type_atom : core_type helper parser
-    val core_type_arrow : core_type helper parser
-    val core_type : core_type helper parser
-    val core_type_poly : core_type helper parser
-    val core_type_package : core_type helper parser
+    val core_type_atom : core_type parser
+    val core_type_arrow : core_type parser
+    val core_type : core_type parser
+    val core_type_poly : core_type parser
+    val core_type_package : core_type parser
 
-    val type_extension_constructor : extension_constructor helper parser
-    val type_extension : type_extension helper parser
+    val type_extension_constructor : extension_constructor parser
+    val type_extension : type_extension parser
 
     val type_decl_params : (core_type * Asttypes.variance) list parser
     val type_decl_constraints : (core_type * core_type * Location.t) list parser
-    val type_declaration : type_declaration helper parser
+    val type_declaration : type_declaration parser
 end
 
 module type EXPRESSION = sig
-    val expression : expression helper parser
-    val expression_arrow : expression helper parser
-    val expression_sequence : expression helper parser
-    val expression_p0 : expression helper parser
+    val expression : expression parser
+    val expression_arrow : expression parser
+    val expression_sequence : expression parser
+    val expression_p0 : expression parser
 end
 
 module type PATTERN = sig
-    val pattern : pattern helper parser
-    val pattern_atom : pattern helper parser
-    val pattern_constrainted : pattern helper parser
-    val pattern_poly_constrainted : pattern helper parser
+    val pattern : pattern parser
+    val pattern_atom : pattern parser
+    val pattern_constrainted : pattern parser
+    val pattern_poly_constrainted : pattern parser
 end

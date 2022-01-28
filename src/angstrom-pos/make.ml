@@ -106,6 +106,7 @@ module Make(T: sig type s end) = struct
             end
         ; typ = Parser
         }
+
     let (<*>) pf pv =
         match pf.typ with
         | Return f ->
@@ -495,9 +496,14 @@ module Make(T: sig type s end) = struct
     let comb_location loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
     let loc_comb loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
 
+    let (>$) = (<*>)
+    let (>) = (<<)
     let ( <*>* ) a b = a <*> seq 0 b
+    let (>*) = (<*>*)
     let ( <*>+ ) a b = a <*> seq 1 b
+    let (>+) = (<*>+)
     let ( <*>? ) a b = a <*> opt b
+    let (>?) = (<*>?)
 
     let mapping = return
 
@@ -583,4 +589,12 @@ module Make(T: sig type s end) = struct
 
     let rapply v f =
         mapping (fun v f -> f v) <*> v <*> f
+
+    let alt xs = List.fold_right (<|>) xs fail
+    let (||) = (<|>)
+    let (&) = (@@)
+
+    let with_loc p =
+        mapping begin fun p1 f p2 -> f (make_location p1 p2) end
+        >$pos >$p >$pos
 end

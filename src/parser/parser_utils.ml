@@ -47,7 +47,6 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
             whitespace << comments
         end
 
-    let (~-) p = ng >> p
     let ng_no_new_line =
         (
             mapping t2
@@ -104,6 +103,9 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
                 | true -> fail ""
                 | false -> return ()
 
+    let with_del p =
+        mapping (fun p1 f p2 -> f (make_location p1 p2))
+        >$pos >$p >$del_pos
 
     let identifier's_character = function
         | 'A'..'Z' | 'a'..'z' | '0'..'9' | '_' | '\'' -> true
@@ -127,6 +129,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
     let upper = function 'A' .. 'Z' -> true | _ -> false
     let lower = function 'a' .. 'z' | '_' -> true | _ -> false
 
+    let sep = ng>>s",">>ng
 
     let ident = Named.p "ident" @@
         take_while1 identifier's_character
@@ -138,12 +141,12 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
     let u_longident =
         fold_left_0_n ~f:begin fun lid str -> Longident.Ldot (lid, str) end
             (u_ident >>| fun str -> Longident.Lident str)
-            (-s"." >> ng >> u_ident)
+            (ng >> s"." >> ng >> u_ident)
 
     let l_longident =
         (
             mapping (fun a b -> Longident.Ldot (a, b))
-            <*> u_longident << -s"." << ng <*> l_ident
+            <*> u_longident << ng << s"." << ng <*> l_ident
         )
         <|>
         (l_ident >>| fun s -> Longident.Lident s)
@@ -153,7 +156,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
     let _longident =
         fold_left_0_n ~f:begin fun acc x -> Longident.Ldot (acc, x) end
             (ident >>| fun x -> Longident.Lident x)
-            (-s"." >> ng >> ident)
+            (ng >> s"." >> ng >> ident)
 
 (*
     let ll_longident =
@@ -166,7 +169,12 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
         l_ident >>= fun str -> loop @@ Longident.Lident str
 *)
     let rec exact_longident = function
-        | Longident.Lident x -> s x >>$ ()
-        | Longident.Ldot (lid, x) -> exact_longident lid >> -s"." >> ng << s x
-        | Longident.Lapply (lid, arg) -> exact_longident lid >> -s"(" >> ng >> exact_longident arg << -s")"
+        | Longident.Lident x -> k x >>$ ()
+        | Longident.Ldot (lid, x) -> exact_longident lid >> ng >> s"." >> ng << s x
+        | Longident.Lapply (lid, arg) -> exact_longident lid >> ng >> s"(" >> ng >> exact_longident arg << ng << s")"
+
+    let parens p = s"(" >> ng >> p << ng << s")"
+    let brackets p = s"[" >> ng >> p << ng << s"]"
+    let braces p = s"{" >> ng >> p << ng << s"}"
+    let chevrons p = s"<" >> ng >> p << ng << s">"
 end

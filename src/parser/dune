@@ -1,4 +1,3 @@
 (library
  (name pc_syntax)
- (libraries angstrom_pos core_kernel syntax fix)
- (preprocess (pps ppx_jane_fix)))
+ (libraries angstrom_pos core_kernel syntax fix))

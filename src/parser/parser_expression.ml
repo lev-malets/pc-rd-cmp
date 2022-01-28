@@ -8,8 +8,8 @@ open APos
 open Sigs
 
 type arrow_parser_helpers = {
-    args_loop : expression helper parser;
-    types_loop : expression helper parser;
+    args_loop : expression parser;
+    types_loop : expression parser;
 }
 
 module Mapping = struct
@@ -18,35 +18,40 @@ module Mapping = struct
             match expr.pexp_desc with
             | Pexp_constant (Pconst_integer (str, suf) as c) ->
                 if Char.equal str.[0] '-' then
-                    mk_helper ~f:Exp.constant c
+                    (fun loc -> Exp.constant ~loc c)
                 else
-                    mk_helper ~f:Exp.constant (Pconst_integer ("-" ^ str, suf))
+                    (fun loc -> Exp.constant ~loc (Pconst_integer ("-" ^ str, suf)))
             | Pexp_constant (Pconst_float (str, suf) as c) ->
                 if Char.equal str.[0] '-' then
-                    mk_helper ~f:Exp.constant c
+                    (fun loc -> Exp.constant ~loc c)
                 else
-                    mk_helper ~f:Exp.constant (Pconst_float ("-" ^ str, suf))
-            | _ -> mk_helper2 Exp.apply (Exp.ident ~loc:op.loc op) [Nolabel, expr]
+                    (fun loc -> Exp.constant ~loc (Pconst_float ("-" ^ str, suf)))
+            | _ -> (fun loc -> Exp.apply ~loc (Exp.ident ~loc:op.loc op) [Nolabel, expr])
         end
 
     let unary_plus =
         mapping begin fun op expr ->
             match expr.pexp_desc with
             | Pexp_constant (Pconst_integer (str, suf)) ->
-                mk_helper ~f:Exp.constant (Pconst_integer (str, suf))
+                (fun loc -> Exp.constant ~loc (Pconst_integer (str, suf)))
             | Pexp_constant (Pconst_float (str, suf)) ->
-                mk_helper ~f:Exp.constant (Pconst_float (str, suf))
-            | _ -> mk_helper2 Exp.apply (Exp.ident ~loc:op.loc op) [Nolabel, expr]
+                (fun loc -> Exp.constant ~loc (Pconst_float (str, suf)))
+            | _ ->
+                (fun loc -> Exp.apply ~loc (Exp.ident ~loc:op.loc op) [Nolabel, expr])
         end
 
     let unary_op =
-        mapping begin fun op expr ->
-            mk_helper2 Exp.apply (Exp.ident ~loc:op.loc op) [Nolabel, expr]
+        mapping begin fun op expr loc ->
+            Exp.apply ~loc (Exp.ident ~loc:op.loc op) [Nolabel, expr]
         end
 
     let binary_op =
-        fun left (op, right) ->
-            mk_helper2 Exp.apply (Exp.ident ~loc:op.loc op) [Nolabel, left; Nolabel, right]
+        mapping begin fun op right left ->
+            Exp.apply
+                ~loc:(comb_location left.pexp_loc right.pexp_loc)
+                (Exp.ident ~loc:op.loc op)
+                [Nolabel, left; Nolabel, right]
+        end
 end
 
 module Make
@@ -70,61 +75,55 @@ module Make
 
             let expression_constrainted =
                 Named.p "expression:constrainted" begin
-                        (
-                            mapping (mk_helper2 Exp.constraint_)
-                            <*> use expression_arrow << -s":" <*> -use core_type
-                        )
-                    <|> expression_arrow
+                        with_loc & hlp2 Exp.constraint_
+                        >$expression_arrow >ng >s":" >ng >$core_type
+                    ||  expression_arrow
                 end
 
             let value_binding_list =
                 let value_binding =
-                    mapping (mk_helper2 @@ Vb.mk ?docs:None ?text:None)
-                    <*> use pattern << -s"=" <*> -use expression_arrow
+                    with_loc & (hlp2 @@ Vb.mk ?docs:None ?text:None)
+                    >$pattern >ng >s"=" >ng >$expression_arrow
                 in
 
-                seq 1 (use value_binding) ~sep:(-k"and" >> ng)
+                seq 1 value_binding ~sep:(ng >k"and" >ng)
 
             let let_ =
                 let rec_flag = k"rec" >>$ Recursive <|> return Nonrecursive in
 
                 Named.p "expression:let" begin
-                    mapping (mk_helper3 Exp.let_)
-                    << k"let" <*> -rec_flag
-                    <*> -value_binding_list << del
-                    <*> (-use expression_sequence <|> return @@ Hc.unit_expr Location.none)
+                    with_loc & hlp3 Exp.let_
+                    >k"let" >ng >$rec_flag >ng >$value_binding_list >del
+                    >$(ng >> expression_sequence || return @@ Hc.unit_expr Location.none)
                 end
 
             let letmodule =
                 Named.p "expression:module" begin
-                    mapping (mk_helper3 Exp.letmodule)
-                    << k"module" <*> -loc u_ident << -s"=" <*> -use modexpr << del <*> -use expression_sequence
+                    with_loc & hlp3 Exp.letmodule
+                    >k"module" >ng >$loc u_ident >ng >s"=" >ng >$modexpr >del >ng >$expression_sequence
                 end
 
             let pack =
                 Named.p "expression:pack" begin
-                        (
-                            mapping (fun m t -> mk_helper2 Exp.constraint_ (Exp.pack m) t)
-                            << k"module" << -s"(" <*> -use modexpr << -s":" <*> -use core_type_package << -s")"
-                        )
-                    <|> (
-                            mapping (mk_helper ~f:Exp.pack)
-                            << k"module" << -s"(" <*> -use modexpr << -s")"
-                        )
+                        with_loc & mapping (fun m t loc -> Exp.constraint_ ~loc (Exp.pack m) t)
+                        >k"module" >ng >s"(" >ng >$modexpr >ng >s":" >ng >$core_type_package >ng >s")"
+
+                    ||  with_loc & hlp Exp.pack
+                        >k"module" >ng >s"(" >ng >$modexpr >ng >s")"
                 end
 
             let letopen =
                 Named.p "expression:open" begin
                     let override = (s"!" >>$ Override) <|> return Fresh in
 
-                    mapping (mk_helper3 Exp.open_)
-                    << k"open" <*> override <*> -loc u_longident << del <*> -use expression_sequence
+                    with_loc & hlp3 Exp.open_
+                    >k"open" >$override >ng >$loc u_longident >del >ng >$expression_sequence
                 end
 
             let letexception =
                 Named.p "expression:exception" begin
-                    mapping (mk_helper2 Exp.letexception)
-                    << k"exception" <*> -use type_extension_constructor << del <*> -use expression_sequence
+                    with_loc & hlp2 Exp.letexception
+                    >k"exception" >ng >$type_extension_constructor >del >ng >$expression_sequence
                 end
 
             let expression_in_braces =
@@ -135,101 +134,82 @@ module Make
                         ; letopen
                         ; letexception
                         ]
-                    <|> expression_arrow
+                    ||  expression_arrow
                 end
 
             let expression_sequence =
                 fix @@ fun expression_sequence ->
                     Named.p "expression:sequence" begin
-                            (
-                                mapping (mk_helper2 Exp.sequence)
-                                <*> use expression_in_braces << del <*> -use expression_sequence
-                            )
-                        <|> add_attrs expression_in_braces
+                            with_loc & hlp2 Exp.sequence
+                            >$expression_in_braces >del >ng >$expression_sequence
+
+                        ||  exp_attrs expression_in_braces
                     end
 
 
-            let scoped_sequence = s"{" >> -expression_sequence << del << -s"}"
+            let scoped_sequence = s"{" >> ng >> expression_sequence << del << ng << s"}"
 
             let arrow =
                 Named.p "expression:arrow" begin
                     let arrow_tail =
-                        let tail = s"=>" >> -use expression_arrow in
-                            (
-                                mapping begin fun typ expr -> Exp.constraint_ ~loc:expr.pexp_loc expr typ end
-                                << s":" <*> -use core_type_atom <*> -tail
-                            )
-                        <|> tail
+                        let tail = s"=>" >> ng >> expression_arrow in
+                            mapping begin fun typ expr -> Exp.constraint_ ~loc:expr.pexp_loc expr typ end
+                            >s":" >ng >$core_type_atom >ng >$tail
+
+                        ||  tail
                     in
 
-                    let label = s"~" >> -loc l_ident in
-
-                    let without_pattern =
-                        (
-                            label >>| fun { txt = s; loc } ->
-                                helper_add_attr "ns.namedArgLoc" ~loc @@
-                                mk_helper () ~f:begin fun ?loc ?attrs () ->
-                                    s,
-                                    let loc = Option.value ~default:Location.none loc in
-                                    Pat.var ~loc ?attrs (Location.mkloc s loc)
-                                end
-                        )
-                    in
+                    let label = s"~" >> ng >> loc l_ident in
 
                     let with_label =
-                            (
-                                mapping begin fun { txt = s; loc } p1 pat p2 ->
-                                    s, apply (helper_add_attr "ns.namedArgLoc" ~loc pat) p1 p2
-                                end
-                                <*> label << -k"as" <*> -pos <*> pattern_constrainted <*> pos
-                            )
-                        <|> use (
-                                mapping begin fun hlp typ ->
-                                    ahelper_map hlp
-                                        ~f:begin fun hlp ->
-                                            mk_helper_fn begin fun ?loc ?attrs () ->
-                                                let s, pat = hlp ~attrs:[] in
-                                                s, Pat.constraint_ ?loc ?attrs pat typ
-                                            end ()
-                                        end
-                                end
-                                <*> set_loc without_pattern << -s":" <*> -use core_type_atom
-                            )
-                        <|> use without_pattern
+                            mapping begin fun { txt; loc } pat ->
+                                txt, pat_add_attr "ns.namedArgLoc" ~loc pat
+                            end
+                            >$label >ng >k"as" >ng >$pattern_constrainted
+
+                        ||  mapping begin fun ({ txt; loc } as var) typ ->
+                                txt,
+                                Pat.constraint_
+                                    ~loc:(comb_location loc typ.ptyp_loc)
+                                    ~attrs:[Hc.attr "ns.namedArgLoc" ~loc]
+                                    (Pat.var ~loc var) typ
+                            end
+                            >$label >ng >s":" >ng >$core_type_atom
+
+                        ||  mapping begin fun ({ txt; loc } as var) ->
+                                txt,
+                                Pat.var ~loc ~attrs:[Hc.attr "ns.namedArgLoc" ~loc] var
+                            end
+                            >$label
                     in
 
                     let with_value =
-                            (
-                                with_label << -s"=" << -s"?"
-                                >>|
-                                fun (s, pat) -> Optional s, pat, None
-                            )
-                        <|> (
-                                mapping begin fun (s, pat) expr -> Optional s, pat, Some expr end
-                                <*> with_label << -s"=" <*> -use expression_constrainted
-                            )
-                        <|> (
-                                with_label
-                                >>|
-                                fun (s, pat) -> Labelled s, pat, None
-                            )
+                            mapping begin fun (s, pat) -> Optional s, pat, None end
+                            >$with_label >ng >s"=" >ng >s"?"
+
+                        ||  mapping begin fun (s, pat) expr -> Optional s, pat, Some expr end
+                            >$with_label >ng >s"=" >ng >$expression_constrainted
+
+                        ||  mapping begin fun (s, pat) -> Labelled s, pat, None end
+                            >$with_label
                     in
 
                     let nolabel =
                         (
-                            use (mapping (mk_helper2 Pat.constraint_) <*> use @@ add_attrs pattern << -s":" <*> -use core_type)
-                            <|>
-                            use @@ add_attrs pattern
+                                with_loc & hlp2 Pat.constraint_
+                                >$pat_attrs pattern >ng >s":" >ng >$core_type
+
+                            ||  pat_attrs pattern
                         ) >>| fun p -> Nolabel, p, None
                     in
 
                     let constr_unit =
                         Named.p "expression:arrow:unit" begin
-                            let unit = s"()" >>$ Longident.Lident "()" in
-                            let pat = loc unit >>| fun lid -> mk_helper2 Pat.construct lid None in
+                            let unit = s"()" >>$ Hc.lid ["()"] in
+                            let pat = loc unit >>| fun lid -> Pat.construct ~loc:lid.loc lid None in
 
-                            mapping (mk_helper4 Exp.fun_ Nolabel None)
-                            <*> use pat <*> -arrow_tail
+                            mapping (fun p1 pat exp p2 -> Exp.fun_ ~loc:(make_location p1 p2) Nolabel None pat exp)
+                            >$pos >$pat >ng >$arrow_tail >$pos
                         end
                     in
 
@@ -239,68 +219,65 @@ module Make
                             let types_loop = getter.get @@ fun x -> x.types_loop in
 
                             let tail =
-                                    (s")" >> -arrow_tail)
-                                <|> (s"," >> -s")" >> -arrow_tail)
-                                <|> (s"," >> -use (add_attrs (k"type" >> -types_loop)))
-                                <|> (s"," >> -use args_loop)
+                                    s")" >> ng >> arrow_tail
+                                ||  s"," >> ng >> s")" >> ng >> arrow_tail
+                                ||  s"," >> ng >> exp_attrs (k"type" >> ng >> types_loop)
+                                ||  s"," >> ng >> args_loop
                             in
 
                             let curried =
-                                    add_attrs (
-                                        mapping begin fun (label, pat, expr) tail ->
-                                            mk_helper4 Exp.fun_ label expr pat tail
-                                        end
-                                        <*> with_value <*> -tail
-                                    )
-                                <|> (
-                                        mapping begin fun (label, pat, expr) tail ->
-                                            mk_helper4 Exp.fun_ label expr pat tail
-                                        end
-                                        <*> nolabel <*> -tail
-                                    )
+                                    exp_attrs & mapping begin fun p1 (label, pat, expr) tail p2 ->
+                                        Exp.fun_ ~loc:(make_location p1 p2) label expr pat tail
+                                    end
+                                    >$pos >$with_value >ng >$tail >$pos
+
+                                ||  mapping begin fun p1 (label, pat, expr) tail p2 ->
+                                        Exp.fun_ ~loc:(make_location p1 p2) label expr pat tail
+                                    end
+                                    >$pos >$nolabel >ng >$tail >$pos
                             in
 
                             {
                                 args_loop =
-                                        (s"." >> -curried >>| helper_add_attr "bs")
-                                    <|> curried
+                                        s"." >> ng >> curried >>| exp_add_attr "bs"
+                                    ||  curried
                                 ;
                                 types_loop = begin
-                                        (
-                                            mapping @@ mk_helper2 Exp.newtype
-                                            <*> loc l_ident <*> -use types_loop
-                                        )
-                                    <|> (s"," >> -add_attrs (k"type" >> -types_loop))
-                                    <|> (s"," >> -args_loop)
+                                        with_loc & hlp2 Exp.newtype
+                                        >$loc l_ident >ng >$types_loop
+
+                                    ||  s"," >> ng >> exp_attrs (k"type" >> ng >> types_loop)
+
+                                    ||  s"," >> ng >> args_loop
                                 end;
                             }
                         in
 
                         Named.p "expression:arrow:many_args" begin
-                                add_attrs (s"(" >> -add_attrs (k"type" >> -loop.types_loop))
-                            <|> add_attrs (s"(" >> -loop.args_loop)
+                                exp_attrs & s"(" >> ng >> exp_attrs (k"type" >> ng >> loop.types_loop)
+                            ||  exp_attrs & s"(" >> ng >> loop.args_loop
                         end
                     in
 
                     let constr_unit_uncurried =
-                        let unit = s"(" >> -s"." >> -s")" >>$ Longident.Lident "()" in
-                        let pat = loc unit >>| fun lid -> mk_helper2 Pat.construct lid None in
+                        let unit =
+                            return @@ Longident.Lident "()"
+                            >s"(" >ng >s"." >ng >s")"
+                        in
+                        let pat = loc unit >>| fun lid -> Pat.construct ~loc:lid.loc lid None in
 
                         Named.p "expression:arrow:unit_uncur" begin
-                            mapping begin fun pat expr ->
-                                helper_add_attr "bs"
-                                (mk_helper4 Exp.fun_ Nolabel None pat expr)
+                            mapping begin fun p1 pat expr p2 ->
+                                Exp.fun_ ~loc:(make_location p1 p2) ~attrs:[Hc.attr "bs"] Nolabel None pat expr
                             end
-                            <*> use pat <*> -arrow_tail
+                            >$pos >$pat >ng >$arrow_tail >$pos
                         end
                     in
 
                     let only_arg =
                         Named.p "expression:arrow:one_arg" begin
-                            add_attrs (
-                                mapping (mk_helper4 Exp.fun_ Nolabel None)
-                                <*> use pattern_atom << -s"=>" <*> -use expression_arrow
-                            )
+                            exp_attrs & mapping (fun p1 p e p2 -> Exp.fun_ ~loc:(make_location p1 p2) Nolabel None p e)
+                            >$pos >$pattern_atom >ng >s"=>" >ng >$expression_arrow >$pos
                         end
                     in
 
@@ -309,8 +286,8 @@ module Make
 
             let tuple =
                 Named.p "expression:tuple" begin
-                    mapping (mk_helper ~f:Exp.tuple)
-                    << s"(" <*> seq 2 (-use expression_constrainted) ~sep:(-s",") ~trail << -s")"
+                    mapping (fun p1 l p2 -> Exp.tuple ~loc:(make_location p1 p2) l)
+                    >$pos >s"(" >ng >$(seq 2 expression_constrainted ~sep ~trail) >ng >s")" >$pos
                 end
 
             let list_helper =
@@ -318,172 +295,168 @@ module Make
 
             let list =
                 Named.p "expression:list" begin
-                        begin
-                            mapping (list_helper [] None)
-                            << s"list{" << -s"}"
-                        end
-                    <|> (s"list{" >> -s"..." >> -expression_constrainted << opt @@ -s"," << -s"}")
-                    <|> begin
-                            mapping list_helper
-                            << s"list{" <*> seq 1 ~sep:(-s",") (-use expression_constrainted)
-                            <*> (
-                                        (-s"," >> -s"..." >> -use expression_constrainted << opt @@ -s"," >>| Option.some)
-                                    <|> (opt @@ -s"," >>$ None)
-                                )
-                            << -s"}"
-                        end
+                        with_loc & mapping (list_helper [] None)
+                        >s"list{" >ng >s"}"
+
+                    ||  s"list{" >> ng >> s"..." >> ng >> expression_constrainted << opt sep << ng << s"}"
+
+                    ||  with_loc & mapping list_helper
+                        >s"list{" >ng >$(seq 1 ~sep expression_constrainted)
+                        >$(
+                                ng >> s"," >> ng >> s"..." >> ng >> expression_constrainted << opt sep >>| Option.some
+                            ||  opt sep >>$ None
+                        )
+                        >ng >s"}"
                 end
 
             let case =
                 mapping begin fun pat guard exp -> Exp.case pat ?guard exp end
-                <*> use pattern <*> opt (-k"when" <|> -k"if" >> -use expression) << -s"=>" <*> -use expression_sequence
+                >$pattern >ng >?(k"when" <|> k"if" >> ng >> expression) >ng >s"=>" >ng >$expression_sequence
 
             let case_list =
-                s"{" >> opt (-s"|") >> seq 1 (-case) ~sep:(-s"|") << -s"}"
+                s"{" >> opt (ng >> s"|") >> seq 1 (ng >> case) ~sep:(ng >> s"|") << ng << s"}"
 
             let switch =
                 Named.p "expression:switch" begin
-                    mapping @@ mk_helper2 Exp.match_
-                    << k"switch" <*> -use expression << ng <*> case_list
+                    with_loc & hlp2 Exp.match_
+                    >k"switch" >ng >$expression >ng >$case_list
                 end
 
             let try_catch =
                 Named.p "expression:try" begin
-                    mapping @@ mk_helper2 Exp.try_
-                    << k"try" <*> -use expression << -k"catch" <*> -case_list
+                    with_loc & hlp2 Exp.try_
+                    >k"try" >ng >$expression >ng >k"catch" >ng >$case_list
                 end
 
             let ifthenelse =
                 fix @@ fun ifthenelse ->
+                let else_ = ng >> k"else" >> ng >> (scoped_sequence <|> ifthenelse) in
+
                 Named.p "expression:if" begin
-                    mapping (mk_helper3 Exp.ifthenelse)
-                    << k"if" <*> -use expression <*> -use scoped_sequence
-                    <*>? (-k"else" >> -use (scoped_sequence <|> ifthenelse))
+                    with_loc & hlp3 Exp.ifthenelse
+                    >k"if" >ng >$expression >ng >$scoped_sequence >?else_
                 end
 
             let for_ =
                 Named.p "expression:for" begin
-                    let direction =
-                            (k"to" >>$ Upto)
-                        <|> (k"downto" >>$ Downto)
+                    let direction = k"to" >>$ Upto || k"downto" >>$ Downto in
+                    let mapping =
+                        mapping begin fun p1 pat ef dir et ea p2 ->
+                            Exp.for_ ~loc:(make_location p1 p2) pat ef et dir ea
+                        end
                     in
 
-                    (
-                        mapping begin fun pat ef dir et ea -> mk_helper5 Exp.for_ pat ef et dir ea end
-                        << k"for" <*> -use pattern << -k"in" <*> -use expression <*> -direction
-                        <*> -use expression <*> -use scoped_sequence
-                    )
-                    <|>
-                    (
-                        mapping begin fun pat ef dir et ea -> mk_helper5 Exp.for_ pat ef et dir ea end
-                        << k"for" << -s"(" <*> -use pattern << -k"in" <*> -use expression
-                        <*> -direction <*> -use expression << -s")" <*> -use scoped_sequence
-                    )
+                        mapping
+                        >$pos >k"for" >ng >$pattern >ng >k"in" >ng >$expression >ng >$direction
+                        >ng >$expression >ng >$scoped_sequence >$pos
+
+                    ||  mapping
+                        >$pos >k"for" >ng >s"(" >ng >$pattern >ng >k"in" >ng >$expression
+                        >ng >$direction >ng >$expression >ng >s")" >ng >$scoped_sequence >$pos
                 end
 
             let while_ =
                 Named.p "expression:while" begin
-                    mapping @@ mk_helper2 Exp.while_
-                    << k"while" <*> -use expression <*> -use scoped_sequence
+                    with_loc & hlp2 Exp.while_
+                    >k"while" >ng >$expression >ng >$scoped_sequence
                 end
 
             let assert_ =
                 Named.p "expression:assert" begin
-                    mapping (mk_helper ~f:Exp.assert_)
-                    << k"assert" <*> -use expression
+                    with_loc & hlp Exp.assert_
+                    >k"assert" >ng >$expression
                 end
 
             let lazy_ =
                 Named.p "expression:lazy" begin
-                    mapping (mk_helper ~f:Exp.lazy_)
-                    << k"lazy" <*> -use expression
+                    with_loc & hlp Exp.lazy_
+                    >k"lazy" >ng >$expression
                 end
 
             let _unit_arg_ loc = Nolabel, Exp.construct ~loc (Location.mkloc (Longident.Lident "()") loc) None
             let _unit_arg = _unit_arg_ Location.none
 
-            let ident = mapping @@ mk_helper ~f:Exp.ident <*> loc l_longident
+            let ident =
+                with_loc & hlp Exp.ident
+                >$loc l_longident
 
             let jsx =
                 Named.p "expression:jsx" begin
                     let arg =
-                            (
-                                mapping begin fun { txt = label; loc } expr ->
-                                    Labelled label, apply_ah @@ helper_add_attr "ns.namedArgLoc" ~loc expr
-                                end
-                                <*> loc l_ident << -s"=" <*> -set_loc expression_p0
-                            )
-                        <|> (
-                                mapping begin fun { txt = label; loc } expr ->
-                                    Optional label, apply_ah @@ helper_add_attr "ns.namedArgLoc" ~loc expr
-                                end
-                                <*> loc l_ident << -s"=" << -s"?" <*> -set_loc expression_p0
-                            )
-                        <|> (
-                                mapping begin fun { txt = label; loc } ->
-                                    Labelled label, Hc.expr_id ~loc ~attrs:[Hc.attr "ns.namedArgLoc" ~loc] [label]
-                                end
-                                <*> loc l_ident
-                            )
-                        <|> (
-                                mapping begin fun { txt = label; loc } ->
-                                    Optional label, Hc.expr_id ~loc ~attrs:[Hc.attr "ns.namedArgLoc" ~loc] [label]
-                                end
-                                << s"?" <*> -loc l_ident
-                            )
+                            mapping begin fun { txt; loc } expr ->
+                                Labelled txt, exp_add_attr "ns.namedArgLoc" ~loc expr
+                            end
+                            >$loc l_ident >ng >s"=" >ng >$expression_p0
+
+                        ||  mapping begin fun { txt; loc } expr ->
+                                Optional txt, exp_add_attr "ns.namedArgLoc" ~loc expr
+                            end
+                            >$loc l_ident >ng >s"=" >ng >s"?" >ng >$expression_p0
+
+                        ||  mapping begin fun { txt; loc } ->
+                                Labelled txt, Hc.expr_id ~loc ~attrs:[Hc.attr "ns.namedArgLoc" ~loc] [txt]
+                            end
+                            >$loc l_ident
+
+                        ||  mapping begin fun { txt; loc } ->
+                                Optional txt, Hc.expr_id ~loc ~attrs:[Hc.attr "ns.namedArgLoc" ~loc] [txt]
+                            end
+                            >s"?" >ng >$loc l_ident
                     in
 
                     let children_list =
-                        seq 0 (-use expression) >>| fun list -> list_helper list None
+                        with_loc & mapping (fun list -> list_helper list None)
+                        >$(seq 0 expression ~sep:ng)
                     in
 
                     let children =
-                        (s"..." >> expression)
-                        <|>
-                        children_list
+                            s"..." >> expression
+                        ||  children_list
                     in
 
                         Named.p "jsx:leaf" begin
-                            mapping begin fun tag args -> mk_helper2 Exp.apply (Exp.ident tag) (args @ [
+                            mapping begin fun p1 tag args p2 -> Exp.apply ~loc:(make_location p1 p2) (Exp.ident tag) (args @ [
                                     Labelled "children", Exp.construct (Location.mknoloc (Longident.Lident "[]")) None;
                                     _unit_arg
                                 ])
                             end
-                            << s"<" <*> -loc (l_ident >>| fun x -> Longident.Lident x) <*>* -arg << -s"/" << -s">"
+                            >$pos >s"<" >ng >$loc (l_ident >>| fun x -> Longident.Lident x) >*(ng >> arg) >ng >s"/" >ng >s">" >$pos
                         end
-                    <|> Named.p "jsx:tag" begin
-                            mapping t3
-                            << s"<" <*> -loc (l_ident >>| fun x -> Longident.Lident x) <*>* -arg << -s">"
-                            <*> -use children << ng
-                            >>= fun (tag, args, children) ->
+                    ||  Named.p "jsx:tag" begin
+                            mapping t4
+                            >$pos >s"<" >ng >$loc (l_ident >>| fun x -> Longident.Lident x) >*(ng >> arg)
+                            >ng >s">" >ng >$children >ng
+                            >>= fun (p1, tag, args, children) ->
                                 let open Angstrom in
                                 string "<" >> ng.p >> string "/" >> ng.p >> (exact_longident tag.txt).p << ng.p << string ">"
-                                >>| fun _ ->
+                                >> APos.pos.p
+                                >>| fun p2 ->
                                 let tailargs =
                                     (Labelled "children", children) :: [_unit_arg]
                                 in
-                                mk_helper2 Exp.apply (Exp.ident tag) (args @ tailargs)
+                                Exp.apply ~loc:(make_location p1 p2) (Exp.ident tag) (args @ tailargs)
                         end
-                    <|> Named.p "jsx:ce:leaf" begin
-                            mapping begin fun tag args ->
+                    ||  Named.p "jsx:ce:leaf" begin
+                            mapping begin fun p1 tag args p2 ->
                                 let tag =
                                     Exp.ident ~loc:tag.loc @@ Location.mkloc (Longident.Ldot (tag.txt, "createElement")) tag.loc
                                 in
 
-                                mk_helper2 Exp.apply tag (args @ [
+                                Exp.apply ~loc:(make_location p1 p2) tag (args @ [
                                     Labelled "children", Exp.construct (Location.mknoloc (Longident.Lident "[]")) None;
                                     _unit_arg])
                             end
-                            << s"<" <*> -loc (l_longident <|> u_longident) <*>* -arg << -s"/" << -s">"
+                            >$pos >s"<" >ng >$loc longident >* (ng >> arg) >ng >s"/" >ng >s">" >$pos
                         end
-                    <|> Named.p "jsx:ce:tag" begin
-                            mapping t3
-                            << s"<" <*> -loc (l_longident <|> u_longident) <*>* -arg << -s">"
-                            <*> -use children << ng
-                            >>= fun ({ txt = tag; loc = tag_loc }, args, children) ->
+                    ||  Named.p "jsx:ce:tag" begin
+                            mapping t4
+                            >$pos >s"<" >ng >$loc longident >* (ng >> arg) >ng >s">"
+                            >ng >$children >ng
+                            >>= fun (p1, { txt = tag; loc = tag_loc }, args, children) ->
                                 let open Angstrom in
                                 string "<" >> ng.p >> string "/" >> ng.p >> (exact_longident tag).p << ng.p << string ">"
-                                >>| fun _ ->
+                                >> APos.pos.p
+                                >>| fun p2 ->
 
                                 let tailargs =
                                     (Labelled "children", children) :: [_unit_arg]
@@ -493,41 +466,40 @@ module Make
                                     Exp.ident ~loc:tag_loc @@ Location.mkloc (Longident.Ldot (tag, "createElement")) tag_loc
                                 in
 
-                                mk_helper2 Exp.apply tag (args @ tailargs)
+                                Exp.apply ~loc:(make_location p1 p2) tag (args @ tailargs)
                         end
-                    <|> Named.p "jsx:notag:item" begin
-                            mapping begin fun expr -> list_helper [expr] None end
-                            << s"<" << -s">" << -s"..." <*> -use expression << -s"<" << -s"/" << -s">"
+                    ||  Named.p "jsx:notag:item" begin
+                            with_loc & mapping begin fun expr -> list_helper [expr] None end
+                            >s"<" >ng >s">" >ng >s"..." >ng >$expression >ng >s"<" >ng >s"/" >ng >s">"
                         end
-                    <|> Named.p "jsx:notag" begin
-                            s"<" >> -s">" >> children_list << -s"<" << -s"/" << -s">"
+                    ||  Named.p "jsx:notag" begin
+                            s"<" >> ng >> s">" >> ng >> children_list << ng << s"<" << ng << s"/" << ng << s">"
                         end
                 end
 
-            let jsx = jsx >>| helper_add_attr "JSX"
+            let jsx = jsx >>| exp_add_attr "JSX"
 
             let array =
                 Named.p "expression:array" begin
-                        (s"[" >> -s"]" >>$ mk_helper ~f:Exp.array [])
-                    <|> (
-                            mapping (mk_helper ~f:Exp.array)
-                            << s"[" <*> seq 1 ~sep:(-s",") ~trail (-use expression_constrainted) << -s"]"
-                        )
+                        mapping (fun p1 p2 -> Exp.array ~loc:(make_location p1 p2) [])
+                        >$pos >s"[" >ng >s"]" >$pos
+
+                    ||  mapping (fun p1 l p2 -> Exp.array ~loc:(make_location p1 p2) l)
+                        >$pos >s"[" >ng >$ (seq 1 ~sep ~trail expression_constrainted) >ng >s"]" >$pos
                 end
 
             let record =
                 Named.p "expression:record" begin
-                    let _nb =
-                            (
-                                mapping t2
-                                <*> -loc l_longident << -s":" <*> -use expression_arrow
-                            )
-                        <|> (-loc l_longident >>| fun lid -> lid, Exp.ident ~loc:lid.loc lid)
+                    let nb =
+                            mapping t2
+                            >$loc l_longident >ng >s":" >ng >$expression_arrow
+
+                        ||  loc l_longident >>| fun lid -> lid, Exp.ident ~loc:lid.loc lid
                     in
 
-                    mapping begin fun expr list -> mk_helper2 Exp.record list expr end
-                    << s"{" <*>? (-s"..." >> -use expression_constrainted << -s",")
-                    <*> seq 1 _nb ~sep:(-s",") ~trail << -s"}"
+                    with_loc & mapping begin fun expr list loc -> Exp.record ~loc list expr end
+                    >s"{" >ng >?(ng >> s"..." >> ng >> expression_constrainted << sep)
+                    >$(seq 1 nb ~sep ~trail) >ng >s"}"
                 end
 
             let bs_object =
@@ -539,50 +511,53 @@ module Make
                             | Some pat -> lid, pat
                             | None -> lid, Exp.ident ~loc lid
                         end
-                        <*> loc Constant.String.string <*>? (-s":" >> -use expression)
+                        >$loc Constant.String.string >? (ng >> s":" >> ng >> expression)
                     in
 
-                    mapping begin fun list ->
-                        mk_helper2 Exp.record list None
+                    mapping begin fun p1 list p2 ->
+                        Exp.record ~loc:(make_location p1 p2) list None
                     end
-                    << s"{" <*> seq 1 (-row) ~sep:(-s",") ~trail << -s"}"
+                    >$pos >s"{" >ng >$(seq 1 row ~sep ~trail) >ng >s"}" >$pos
                 in
 
                 Named.p "bs_object" begin
-                    use record >>| fun x -> mk_helper ~f:Exp.extension (Location.mkloc "obj" x.pexp_loc, PStr [Str.eval x])
+                    record >>| fun x -> Exp.extension ~loc:x.pexp_loc (Location.mkloc "obj" x.pexp_loc, PStr [Str.eval x])
                 end
 
-            let extension = mapping @@ mk_helper ~f:Exp.extension <*> extension
+            let extension =
+                with_loc & hlp Exp.extension
+                >$extension
 
             let coerce =
                 Named.p "expression:coerce" begin
-                    mapping (fun a b -> mk_helper3 Exp.coerce a None b)
-                    << s"(" <*> -use expression_constrainted << -s":>" <*> -use core_type_atom << -s")"
+                    mapping (fun p1 a b p2 -> Exp.coerce ~loc:(make_location p1 p2) a None b)
+                    >$pos >s"(" >ng >$expression_constrainted >ng >s":>" >ng >$core_type_atom >ng >s")" >$pos
                 end
 
             let interpolated_string qtag =
-                let op = Exp.ident @@ Location.mknoloc @@ Longident.Lident "^" in
+                let op = Hc.expr_id ["^"] in
 
                 let cons = mapping cons in
 
                 let parts = fix @@ fun parts ->
                     cons
-                    <*> take_while (function '\n' | '$' | '`' | '\\' | '\r' -> false | _ -> true)
-                    <*> (
-                                (cons <*> new_line <*> parts)
-                            <|> (cons <*> (s"\\`" >>$ "`") <*> parts)
-                            <|> (cons <*> (s"\\$" >>$ "$") <*> parts)
-                            <|> (cons <*> (s"\\\\" >>$ "\\") <*> parts)
-                            <|> (cons <*> (s"$" << failed (s"{")) <*> parts)
-                            <|> return []
-                        )
+                    >$take_while (function '\n' | '$' | '`' | '\\' | '\r' -> false | _ -> true)
+                    >$(
+                            cons >$new_line >$parts
+                        ||  cons >$(s"\\`" >>$ "`") >$parts
+                        ||  cons >$(s"\\$" >>$ "$") >$parts
+                        ||  cons >$(s"\\\\" >>$ "\\") >$parts
+                        ||  cons >$(s"$" << failed (s"{")) >$parts
+                        ||  return []
+                    )
                 in
                 let string =
-                    parts >>| fun l ->
+                    mapping begin fun l p1 p2 ->
                         let str = String.concat l in
-                        helper_add_attr "res.template" @@
-                        mk_helper ~f:Exp.constant @@
+                        Exp.constant ~loc:(make_location p1 p2) ~attrs:[Hc.attr "res.template"] @@
                         Const.string ~quotation_delimiter:qtag str
+                    end
+                    >$parts
                 in
 
                 let string_part =
@@ -590,74 +565,64 @@ module Make
 
                     let tail =
                         mapping begin fun expr pos tail prev ->
-                            tail @@ apply
-                                (mk_helper2 Exp.apply op [Nolabel, prev; Nolabel, expr])
-                                prev.pexp_loc.loc_start pos
+                            tail (Exp.apply ~loc:(make_location prev.pexp_loc.loc_start pos) op [Nolabel, prev; Nolabel, expr])
                         end
-                        << s"${" <*> -use expression << -s"}" <*> pos <*> string_part
+                        >s"${" >ng >$expression >ng >s"}" >$pos >$string_part
                     in
 
                     rapply pos @@ rapply string
                     (
-                            (
-                                s"`" >>$ fun str _p1 prev ->
-                                helper_add_attr "res.template" @@
-                                helper @@ fun ~p1 ~p2 ~attrs ->
-                                    apply
-                                        (
-                                            helper_add_attrs attrs @@
-                                            mk_helper2 Exp.apply op [
-                                                Nolabel, prev;
-                                                Nolabel, apply str p1 p2;
-                                            ]
-                                        )
-                                        p1 p2
-                            )
-                        <|> (
-                                mapping begin fun p2 tail str p1 prev ->
-                                    let e = apply str p1 p2 in
-                                    tail (
-                                        apply (
-                                            helper_add_attr "res.template" @@
-                                            mk_helper2 Exp.apply op [Nolabel, prev; Nolabel, e]
-                                        ) prev.pexp_loc.loc_start p2
-                                    )
-                                end
-                                <*> pos <*> tail
-                            )
+                            mapping begin fun p2 str p1 prev ->
+                                Exp.apply
+                                    ~loc:{prev.pexp_loc with loc_end = p2}
+                                    ~attrs:[Hc.attr "res.template"] op
+                                    [
+                                            Nolabel, prev;
+                                            Nolabel, str p1 p2;
+                                    ]
+                            end
+                            >s"`" >$pos
+                        ||  mapping begin fun p2 tail str p1 prev ->
+                                tail @@ Exp.apply
+                                    ~loc:{prev.pexp_loc with loc_end = p2}
+                                    ~attrs:[Hc.attr "res.template"] op
+                                    [
+                                            Nolabel, prev;
+                                            Nolabel, str p1 p2;
+                                    ]
+                            end
+                            >$pos >$tail
                     )
                 in
 
-                s"`" >>
+                rapply pos
                 (
-                    rapply string
+                    s"`" >>
                     (
-                            (s"`" >>$ fun str -> str)
-                        <|> (
-                                mapping begin fun pos1 expr pos2 tail str ->
-                                    helper begin fun ~p1 ~p2 ~attrs ->
-                                        let e0 =
-                                            apply str p1 pos1
-                                        in
-                                        let e1 =
-                                            apply
-                                                (
-                                                    helper_add_attr "res.template" @@
-                                                    mk_helper2 Exp.apply op [Nolabel, e0; Nolabel, expr]
-                                                )
-                                                p1 pos2
-                                        in
-                                        apply (helper_add_attrs attrs @@ tail e1) p1 p2
-                                    end
+                        rapply string
+                        (
+                                mapping (fun p2 str p1 -> str p1 p2)
+                                >s"`" >$pos
+
+                            ||  mapping begin fun pos1 expr pos2 tail str p1 ->
+                                    let e0 = str p1 pos1 in
+                                    let e1 = Exp.apply
+                                        ~loc:(make_location p1 pos2)
+                                        ~attrs:[Hc.attr "res.template"]
+                                        op
+                                        [Nolabel, e0; Nolabel, expr]
+                                    in
+                                    tail e1
                                 end
-                                <*> pos << s"${" <*> -use expression << -s"}" <*> pos <*> string_part
-                            )
+                                >$pos >s"${" >ng >$expression >ng >s"}" >$pos >$string_part
+                        )
                     )
                 )
 
             let string =
                 Named.p "expression:string" begin
-                    Constant.String.multiline ~q:'"' >>| mk_helper ~f:Exp.constant
+                    with_loc & hlp Exp.constant
+                    >$Constant.String.multiline ~q:'"'
                 end
 
             let js_string = Named.p "expression:js_string" @@ interpolated_string "js"
@@ -666,34 +631,34 @@ module Make
                 (s"json" >> interpolated_string "json")
 
             let constr_args =
-                    (loc_of (s"(" >> -s")") >>| Hc.unit_expr)
-                <|> use tuple
-                <|> (s"(" >> -use expression_constrainted << opt @@ -s"," << -s")")
+                    loc_of (s"(" >> ng >> s")") >>| Hc.unit_expr
+                ||  tuple
+                ||  s"(" >> ng >> expression_constrainted << opt sep << ng << s")"
 
 
             let polyvariant =
                 let tag =
                         u_ident
-                    <|> Constant.String.string
-                    <|> take_while (function '0'..'9' -> true | _ -> false)
+                    ||  Constant.String.string
+                    ||  take_while (function '0'..'9' -> true | _ -> false)
                 in
 
                 Named.p "polyvariant" begin
-                    mapping @@ mk_helper2 Exp.variant
-                    << s"#" <*> tag <*>? constr_args
+                    with_loc & hlp2 Exp.variant
+                    >s"#" >$tag >?constr_args
                 end
 
             let true_ =
-                mapping (fun a -> mk_helper2 Exp.construct a None)
-                <*> loc (k"true" >>$ Longident.Lident "true")
+                with_loc & mapping (fun a loc -> Exp.construct ~loc a None)
+                >$loc (k"true" >>$ Longident.Lident "true")
 
             let false_ =
-                mapping (fun a -> mk_helper2 Exp.construct a None)
-                <*> loc (k"false" >>$ Longident.Lident "false")
+                with_loc & mapping (fun a loc -> Exp.construct ~loc a None)
+                >$loc (k"false" >>$ Longident.Lident "false")
 
             let string_ident =
-                mapping @@ mk_helper ~f:Exp.ident
-                << s"\\" <*> loc (Constant.String.string >>| fun x -> Longident.Lident x)
+                with_loc & hlp Exp.ident
+                >s"\\" >$loc (Constant.String.string >>| fun x -> Longident.Lident x)
 
             let atom =
                 Named.p "expression:atom" begin
@@ -714,18 +679,26 @@ module Make
                     ; true_
                     ; false_
                     ; ident
-                    ; mapping @@ mk_helper2 Exp.construct <*> loc u_longident <*>? constr_args
+                    ;
+                        with_loc & hlp2 Exp.construct
+                        >$loc u_longident >? constr_args
                     ; polyvariant
-                    ; mapping (fun a -> mk_helper2 Exp.construct a None) <*> loc (s"()" >>$ Longident.Lident "()")
+                    ;
+                        with_loc & mapping (fun a loc -> Exp.construct ~loc a None)
+                        >$loc (s"()" >>$ Longident.Lident "()")
                     ; tuple
                     ; coerce
-                    ; s"(" >> -add_attrs expression_constrainted << -s")"
+                    ;
+                        with_loc & parens & mapping exp_loc
+                        >$exp_attrs expression_constrainted
                     ; array
-                    ; scoped_sequence >>| helper_add_attr "ns.braces"
+                    ; scoped_sequence >>| exp_add_attr "ns.braces"
                     ; record
                     ; bs_object
                     ; extension
-                    ; Constant.p >>| mk_helper ~f:Exp.constant
+                    ;
+                        with_loc & hlp Exp.constant
+                        >$Constant.p
                     ]
                 end
 
@@ -739,106 +712,95 @@ module Make
             let field_set_cont =
                 Named.p "expression:field:set" begin
                     mapping begin fun lid expr prev ->
-                        mk_helper3 Exp.setfield prev lid expr
+                        let loc = comb_location prev.pexp_loc expr.pexp_loc in
+                        Exp.setfield ~loc prev lid expr
                     end
-                    << -s"." <*> -loc l_longident << -s "=" <*> -use expression_arrow
+                    >ng >s"." >ng >$loc l_longident >ng >s"=" >ng >$expression_arrow
                 end
 
             let object_set_cont =
                 Named.p "expression:object:set" begin
-                    mapping begin fun idx p1 loc value expr ->
-                        let s = Exp.send ~loc:(make_location expr.pexp_loc.loc_start p1) expr idx in
+                    mapping begin fun idx p1 loc value prev ->
+                        let s = Exp.send ~loc:(make_location prev.pexp_loc.loc_start p1) prev idx in
                         let lid = Exp.ident ~loc @@ Location.mkloc (Longident.Lident "#=") loc in
-                        mk_helper2 Exp.apply lid [Nolabel, s; Nolabel, value]
+                        Exp.apply ~loc:(comb_location prev.pexp_loc value.pexp_loc) lid [Nolabel, s; Nolabel, value]
                     end
-                    << -s"[" <*> -loc Constant.String.string << -s"]" <*> pos <*> -loc_of (s"=") <*> -use expression_arrow
+                    >ng >s"[" >ng >$loc Constant.String.string >ng >s"]" >$pos >ng >$loc_of (s"=") >ng >$expression_arrow
                 end
 
             let array_set_cont =
                 Named.p "expression:array:set" begin
-                    mapping begin fun idx value expr ->
-                        mk_helper2 Exp.apply (Hc.expr_id ["Array"; "set"]) [Nolabel, expr; Nolabel, idx; Nolabel, value]
+                    mapping begin fun idx value prev ->
+                        let loc = comb_location prev.pexp_loc value.pexp_loc in
+                        Exp.apply ~loc (Hc.expr_id ["Array"; "set"]) [Nolabel, prev; Nolabel, idx; Nolabel, value]
                     end
-                    << -s"[" <*> -use expression << -s"]" << -s"=" <*> -use expression_arrow
+                    >ng >s"[" >ng >$expression >ng >s"]" >ng >s"=" >ng >$expression_arrow
                 end
 
             let tail =
                 Named.p "expression:tail" begin
-                    let labelled _arg =
-                            (
-                                mapping begin fun { txt; loc } expr ->
-                                    Optional txt,
-                                    apply_ah @@ helper_add_attr "ns.namedArgLoc" ~loc expr
-                                end
-                                << s"~" <*> -loc l_ident << -s"=" << -s"?" <*> -set_loc expression_constrainted
-                            )
-                        <|> (
-                                mapping begin fun tag expr -> Optional tag, expr end
-                                << s"~" <*> -l_ident << -s"=" << -s"?" <*> -use _arg
-                            )
-                        <|> (
-                                mapping begin fun { txt; loc } expr ->
-                                    Labelled txt,
-                                    apply_ah @@ helper_add_attr "ns.namedArgLoc" ~loc expr
-                                end
-                                << s"~" <*> -loc l_ident << -s"=" <*> -set_loc expression_constrainted
-                            )
-                        <|> (
-                                mapping begin fun tag expr -> Labelled tag, expr end
-                                << s"~" <*> -l_ident << -s"=" <*> -use _arg
-                            )
-                        <|> (
-                                mapping begin fun { txt; loc } typ p2 ->
-                                    let exp =
-                                        apply
-                                        (
-                                            helper_add_attr "ns.namedArgLoc" ~loc @@
-                                            mk_helper2 Exp.constraint_ (Hc.expr_id ~loc ~attrs:[Hc.attr ~loc "ns.namedArgLoc"] [txt]) typ
-                                        )
-                                        loc.loc_start p2
-                                    in
-                                    Labelled txt, exp
-                                end
-                                << s"~" <*> -loc l_ident
-                                << -s":" <*> -use core_type_atom <*> pos
-                            )
-                        <|> (
-                                mapping begin fun { txt; loc } p2 ->
-                                    let exp =
-                                        apply
-                                        (
-                                            helper_add_attr "ns.namedArgLoc" ~loc @@
-                                            mk_helper ~f:Exp.ident (Location.mkloc (Hc.lid [txt]) loc)
-                                        )
-                                        loc.loc_start p2
-                                    in
-                                    Optional txt, exp
-                                end
-                                << s"~" <*> -loc l_ident << -s"?" <*> pos
-                            )
-                        <|> (
-                                mapping begin fun { txt; loc } ->
-                                    Labelled txt
-                                    ,
-                                    Hc.expr_id ~loc ~attrs:[Hc.attr ~loc "ns.namedArgLoc"] [txt]
-                                end
-                                << s"~" <*> -loc l_ident
-                            )
-                        <|> (use (expression_constrainted <|> _arg) >>| fun e -> Nolabel, e)
+                    let labelled special_arg =
+                            mapping begin fun { txt; loc } expr ->
+                                Optional txt,
+                                exp_add_attr "ns.namedArgLoc" ~loc expr
+                            end
+                            >s"~" >ng >$loc l_ident >ng >s"=" >ng >s"?" >ng >$expression_constrainted
+                        ||  mapping begin fun tag expr -> Optional tag, expr end
+                            >s"~" >ng >$l_ident >ng >s"=" >ng >s"?" >ng >$special_arg
+
+                        ||  mapping begin fun { txt; loc } expr ->
+                                Labelled txt,
+                                exp_add_attr "ns.namedArgLoc" ~loc expr
+                            end
+                            >s"~" >ng >$loc l_ident >ng >s"=" >ng >$expression_constrainted
+
+                        ||  mapping begin fun tag expr -> Labelled tag, expr end
+                            >s"~" >ng >$l_ident >ng >s"=" >ng >$special_arg
+
+                        ||  mapping begin fun { txt; loc } typ p2 ->
+                                let exp =
+                                    Exp.constraint_
+                                        ~loc:(make_location loc.loc_start p2)
+                                        ~attrs:[Hc.attr ~loc "ns.namedArgLoc"]
+                                        (Hc.expr_id ~loc ~attrs:[Hc.attr ~loc "ns.namedArgLoc"] [txt]) typ
+                                in
+                                Labelled txt, exp
+                            end
+                            >s"~" >ng >$loc l_ident >ng >s":" >ng >$core_type_atom >$pos
+
+                        ||  mapping begin fun { txt; loc } p2 ->
+                                let exp =
+                                    Exp.ident
+                                        ~loc:(make_location loc.loc_start p2)
+                                        ~attrs:[Hc.attr ~loc "ns.namedArgLoc"]
+                                        (Location.mkloc (Hc.lid [txt]) loc)
+                                in
+                                Optional txt, exp
+                            end
+                            >s"~" >ng >$loc l_ident >ng >s"?" >$pos
+
+                        ||  mapping begin fun { txt; loc } ->
+                                Labelled txt
+                                ,
+                                Hc.expr_id ~loc ~attrs:[Hc.attr ~loc "ns.namedArgLoc"] [txt]
+                            end
+                            >s"~" >ng >$loc l_ident
+
+                        ||  (expression_constrainted <|> special_arg) >>| fun e -> Nolabel, e
                     in
 
                     let apply =
                         Named.p "expression:apply" begin
                             let flags = ref [] in
 
-                            let _arg =
-                                mapping @@ mk_helper ~f:Exp.ident
-                                <*> loc (k"_" >> exec @@ fun _ -> List.hd_exn !flags := true; Longident.Lident "__x")
+                            let special_arg =
+                                mapping (fun loc -> Exp.ident ~loc @@ Location.mkloc (Longident.Lident "__x") loc)
+                                >$loc_of (k"_") >exec (fun _ -> List.hd_exn !flags := true)
                             in
 
                             let params =
-                                    (s"(" >> seq 1 ~sep:(-s",") ~trail (-labelled _arg) << -s")")
-                                <|> (s"(" >> -loc_of (s")") >>| fun loc -> [_unit_arg_ loc])
+                                    s"(" >> ng >> seq 1 ~sep ~trail (labelled special_arg) << ng << s")"
+                                ||  s"(" >> ng >> loc_of (s")") >>| fun loc -> [_unit_arg_ loc]
                             in
 
                             let drop_flag = exec @@ fun _ ->
@@ -849,86 +811,89 @@ module Make
 
                             exec (fun _ -> flags := ref false :: !flags) >>
                             (
-                                mapping begin fun list flag expr ->
-                                    mk_helper () ~f:begin fun ?loc ?attrs () ->
-                                        if flag then
-                                            let x = Exp.apply ?loc ?attrs expr list in
-                                            Exp.fun_ ?loc ?attrs Nolabel None (Pat.var @@ Location.mknoloc "__x") x
-                                        else
-                                            Exp.apply ?loc ?attrs expr list
-                                    end
+                                mapping begin fun list flag p2 prev ->
+                                    let loc = { prev.pexp_loc with loc_end = p2 } in
+                                    if flag then
+                                        let x = Exp.apply ~loc prev list in
+                                        Exp.fun_ ~loc Nolabel None (Pat.var @@ Location.mknoloc "__x") x
+                                    else
+                                        Exp.apply ~loc prev list
                                 end
-                                << ng_no_new_line <*> params <*> drop_flag
+                                >ng_no_new_line >$params >$drop_flag >$pos
                             ) <|> (drop_flag >> fail)
                         end
                     in
 
                     let apply_uncurried =
                         Named.p "expression:apply:uncurried" begin
-                            let helper expr args =
-                                helper_add_attr "bs" @@
-                                mk_helper2 Exp.apply expr args
-                            in
-
                             let apply_params =
-                                s"." >> seq 1 ~sep:(-s",") (-labelled fail)
+                                s"." >> ng >> seq 1 ~sep (labelled fail)
                             in
 
                             let args =
                                 Named.p "expression:apply:uncurried:tail" begin
                                     fold_left_cont_0_n
                                         (
-                                            mapping begin fun args p2 -> (fun expr -> helper expr args), p2 end
-                                            <*> apply_params <*> pos
+                                            mapping begin fun args p2 ->
+                                                (fun expr -> Exp.apply ~loc:{expr.pexp_loc with loc_end = p2} ~attrs:[Hc.attr "bs"] expr args)
+                                            end
+                                            >$apply_params >$pos
                                         )
                                         (
-                                            mapping begin fun args p3 (cont, p2) ->
+                                            mapping begin fun args p3 cont ->
                                                 begin fun expr ->
-                                                    let expr = Basic.apply (cont expr) expr.pexp_loc.loc_start p2 in
-                                                    helper expr args
-                                                end, p3
+                                                    let expr = cont expr in
+                                                    Exp.apply ~loc:{expr.pexp_loc with loc_end = p3 } ~attrs:[Hc.attr "bs"] expr args
+                                                end
                                             end
-                                            << -s"," << ng <*> apply_params <*> pos
+                                            >ng >s"," >ng >$apply_params >$pos
                                         )
                                 end
-                                >>| fun (hlp, _) -> hlp
                             in
 
                             let unit_arg =
-                                    (
-                                        s"(" >> -s"." >> -loc_of (s"()") << -s")"
-                                        >>| fun loc -> [Nolabel, res_unit loc]
-                                    )
-                                <|> (s"(" >> -s"." >> -s")" >>$ [_unit_arg])
+                                    mapping (fun loc -> [Nolabel, res_unit loc])
+                                    >s"(" >ng >s"." >ng >$loc_of (s"()") >ng >s")"
+
+                                ||  return [_unit_arg]
+                                    >s"(" >ng >s"." >ng >s")"
                             in
 
-                                (ng >> unit_arg >>| fun arg expr -> helper expr arg)
-                            <|> (-s"(" >> -args << opt (-s",") << -s")")
+                                mapping begin fun arg loc_end prev ->
+                                    Exp.apply ~loc:{prev.pexp_loc with loc_end} ~attrs:[Hc.attr "bs"] prev arg
+                                end
+                                >ng >$unit_arg >$pos
+                            ||  ng >> s"(" >> ng >> args << opt sep << ng << s")"
                         end
                     in
 
                     let field =
                         failed field_set_cont >>
                         Named.p "expression:field" begin
-                            -s"." >> -loc l_longident >>| fun lid expr ->
-                                mk_helper2 Exp.field expr lid
+                            mapping begin fun lid loc_end prev ->
+                                Exp.field ~loc:{prev.pexp_loc with loc_end} prev lid
+                            end
+                            >ng >s"." >ng >$loc l_longident >$pos
                         end
                     in
 
                     let object_get =
                         failed object_set_cont >>
                         Named.p "expression:send" begin
-                            -s"[" >> -loc Constant.String.string << -s"]"
-                            >>| fun str expr -> mk_helper2 Exp.send expr str
+                            mapping begin fun str loc_end prev ->
+                                Exp.send ~loc:{prev.pexp_loc with loc_end} prev str
+                            end
+                            >ng >s"[" >ng >$loc Constant.String.string >ng >s"]" >$pos
                         end
                     in
 
                     let array_get =
                         failed array_set_cont >>
                         Named.p "expression:index" begin
-                            -s"[" >> -use expression_constrainted << -s"]"
-                            >>| fun idx expr ->
-                                mk_helper2 Exp.apply (Hc.expr_id ["Array"; "get"]) [Nolabel, expr; Nolabel, idx]
+                            mapping begin fun idx loc_end prev ->
+                                Exp.apply ~loc:{prev.pexp_loc with loc_end} (Hc.expr_id ["Array"; "get"]) [Nolabel, prev; Nolabel, idx]
+                            end
+                            >ng >s"[" >ng >$expression_constrainted >ng >s"]" >$pos
                         end
                     in
 
@@ -937,19 +902,8 @@ module Make
 
             let primary =
                 Named.p "expression:primary" begin
-                    fold_left_cont_0_n
-                        (
-                            mapping t3
-                            <*> pos <*> atom <*> pos
-                        )
-                        (
-                            mapping begin fun cont p3 (p1, expr, p2) ->
-                                p1, cont @@ apply expr p1 p2, p3
-                            end
-                            <*> tail <*> pos
-                        )
+                    fold_left_cont_0_n atom tail
                 end
-                >>| fun (_, x, _) -> x
 
             let set =
                 Named.p "expression:set" begin
@@ -959,50 +913,44 @@ module Make
                         end
                     in
 
-                    fold_left_cont_0_1
-                        (
-                            mapping t3
-                            <*> pos <*> primary <*> pos
-                        )
-                        (
-                            mapping begin fun cont p3 (p1, expr, p2) ->
-                                p1, cont @@ apply expr p1 p2, p3
-                            end
-                            <*> set_cont <*> pos
-                        )
+                    fold_left_cont_0_1 primary set_cont
                 end
-                >>| fun (_, x, _) -> x
 
             let unops = op_alias "!" "not"
 
             let unary = fix @@ fun unary ->
-                    (
-                        Mapping.unary_minus
-                        <*> loc (op_alias "-." "~-." <|> op_alias "-" "~-") <*> -use unary
-                    )
-                <|> (
-                        Mapping.unary_plus
-                        <*> loc (op_alias "+." "~+." <|> op_alias "+" "~+") <*> -use unary
-                    )
-                <|> (
-                        Mapping.unary_op
-                        <*> loc @@ unops <*> -use unary
-                    )
-                <|> set
+                    with_loc & Mapping.unary_minus
+                    >$loc (op_alias "-." "~-." <|> op_alias "-" "~-") >ng >$unary
+
+                ||  with_loc & Mapping.unary_plus
+                    >$loc (op_alias "+." "~+." <|> op_alias "+" "~+") >ng >$unary
+
+                ||  with_loc & Mapping.unary_op
+                    >$loc unops >ng >$unary
+
+                ||  set
 
             let p0 =
                 Named.p "expression:p0" @@
-                add_attrs (ifthenelse <|> unary)
+                exp_attrs (ifthenelse <|> unary)
 
             let expression_p0 = p0
 
             let left_assoc mp ops =
-                fold_hlp_left_0_n ~f:Mapping.binary_op
-                mp (mapping t2 <*> -loc ops <*> -use mp)
+                let tail =
+                    Mapping.binary_op
+                    >ng >$loc ops >ng >$mp
+                in
+
+                fold_left_cont_0_n mp tail
 
             let left_assoc2 mp ops =
-                fold_hlp_left_0_n ~f:Mapping.binary_op
-                mp (mapping t2 <*> ops <*> -use mp)
+                let tail =
+                    Mapping.binary_op
+                    >$ops >ng >$mp
+                in
+
+                fold_left_cont_0_n mp tail
 
             let p1 =
                 Named.p "expression:p1" @@
@@ -1017,8 +965,8 @@ module Make
                 Named.p "expression:p4" @@
                 left_assoc2 p3
                 (
-                        (-loc (op_alias "++" "^" <|> o"+." <|> o"+"))
-                    <|> (failed (ng_new_line >> (o"-." <|> o"-") >> p0) >> -loc (o"-." <|> o"-"))
+                        (ng >> loc (op_alias "++" "^" <|> o"+." <|> o"+"))
+                    <|> (failed (ng_new_line >> (o"-." <|> o"-") >> p0) >> ng >> loc (o"-." <|> o"-"))
                 )
             let p5 =
                 Named.p "expression:p5" @@
@@ -1027,7 +975,7 @@ module Make
                     Peek.first
                     [ op_alias "===" "=="; op_alias "==" "="; failed (o"=>") >> o"="
                     ; op_alias "!==" "!="; op_alias "!=" "<>"; o"<="; o">="; o"|>"
-                    ; failed jsx >> failed (s"<" >> -s"/") >> o"<"; o">"
+                    ; failed jsx >> failed (s"<" >> ng >> s"/") >> o"<"; o">"
                     ]
                 )
             let p6 =
@@ -1042,11 +990,10 @@ module Make
 
             let ternary =
                 Named.p "expression:ternary" begin
-                    (
-                        mapping (mk_helper3 Exp.ifthenelse)
-                        <*> use p8 << -s"?" <*> -use expression_arrow << -s":" <*> (-use expression_arrow >>| some)
-                    )
-                    >>| (helper_add_attr "ns.ternary")
+                    with_loc & mapping begin fun e1 e2 e3 loc ->
+                        Exp.ifthenelse ~loc ~attrs:[Hc.attr "ns.ternary"] e1 e2 (Some e3)
+                    end
+                    >$p8 >ng >s"?" >ng >$expression_arrow >ng >s":" >ng >$expression_arrow
                 end
 
             let expression =
