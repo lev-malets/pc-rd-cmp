@@ -1,14 +1,6 @@
 
-module Memoized =
-    Angstrom_pos.Trace.Memoized
-        (Pc_syntax.Basic.APos)
-        (struct let memo_spec = Pc_syntax.Parser.memo_spec end)
-module Parse =
-    Pc_syntax.Parser.Make
-        (struct
-            module Named = Memoized
-            module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.APos)
-        end)
+module APos = Angstrom_pos.Make(Pc_syntax.State)
+module Parse = Pc_syntax.Parser.Make(APos)
 
 let input = ref ""
 let anon_fun _ = ()

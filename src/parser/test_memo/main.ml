@@ -1,28 +1,5 @@
+open Core_kernel
 open Run_common
-
-module Peek = Angstrom_pos.Peek.MakePeek(Pc_syntax.Basic.APos)
-module Measured =
-    Angstrom_pos.Trace.Measured
-        (Pc_syntax.Basic.APos)
-        (struct let memo_spec = Pc_syntax.Parser.memo_spec end)
-module Traced =
-    Angstrom_pos.Trace.Traced
-        (Pc_syntax.Basic.APos)
-        (struct let memo_spec = Pc_syntax.Parser.memo_spec end)
-
-module ParseMeasured =
-    Pc_syntax.Parser.Make
-        (struct
-            module Named = Measured
-            module Peek = Peek
-        end)
-module ParseTraced =
-    Pc_syntax.Parser.Make
-        (struct
-            module Named = Traced
-            module Peek = Peek
-        end)
-
 
 let input = ref ""
 let output = ref ""
@@ -33,51 +10,56 @@ let speclist =
     ; "--output", Arg.Set_string output, ""
     ]
 
-let print_stats _ =
-    let stats = Exec_info.to_stats Traced.tt in
+
+let () =
+    Arg.parse speclist anon_fun "";
+
+    let (module Traced), (module APosTraced), (module ParseTraced) = mk_traced ~peek:true () in
+    let (module Measured), (module APosMeasured), (module ParseMeasured) = mk_measured ~peek:true () in
+
+    let filename = !input in
+    let src = read_file ~filename in
+
+    begin match Filename.extension filename with
+    | ".res" ->
+        let _ = ParseTraced.parse_implementation ~src ~filename in
+        let _ = ParseMeasured.parse_implementation ~src ~filename in
+        ()
+    | ".resi" ->
+        let _ = ParseTraced.parse_interface ~src ~filename in
+        let _ = ParseMeasured.parse_interface ~src ~filename in
+        ()
+    | _ ->
+        failwith filename
+    end;
+
+    let stats = Angstrom_pos.Alt.Exec_info.to_stats Traced.tt in
     let list = ref [] in
 
-    let ch = open_out !output in
+    let ch = Out_channel.create !output in
 
-    Hashtbl.iter
-        begin fun parser stats ->
-            if parser.[0] != '\'' then
-            list := (parser, stats) :: !list
+    Hashtbl.iteri
+        ~f:begin fun ~key:parser ~data:stats ->
+            let name = APosTraced.name_of_id parser in
+            if Char.(name.[0] <> '\'') then
+            list := (name, parser, stats) :: !list
         end
         stats;
 
-    let list = List.sort (fun (n1, _) (n2, _) -> compare n1 n2) !list in
+    let list = List.sort ~compare:(fun (n1, _, _) (n2, _, _) -> String.compare n1 n2) !list in
 
     (*Printf.fprintf ch "memo table size: %d\n\n" (Hashtbl.length Measured.table);*)
     Printf.fprintf ch "%40s | %10s |  | \n\n" "name" "call count";
 
     List.iter
-        begin fun (parser, stats) ->
-            let i = Hashtbl.find Measured.name2id parser in
+        ~f:begin fun (name, parser, stats) ->
+            let info = Hashtbl.find_exn Measured.id2info parser in
 
             Printf.fprintf ch "%40s | %16d | %16.4f | %16d | %16.2f\n"
-                parser
-                Measured.counts.(i) stats.Exec_info.call_count
-                Measured.times.(i)
-                (float_of_int Measured.times.(i) /. float_of_int Measured.counts.(i))
+                name
+                info.count stats.Angstrom_pos.Alt.Exec_info.call_count
+                info.time
+                (float_of_int info.time /. float_of_int info.count)
         end
         list;
-    close_out ch
-
-let () =
-    Arg.parse speclist anon_fun "";
-
-    let filename = !input in
-    let src = read_file ~filename in
-
-    match Filename.extension filename with
-    | ".res" ->
-        let _ = ParseTraced.parse_implementation ~src ~filename in
-        let _ = ParseMeasured.parse_implementation ~src ~filename in
-        print_stats ()
-    | ".resi" ->
-        let _ = ParseTraced.parse_interface ~src ~filename in
-        let _ = ParseMeasured.parse_interface ~src ~filename in
-        print_stats ()
-    | _ ->
-        failwith filename
+    Out_channel.close ch

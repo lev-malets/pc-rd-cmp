@@ -1,12 +1,10 @@
 open Base
+open Parsetree
 
-module APos = Angstrom_pos.Make(State)
+module Parser = Angstrom_pos.Sigs.MkParser(State)
 module Charset = Angstrom_pos.Charset
 
-type 'a parser = 'a APos.Parser.t
-
-open APos
-open Parsetree
+type 'a parser = 'a Parser.t
 
 module Opt = struct
     let set x =
@@ -40,33 +38,6 @@ module Hc = struct
 
     let unit_expr loc = Ast_helper.Exp.construct ~loc (Location.mkloc (Longident.Lident "()") loc) None
 end
-
-let na_hlp (f: ?loc:Warnings.loc -> 'a -> 'b) =
-    return @@ fun a loc -> f ~loc a
-
-let hlp (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) =
-    return @@ fun a loc -> f ~loc a
-
-let hlp2 (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) =
-    return @@ fun a b loc -> f ~loc a b
-
-let hlp3 (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) =
-    return @@ fun a b c loc -> f ~loc a b c
-
-let hlp4 (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) =
-    return @@ fun a b c d loc -> f ~loc a b c d
-
-let hlp_a (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) =
-    return @@ fun attrs a loc -> f ~loc ~attrs a
-
-let hlp2_a (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) =
-    return @@ fun attrs a b loc -> f ~attrs ~loc a b
-
-let hlp3_a (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) =
-    return @@ fun attrs a b c loc -> f ~attrs ~loc a b c
-
-let hlp4_a (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) =
-    return @@ fun attrs a b c d loc -> f ~attrs ~loc a b c d
 
 let make_list_helper ~constr ~tuple ~get_loc seq ext loc =
     let nil_loc = {loc with Location.loc_ghost = true} in

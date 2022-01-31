@@ -1,4 +1,4 @@
-
+open Core_kernel
 open Run_common
 
 let trace = ref None
@@ -11,8 +11,8 @@ let speclist =
             function
             | "res" -> parser := (module ParseRes)
             | "pc" ->
-                let t, p = mk_traced ~peek:true Pc_syntax.Parser.memo_spec in
-                trace := Some t;
+                let t, a, p = mk_traced ~peek:true () in
+                trace := Some (t, a);
                 parser := p
             | _ -> failwith "unreachable"
         ),
@@ -23,41 +23,46 @@ let speclist =
 let print_last_pos () =
     match !trace with
     | None -> ()
-    | Some (module Trace) ->
-        let path, pos = Exec_info.last_pos Trace.tt in
-        Printf.printf "%s\n" @@ String.concat " |> " path;
-        Printf.printf "%s:%d:%d\n" pos.pos_fname pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
+    | Some ((module Traced), (module APos)) ->
+        let path, pos = Angstrom_pos.Alt.Exec_info.last_pos Traced.tt in
+        let names =
+            List.map path ~f:APos.name_of_id
+        in
+
+        Caml.Printf.printf "%s\n" @@ String.concat ~sep:" |> " names;
+        Caml.Printf.printf "%s:%d:%d\n" pos.pos_fname pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
 let print_ast ~pp x =
     let och =
         match !output with
-        | "" -> stdout
-        | file -> open_out file
+        | "" -> Stdio.stdout
+        | file -> Out_channel.create file
     in
     pp (Format.formatter_of_out_channel och) x;
-    flush och
+    Out_channel.flush och
 
 let () =
-    Arg.parse speclist anon_fun "";
+    Caml.Arg.parse speclist anon_fun "";
 
     let (module Parse) = !parser in
     let filename = !input in
     let src = read_file ~filename in
 
-    begin if String.sub filename (String.length filename - 4) 4 = ".res" then
+    match Filename.extension filename with
+    | ".res" ->
         let x = Parse.parse_implementation ~src ~filename in
 
-        match x with
-        | Error x -> print_last_pos (); failwith x
-        | Ok s -> print_ast ~pp: Printast.implementation @@
+        begin match x with
+        | None -> print_last_pos (); failwith "x"
+        | Some s -> print_ast ~pp: Printast.implementation @@
             Pc_syntax.Parsetree_mapping.structure !mapping s
-    else if String.sub filename (String.length filename - 5) 5 = ".resi" then
+        end
+    | ".resi" ->
         let x = Parse.parse_interface ~src ~filename in
 
-        match x with
-        | Error x -> print_last_pos (); failwith x
-        | Ok s -> print_ast ~pp:Printast.interface @@
+        begin match x with
+        | None -> print_last_pos (); failwith "x"
+        | Some s -> print_ast ~pp:Printast.interface @@
             Pc_syntax.Parsetree_mapping.signature !mapping s
-    else
-        failwith filename
-    end;
+        end
+    | _ -> failwith filename

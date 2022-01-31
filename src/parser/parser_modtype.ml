@@ -3,14 +3,13 @@ open Sigs
 open Parsetree
 open Ast_helper
 open Basic
-open APos
 
 module Make
-        (Ext: EXT)
+        (APos: APOS)
         (Utils: UTILS) (Core: CORE) (Type: TYPE) (Expression: EXPRESSION) (Modexpr: MODEXPR)
         : MODTYPE = struct
 
-    open Ext
+    open APos
     open Utils
     open Core
     open Type
@@ -23,8 +22,8 @@ module Make
             let modtype_with = getter.get @@ fun (module M: MODTYPE) -> M.modtype_with
 
             let modtype_atom =
-                Named.p "modtype:atom" begin
-                    Peek.first
+                named "modtype:atom" begin
+                    peek_first
                     [
                         with_loc & parens & mapping mty_loc
                         +modtype_with
@@ -65,7 +64,7 @@ module Make
                         +attrs_ -ng +modtype -ng +tail
                 in
 
-                Named.p "modtype:functor" begin
+                named "modtype:functor" begin
                         mty_attrs & with_loc &
                         s"(" >> ng >> with_functor_args
 
@@ -89,7 +88,7 @@ module Make
                 in
 
                 let with_constraint =
-                    Named.p "with constraint" begin
+                    named "with constraint" begin
                             mapping begin fun name decl ->
                                 let str = match [@warning "-8"] name.Location.txt with
                                     | Longident.Lident s -> s
@@ -122,7 +121,7 @@ module Make
                 +modtype_functor -ng -k"with" +(seq ~n:1 ~sep:(ng >> k"and") (ng >> with_constraint))
 
             let modtype_with =
-                Named.p "modtype:with"
+                named "modtype:with"
                 (modtype_with <|> modtype_functor)
         end : MODTYPE)
 

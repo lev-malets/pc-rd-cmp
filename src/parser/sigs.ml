@@ -1,15 +1,11 @@
-
-open Basic
 open Parsetree
+open Basic
 
-module type EXT = sig
-    module Named: Angstrom_pos.Sigs.NAMED with module Parser = APos.Parser
-    module Peek: Angstrom_pos.Sigs.PEEK with module Parser = APos.Parser
-end
+module type APOS = Angstrom_pos.S with module Parser = Basic.Parser
 
 module type PARSE = sig
-    val parse_interface : src:string -> filename:string -> (signature, string) result
-    val parse_implementation : src:string -> filename:string -> (structure, string) result
+    val parse_interface : src:string -> filename:string -> signature option
+    val parse_implementation : src:string -> filename:string -> structure option
 end
 
 module type CORE = sig
@@ -31,21 +27,13 @@ module type CORE = sig
 end
 
 module type CONSTANT = sig
-    module Number : sig
-        val p : constant parser
-    end
+    val number : constant parser
+    val character : constant parser
+    val string_raw : string parser
+    val string : constant parser
+    val string_multiline : q:string -> constant parser
 
-    module Character : sig
-        val p : constant parser
-    end
-
-    module String : sig
-        val string : string parser
-        val multiline : q:char -> constant parser
-        val p : constant parser
-    end
-
-    val p : constant parser
+    val constant : constant parser
 end
 
 module type UTILS = sig
@@ -64,7 +52,6 @@ module type UTILS = sig
     val del_pos : Lexing.position parser
     val del : unit parser
     val with_del : (Location.t -> 'a) parser -> 'a parser
-    val s : string -> string parser
 
     val identifier's_character : char -> bool
     val k : string -> unit parser
@@ -74,7 +61,6 @@ module type UTILS = sig
     val op_alias : string -> string -> Longident.t parser
 
     val ident : string parser
-
     val l_ident : string parser
     val u_ident : string parser
 
@@ -82,6 +68,17 @@ module type UTILS = sig
     val u_longident : Longident.t parser
     val l_longident : Longident.t parser
     val exact_longident : Longident.t -> unit parser
+
+    val na_hlp : (?loc:Warnings.loc -> 'a -> 'b) -> ('a -> Location.t -> 'b) parser
+    val hlp : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) -> ('a -> Location.t -> 'b) parser
+    val hlp2 : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c ) -> ('a -> 'b -> Location.t -> 'c) parser
+    val hlp3 : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) -> ('a -> 'b -> 'c -> Location.t -> 'd) parser
+    val hlp4 : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) -> ('a -> 'b -> 'c -> 'd -> Location.t -> 'e) parser
+
+    val hlp_a : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) -> (attributes -> 'a -> Location.t -> 'b) parser
+    val hlp2_a : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c ) -> (attributes -> 'a -> 'b -> Location.t -> 'c) parser
+    val hlp3_a : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) -> (attributes -> 'a -> 'b -> 'c -> Location.t -> 'd) parser
+    val hlp4_a : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) -> (attributes -> 'a -> 'b -> 'c -> 'd -> Location.t -> 'e) parser
 end
 
 module type MODTYPE = sig

@@ -1,9 +1,8 @@
+open Base
 
 module Make(T: sig type s end) = struct
-    module Parser = Sigs.MkParser(struct type s = T.s end)
+    module Parser = Sigs.MkParser(T)
     open Parser
-
-    let (!!) = Lazy.force
 
     module Angstrom = struct
         module Angstrom_ = Angstrom_mod.Angstrom.Make(struct type s = Parser.Angstrom.s end)
@@ -23,11 +22,17 @@ module Make(T: sig type s end) = struct
             }
     end
 
-
     type 'b getter = { get: 'a. ('b -> 'a Parser.t) -> 'a Parser.t }
 
+    module Id = struct
+        let fail = 0
+
+        let next = ref 1
+        let get () = let x = !next in next := x + 1; x
+    end
+
     let print_info p =
-        print_endline @@
+        Caml.print_endline @@
         match p.info with
         | Unknown -> "unknown"
         | Empty -> "empty"
@@ -49,7 +54,7 @@ module Make(T: sig type s end) = struct
                    p1
         in
 
-        { p; info; typ }
+        { p; info; typ; id = Id.get() }
 
     let (>>) p1 p2 =
         match p1.typ, p2.typ with
@@ -105,6 +110,7 @@ module Make(T: sig type s end) = struct
                 }
             end
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let (<*>) pf pv =
@@ -129,6 +135,7 @@ module Make(T: sig type s end) = struct
         ; typ =
             Value
             { v; p }
+        ; id = Id.get()
         }
     let (>>=) p f =
         let info =
@@ -140,16 +147,20 @@ module Make(T: sig type s end) = struct
         { p = Angstrom.(p.p >>= f)
         ; info
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let (>>|) p f =
         { p with p = Angstrom.(p.p >>| f)
         ; typ = Parser
+        ; id = Id.get()
         }
 
-    let parse_string p state ?(filename = "none") =
+    let parse_string p state ?(filename = "none") text =
         let open Angstrom in
-        parse_string ~consume:All p.p (State.make filename state)
+        match parse_string ~consume:All p.p (State.make filename state) text with
+        | Ok x -> Some x
+        | _ -> None
 
     let make_position pos s =
         let open State in
@@ -171,6 +182,7 @@ module Make(T: sig type s end) = struct
             { p = { run = fun i -> (Lazy.force p).p.run i }
             ; info = Unknown
             ; typ = Parser
+            ; id = Id.get()
             }
         in
         Lazy.force p
@@ -182,6 +194,7 @@ module Make(T: sig type s end) = struct
                 { p = { run = fun i -> (get @@ Lazy.force res).p.run i }
                 ; info = Unknown
                 ; typ = Parser
+                ; id = Id.get()
                 }
             }
         in
@@ -191,12 +204,14 @@ module Make(T: sig type s end) = struct
         { p = Angstrom.(return x)
         ; info = Empty
         ; typ = Return x
+        ; id = Id.get()
         }
     let advance i =
         if i = 0 then
             { p = Angstrom.(advance 0)
             ; info = Empty
             ; typ = Return ()
+            ; id = Id.get()
             }
         else
             let p = Angstrom.(advance i) in
@@ -206,15 +221,17 @@ module Make(T: sig type s end) = struct
                 ; first = Charset.full
                 }
             ; typ = Value { v = (); p }
+            ; id = Id.get()
             }
 
-    let fail =
+    let fail: 'a. 'a Parser.t =
         { p =
             { run = fun input pos state more fail _succ ->
                 fail input pos state more [] ""
             }
         ; info = Unknown
         ; typ = Parser
+        ; id = Id.fail
         }
 
     let any_char =
@@ -224,12 +241,14 @@ module Make(T: sig type s end) = struct
             ; first = Charset.full
             }
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let peek_char =
         { p = Angstrom.peek_char
         ; info = Unknown
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let char c =
@@ -240,10 +259,11 @@ module Make(T: sig type s end) = struct
             ; first = Charset.singleton c
             }
         ; typ = Value { v = c; p }
+        ; id = Id.get()
         }
 
     let string s =
-        if s = "" then
+        if String.(s = "") then
             return ""
         else
             let p = Angstrom.string s in
@@ -253,6 +273,7 @@ module Make(T: sig type s end) = struct
                 ; first = Charset.singleton s.[0]
                 }
             ; typ = Value { v = s; p }
+            ; id = Id.get()
             }
 
     let mk_first_test f =
@@ -260,7 +281,7 @@ module Make(T: sig type s end) = struct
             function
             | 256 -> set
             | i ->
-                let c = Char.chr i in
+                let c = Char.of_int_exn i in
                 let newset =
                     if f c then Charset.add set c
                     else set
@@ -276,6 +297,7 @@ module Make(T: sig type s end) = struct
             ; first = mk_first_test f
             }
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let take_while1 f =
@@ -285,6 +307,7 @@ module Make(T: sig type s end) = struct
             ; first = mk_first_test f
             }
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let skip f =
@@ -294,6 +317,7 @@ module Make(T: sig type s end) = struct
             ; first = mk_first_test f
             }
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let skip_while f =
@@ -303,6 +327,7 @@ module Make(T: sig type s end) = struct
             ; first = mk_first_test f
             }
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let satisfy f =
@@ -312,18 +337,21 @@ module Make(T: sig type s end) = struct
             ; first = mk_first_test f
             }
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let pos =
         { p = Angstrom.with_state make_position
         ; info = Empty
         ; typ = Parser
+        ; id = Id.get()
         }
     let advance_line =
         let p = Angstrom.state_map (fun pos s -> State.{s with line = { no = s.line.no + 1; start = pos }}) in
         { p
         ; info = Empty
         ; typ = Value { v = (); p }
+        ; id = Id.get()
         }
 
     let new_line =
@@ -356,7 +384,7 @@ module Make(T: sig type s end) = struct
                     | '\n' -> loop (lines + 1) (pos + 1) @@ pos + 1
                     | '\t' -> loop lines start @@ pos + 1
                     | '\r' ->
-                        begin match pos + 1 < len && char (pos + 1) = '\n' with
+                        begin match pos + 1 < len && Char.(char (pos + 1) = '\n') with
                         | true -> loop (lines + 1) (pos + 2) @@ pos + 2
                         | false -> fail input pos state more [] "ws_pos"
                         end
@@ -373,6 +401,7 @@ module Make(T: sig type s end) = struct
             ; first = Charset.of_list [' '; '\n'; '\t'; '\r']
             }
         ; typ = Value { v = (); p = whitespace }
+        ; id = Id.get()
         }
 
     let with_literal p =
@@ -386,22 +415,26 @@ module Make(T: sig type s end) = struct
                 (v, str)
             end
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let consumed p =
         { p with p = Angstrom.consumed p.p
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let state_get =
         { p = Angstrom.(state_get >>| (fun s -> s.custom))
         ; info = Empty
         ; typ = Parser
+        ; id = Id.get()
         }
     let state_map f =
         { p = Angstrom.(state_map (fun _pos s -> {s with custom = f s.custom}))
         ; info = Empty
         ; typ = Parser
+        ; id = Id.get()
         }
     let state_set custom = state_map (fun _ -> custom)
 
@@ -419,6 +452,7 @@ module Make(T: sig type s end) = struct
             }
         ; info = Empty
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let opt p =
@@ -430,6 +464,7 @@ module Make(T: sig type s end) = struct
             | Consume p -> Consume {p with empty = true}
             end
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let seq ?(n=0) ?sep ?(trail = false) p =
@@ -488,6 +523,7 @@ module Make(T: sig type s end) = struct
             end
         ; info
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let trail = true
@@ -518,6 +554,7 @@ module Make(T: sig type s end) = struct
         { p = Angstrom.exec f
         ; info = Empty
         ; typ = Parser
+        ; id = Id.get()
         }
 
     let fold_left_0_n ~f nil p =
@@ -535,23 +572,13 @@ module Make(T: sig type s end) = struct
             end
         ; info
         ; typ = Parser
+        ; id = Id.get()
         }
 
-
-
-    let fold_left_0_1 ~f ~fr nil p =
+    let fold_left_0_1 ~f nil p =
             (mapping f <*> nil <*> p)
         <|> nil
-        >>| fr
 
-(*
-    let fold_right_0_n ~f p nil =
-        fix @@ fun loop ->
-            map2 p loop
-            ~f:begin fun p acc -> f p acc end
-            <|>
-            nil
-*)
     let fold_left_cont_0_n nil cont =
         let tail = fix @@ fun tail ->
             mapping begin fun cont tail ->
@@ -578,17 +605,136 @@ module Make(T: sig type s end) = struct
         end
         +nil +opt(cont)
 
-    let wrapped start final p =
-        { p with p = (start >> p << final <|> (final >> fail)).p }
-
     let (&&) v f =
         mapping (fun v f -> f v) <*> v <*> f
 
-    let alt xs = List.fold_right (<|>) xs fail
     let (||) = (<|>)
     let (&) = (@@)
 
     let with_loc p =
         mapping begin fun p1 f p2 -> f (make_location p1 p2) end
         +pos +p +pos
+
+    let peek_first (expected: 'a Parser.t list): 'a Parser.t =
+        let arr = Array.create ~len:256 Angstrom.(fail "") in
+        let first = ref Charset.empty in
+
+        let rec loop =
+            function
+            | [] -> ()
+            | p::xs ->
+                let p_first =
+                    match p.info with
+                    | Consume {empty=false; first} -> first
+                    | _ -> failwith ""
+                in
+
+                first := Charset.union !first p_first;
+
+                loop xs;
+
+                p_first |> Charset.iter_code
+                    begin fun c ->
+                        arr.(c) <- Angstrom.(p.p <|> arr.(c))
+                    end
+        in
+        loop expected;
+
+        { p = Angstrom.(peek_char_fail >>= fun c -> arr.(Char.to_int c))
+        ; info =
+            Consume
+            { empty = false
+            ; first = !first
+            }
+        ; typ = Parser
+        ; id = Id.get()
+        }
+
+    module MemoKey = struct
+        type t = int * int * int
+
+        let compare (h1, l1, p1) (h2, l2, p2) =
+            let c1 = compare h1 h2 in
+            if c1 <> 0 then c1 else
+
+            let c2 = compare l1 l2 in
+            if c2 <> 0 then c2 else
+
+            compare p1 p2
+
+        let sexp_of_t (h, l, p) = sexp_of_list Int.sexp_of_t [h; l; p]
+
+        let hash (_, _, p) = p
+    end
+
+    let memoid2id = Hashtbl.create (module Int)
+    let id2memoid = Hashtbl.create (module Int)
+
+    let memo p =
+        let open Parser in
+
+        let table = Hashtbl.create (module MemoKey) in
+        let id = Id.get() in
+
+        let _ = Hashtbl.add memoid2id ~key:id ~data:p.id in
+        let _ = Hashtbl.add id2memoid ~data:id ~key:p.id in
+
+        { p with
+            id;
+            p = { run = fun input pos state more fail succ ->
+                let input_i: int = Caml.Obj.magic (Caml.Obj.repr input) in
+                let input_hi = input_i lsr 4 in
+                let input_li = input_i land 4 in
+
+                let key = (input_hi, input_li, pos) in
+                match Hashtbl.find table key with
+                | Some x ->
+                    (match x with
+                    | Ok (input', pos', state', more', v) -> succ input' pos' state' more' v
+                    | Error (input', pos', state', more', marks', msg') -> fail input' pos' state' more' marks' msg'
+                    )
+                | None ->
+                    let succ' input' pos' state' more' v =
+                        let _ = Hashtbl.add_exn table ~key ~data:(Ok (input', pos', state', more', v)) in
+                        succ input' pos' state' more' v
+                    in
+                    let fail' input' pos' state' more' marks' msg' =
+                        Hashtbl.add_exn table ~key ~data:(Error (input', pos', state', more', marks', msg'));
+                        fail input' pos' state' more' marks' msg'
+                    in
+                    p.p.run input pos state more fail' succ'
+            };
+        }
+
+    let name2id = Hashtbl.create (module String)
+    let id2name = Hashtbl.create (module Int)
+
+    let named (name: string) p =
+        let id = Id.get() in
+        Hashtbl.add_exn name2id ~key:name ~data:id;
+        Hashtbl.add_exn id2name ~key:id ~data:name;
+        {p with id}
+
+    let s =
+        Fix.Memoize.String.memoize @@ fun x ->
+        named ("\'" ^ x ^ "\'") begin
+            match String.length x with
+            | 0 -> return ""
+            | 1 -> char x.[0] >>$ x
+            | _ -> string x
+        end
+
+
+    let rec name_of_id id =
+        match Hashtbl.find memoid2id id with
+        | Some id ->
+            let name = name_of_id id in
+            name ^ "*"
+        | None ->
+            begin match Hashtbl.find id2name id with
+            | Some x -> x
+            | None -> "_unnamed_"
+            end
+
+    let name_of p = name_of_id p.id
 end

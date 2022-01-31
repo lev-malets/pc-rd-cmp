@@ -1,36 +1,15 @@
 open Base
 open Basic
-open APos
 open Parsetree
 open Sigs
 open Ast_helper
 open Asttypes
 
-module Mapping = struct
-    let type_first =
-        mapping begin fun attrs eflag rec_flag decl ->
-            let decl =
-                match eflag with
-                | None -> decl
-                | Some loc -> tdecl_add_attr "genType" ~loc decl
-            in
-            rec_flag, {decl with ptype_attributes = attrs @ decl.ptype_attributes}
-        end
+module Make (APos: APOS) = struct
+    module Utils = Parser_utils.Make(APos)
 
-    let type_other =
-        mapping begin fun attrs eflag decl ->
-            let decl =
-                match eflag with
-                | None -> decl
-                | Some loc -> tdecl_add_attr "genType" ~loc decl
-            in
-            {decl with ptype_attributes = attrs @ decl.ptype_attributes}
-        end
-end
-
-module Make (Ext: EXT) = struct
-    module Utils = Parser_utils.Make(Ext.Named)
     open Utils
+    open APos
 
     type parsers =
         {
@@ -42,9 +21,8 @@ module Make (Ext: EXT) = struct
         }
 
     let parsers = fix_poly @@ fun getter ->
-        let open Ext in
-
-        let module Constant = Parser_constant.Make(Ext)(Utils) in
+        let module Constant = Parser_constant.Make(APos) in
+        let open Constant in
         let open Utils in
 
         let payload = getter.get @@ fun x -> x.payload in
@@ -52,7 +30,7 @@ module Make (Ext: EXT) = struct
 
         let id_payload_pair start =
             mapping t2
-            <*> loc (s start >> attrubute_id) <*> payload
+            +loc(s start >> attrubute_id) +payload
         in
 
         let module Core: CORE =
@@ -60,14 +38,14 @@ module Make (Ext: EXT) = struct
                 let signature = getter.get @@ fun x -> x.signature
                 let structure = getter.get @@ fun x -> x.structure
 
-                let attribute = Named.p "attribute" @@ id_payload_pair "@"
-                let extension = Named.p "extension" @@ id_payload_pair "%"
+                let attribute = named "attribute" @@ id_payload_pair "@"
+                let extension = named "extension" @@ id_payload_pair "%"
 
                 let attrs_ =
-                    Named.p "attrs" @@
+                    memo & named "attrs" &
                     seq ~sep:ng ~trail attribute
                 let attrs1_ =
-                    Named.p "attrs1" @@
+                    named "attrs1" @@
                     seq ~n:1 ~sep:ng ~trail attribute
 
                 let pat_attrs p =
@@ -133,19 +111,19 @@ module Make (Ext: EXT) = struct
                 let variant_tag =
                     s"#"
                     >>
-                    (ident <|> Constant.String.string <|> take_while1 (function '0'..'9' -> true | _ -> false))
+                    (ident <|> string_raw <|> take_while1 (function '0'..'9' -> true | _ -> false))
             end
         in
 
-        let module Type = Parser_type.Make (Ext) (Utils) (Constant) (Core) in
-        let module Pattern = Parser_pattern.Make (Ext) (Utils) (Constant) (Core) (Type) in
+        let module Type = Parser_type.Make (APos) (Utils) (Constant) (Core) in
+        let module Pattern = Parser_pattern.Make (APos) (Utils) (Constant) (Core) (Type) in
 
         let open Core in
         let open Type in
         let open Pattern in
 
         let payload =
-            Named.p "payload" begin
+            named "payload" begin
                     parens & mapping (fun x -> PPat (x, None))
                     -s"?" -ng +pattern
 
@@ -169,15 +147,15 @@ module Make (Ext: EXT) = struct
 
         let module Expression =
             Parser_expression.Make
-                (Ext) (Utils) (Constant)
+                (APos) (Utils) (Constant)
                 (Core) (Type) (Pattern) (Modexpr)
         in
 
         let module Modtype = Parser_modtype.Make
-            (Ext) (Utils) (Core) (Type) (Expression) (Modexpr)
+            (APos) (Utils) (Core) (Type) (Expression) (Modexpr)
         in
         let module Modexpr = Parser_modexpr.Make
-            (Ext) (Utils) (Core) (Type) (Expression) (Modtype)
+            (APos) (Utils) (Core) (Type) (Expression) (Modtype)
         in
 
         let open Modtype in
@@ -185,17 +163,17 @@ module Make (Ext: EXT) = struct
         let open Expression in
 
         let module_extension =
-            Named.p "module extension" @@
+            named "module extension" @@
             id_payload_pair "%%"
         in
 
         let module_attribute =
-            Named.p "module attribute" @@
+            named "module attribute" @@
             id_payload_pair "@@"
         in
 
         let open_ =
-            Named.p "open" &
+            named "open" &
             with_loc & mapping begin fun attrs override name loc ->
                 Opn.mk ~loc ~attrs ?docs:None ?override name
             end
@@ -203,7 +181,7 @@ module Make (Ext: EXT) = struct
         in
 
         let exception_ =
-            Named.p "top:exception" &
+            named "top:exception" &
             mapping (fun attrs constr -> {constr with pext_attributes = constr.pext_attributes @ attrs} )
             +attrs_ -k"exception" -ng +type_extension_constructor
         in
@@ -214,21 +192,35 @@ module Make (Ext: EXT) = struct
         in
 
         let modtype_base =
-            Named.p "top:modtype" & with_loc & mapping
+            named "top:modtype" & with_loc & mapping
                 (fun attrs name typ loc -> Mtd.mk ~attrs ~loc ~typ name)
             +attrs_ -k"module" -ng -k"type" -ng +loc ident -ng -s"=" -ng +modtype_with
         in
 
         let type_ mk =
             let first =
-                Mapping.type_first
+                mapping begin fun attrs eflag rec_flag decl ->
+                    let decl =
+                        match eflag with
+                        | None -> decl
+                        | Some loc -> tdecl_add_attr "genType" ~loc decl
+                    in
+                    rec_flag, {decl with ptype_attributes = attrs @ decl.ptype_attributes}
+                end
                 +attrs_ +opt(loc_of @@ k"export" << ng) -k"type" -ng
                 +(((k"rec" >> ng >>$ Recursive) <|> (k"nonrec" >> ng >>$ Nonrecursive) <|> return Nonrecursive))
                 +type_declaration
             in
 
             let other =
-                Mapping.type_other
+                mapping begin fun attrs eflag decl ->
+                    let decl =
+                        match eflag with
+                        | None -> decl
+                        | Some loc -> tdecl_add_attr "genType" ~loc decl
+                    in
+                    {decl with ptype_attributes = attrs @ decl.ptype_attributes}
+                end
                 +attrs_ -k"and" -ng +opt(loc_of @@ k"export" << ng) +type_declaration
             in
 
@@ -239,17 +231,17 @@ module Make (Ext: EXT) = struct
         in
 
         let external_ =
-            Named.p "external" begin
+            named "external" begin
                 with_loc & mapping begin fun attrs name typ prim loc ->
                     Val.mk ~loc ~attrs ?docs:None ~prim name typ
                 end
                 +attrs_ -k"external" -ng +loc l_ident -ng -s":" -ng +core_type_poly
-                -ng -s"=" +seq ~n:1 (ng >> Constant.String.string)
+                -ng -s"=" +seq ~n:1 (ng >> string_raw)
             end
         in
 
         let module_decl =
-            Named.p "module decl" begin
+            named "module decl" begin
                 let module_alias =
                     with_loc & hlp Mty.alias
                     +loc u_longident
@@ -265,12 +257,12 @@ module Make (Ext: EXT) = struct
         in
 
         let module_ =
-            Named.p "module" & with_loc &
+            named "module" & with_loc &
             attrs_ && k"module" >> ng >> module_decl
         in
 
         let module_rec =
-            Named.p "module rec" begin
+            named "module rec" begin
                 let first =
                     with_loc & attrs_ &&
                     k"module" >> ng >> k"rec" >> ng >> module_decl
@@ -286,7 +278,7 @@ module Make (Ext: EXT) = struct
         in
 
         let import =
-            Named.p "import" begin
+            named "import" begin
                 let item =
                     with_loc & mapping begin fun name alias typ loc attrs ->
                         let alias = Option.value alias ~default:name in
@@ -313,7 +305,7 @@ module Make (Ext: EXT) = struct
 
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    +attrs_ -k"import" -ng +list -ng -k"from" -ng +loc Constant.String.string
+                    +attrs_ -k"import" -ng +list -ng -k"from" -ng +loc string_raw
 
                 ||  with_loc & mapping begin fun attrs item name loc ->
                         let attr =
@@ -323,7 +315,7 @@ module Make (Ext: EXT) = struct
                         let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    +attrs_ -k"import" -ng +item -ng -k"from" -ng +loc Constant.String.string
+                    +attrs_ -k"import" -ng +item -ng -k"from" -ng +loc string_raw
 
                 ||  with_loc & mapping begin fun attrs list names loc ->
                         let attr =
@@ -370,10 +362,10 @@ module Make (Ext: EXT) = struct
         in
 
         let signature =
-            Named.p "sig" begin
+            named "sig" begin
                 seq ~sep:ng
                 (
-                    Peek.first
+                    peek_first
                     [
                         with_del & na_hlp Sig.attribute
                         +module_attribute
@@ -383,22 +375,22 @@ module Make (Ext: EXT) = struct
                         with_del & hlp_a Sig.extension
                         +attrs_ +module_extension
                     ;
-                        Named.p "sig:exception" & with_del & na_hlp Sig.exception_
+                        named "sig:exception" & with_del & na_hlp Sig.exception_
                         +exception_
                     ;
                         with_del & na_hlp Sig.value
                         +external_
                     ;
-                        Named.p "sig:include" & with_del & na_hlp Sig.include_
+                        named "sig:include" & with_del & na_hlp Sig.include_
                         +include_ modtype_with
                     ;
-                        Named.p "sig:value" & with_del & na_hlp Sig.value
+                        named "sig:value" & with_del & na_hlp Sig.value
                         +(
                             with_loc & hlp2_a (Val.mk ?docs:None ?prim:None)
                             +attrs_ -k"let" -ng +loc l_ident -ng -s":" -ng +core_type_poly
                         )
                     ;
-                        Named.p "sig:modtype" & with_del & na_hlp Sig.modtype
+                        named "sig:modtype" & with_del & na_hlp Sig.modtype
                         +(
                                 modtype_base
 
@@ -420,11 +412,11 @@ module Make (Ext: EXT) = struct
         in
 
         let value_str =
-            Named.p "str:value" begin
+            named "str:value" begin
                 let lat = k"type" >> seq ~n:1 (ng >> loc l_ident) << ng << s"." in
 
                 let with_lat =
-                    Named.p "str:value:vb:lat" begin
+                    named "str:value:vb:lat" begin
                         mapping begin fun p1 attrs pat types typ expr vb_attrs vb_loc ->
                             let mapping =
                                 { Parsetree_mapping.default with
@@ -520,7 +512,7 @@ module Make (Ext: EXT) = struct
         in
 
         let module_binding =
-            Named.p "str:mb" begin
+            named "str:mb" begin
                 with_loc &
                 attrs_ && k"module" >> ng >> module_binding_helper
             end
@@ -536,58 +528,57 @@ module Make (Ext: EXT) = struct
                 attrs_ && k"and" >> ng >> module_binding_helper
             in
 
-            Named.p "str:mb:rec" begin
+            named "str:mb:rec" begin
                 mapping cons
                 +first +seq (ng >> other)
             end
         in
 
         let structure =
-            Named.p "str" begin
-                seq ~sep:ng
-                (
-                    Peek.first
-                    [
-                        with_del & na_hlp Str.attribute
-                        +module_attribute
-                    ;
-                        with_del & na_hlp Str.rec_module
-                        +rec_module_binding
-                    ; value_str
-                    ;
-                        with_del & hlp_a Str.extension
-                        +attrs_ +module_extension
-                    ;
-                        Named.p "str:exception" & with_del & na_hlp Str.exception_
-                        +exception_
-                    ;
-                        with_del & na_hlp Str.primitive
-                        +external_
-                    ;
-                        with_del & na_hlp Str.include_
-                        +import
-                    ;
-                        Named.p "str:include" & with_del & na_hlp Str.include_
-                        +include_ modexpr
-                    ;
-                        with_del & na_hlp Str.module_
-                        +module_binding
-                    ;
-                        Named.p "str:modtype" & with_del & na_hlp Str.modtype
-                        +modtype_base
-                    ;
-                        with_del & na_hlp Str.open_
-                        +open_
-                    ;
-                        with_del & na_hlp Str.type_extension
-                        +type_extension
-                    ; type_ Str.type_
-                    ;
-                        with_del & hlp_a Str.eval
-                        +attrs_ +expression_arrow
-                    ]
-                )
-            end
+            memo & named "str" &
+            seq ~sep:ng
+            (
+                peek_first
+                [
+                    with_del & na_hlp Str.attribute
+                    +module_attribute
+                ;
+                    with_del & na_hlp Str.rec_module
+                    +rec_module_binding
+                ; value_str
+                ;
+                    with_del & hlp_a Str.extension
+                    +attrs_ +module_extension
+                ;
+                    named "str:exception" & with_del & na_hlp Str.exception_
+                    +exception_
+                ;
+                    with_del & na_hlp Str.primitive
+                    +external_
+                ;
+                    with_del & na_hlp Str.include_
+                    +import
+                ;
+                    named "str:include" & with_del & na_hlp Str.include_
+                    +include_ modexpr
+                ;
+                    with_del & na_hlp Str.module_
+                    +module_binding
+                ;
+                    named "str:modtype" & with_del & na_hlp Str.modtype
+                    +modtype_base
+                ;
+                    with_del & na_hlp Str.open_
+                    +open_
+                ;
+                    with_del & na_hlp Str.type_extension
+                    +type_extension
+                ; type_ Str.type_
+                ;
+                    with_del & hlp_a Str.eval
+                    +attrs_ +expression_arrow
+                ]
+            )
         in
 
         {
@@ -607,21 +598,3 @@ module Make (Ext: EXT) = struct
     let parse_interface = parse (ng >> parsers.signature << ng) State.default
     let parse_implementation = parse (ng >> parsers.structure << ng) State.default
 end
-
-let memo_spec =
-    [ "expression"
-    ; "expression:arrow"
-    ; "expression:in_braces"
-    ; "expression:p0"
-    ; "expression:p8"
-    ; "expression:sequence"
-    ; "typexpr"
-    ; "typexpr:atom"
-    ; "typexpr:arrow"
-    ; "str"
-    ; "nongrammar"
-    ; "attrs"
-    ; "pattern"
-    ; "expression:object:set"
-    ; "const:number"
-    ]

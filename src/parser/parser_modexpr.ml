@@ -3,49 +3,52 @@ open Sigs
 open Parsetree
 open Ast_helper
 open Basic
-open APos
 
 module Make
-        (Ext: EXT)
+        (APos: APOS)
         (Utils: UTILS) (Core: CORE) (Type: TYPE) (Expression: EXPRESSION) (Modtype: MODTYPE)
         : MODEXPR = struct
 
-    open Ext
+    open APos
     open Utils
     open Core
     open Type
     open Expression
     open Modtype
 
+    module Parser = APos.Parser
+
     let x = fix_poly @@ fun getter ->
         (module struct
+            module Parser = APos.Parser
+
             let modexpr = getter.get @@ fun (module M: MODEXPR) -> M.modexpr
 
             let modexpr_constrainted =
-                Named.p "modexpr:constrainted" @@
+                named "modexpr:constrainted" @@
                 fold_left_cont_0_1
                     modexpr
                     (
                         mapping begin fun typ prev ->
-                            Mod.constraint_ ~loc:(comb_location prev.pmod_loc typ.pmty_loc) prev typ
+                            Mod.constraint_ ~loc:(loc_comb prev.pmod_loc typ.pmty_loc) prev typ
                         end
                         -ng -s":" -ng +modtype
                     )
 
             let atom =
-                Named.p "modexpr:atom" begin
+                named "modexpr:atom" begin
                     let unpack_constr =
                         fold_left_cont_0_1
                             expression
                             (
                                 mapping begin fun typ prev ->
-                                    Exp.constraint_ ~loc:(comb_location prev.pexp_loc typ.ptyp_loc) prev typ
+                                    Exp.constraint_ ~loc:(loc_comb prev.pexp_loc typ.ptyp_loc) prev typ
                                 end
                                 -ng -s":" -ng +core_type_package
                             )
                     in
 
-                    Peek.first
+                    peek_first
                     [
                         with_loc & hlp Mod.unpack
                         -k"unpack" -ng -s"(" -ng +unpack_constr -ng -s")"
@@ -62,7 +65,7 @@ module Make
                 end
 
             let apply =
-                Named.p "modexpr:apply" begin
+                named "modexpr:apply" begin
                     let genarg =
                         with_loc & mapping (fun loc -> Mod.structure ~loc [])
                         -s"(" -ng -s")"
@@ -75,7 +78,7 @@ module Make
                             (
                                 mapping begin fun arg prev ->
                                     Mod.apply
-                                        ~loc:(comb_location prev.pmod_loc arg.pmod_loc)
+                                        ~loc:(loc_comb prev.pmod_loc arg.pmod_loc)
                                         prev arg
                                 end
                                 +arg
@@ -84,7 +87,7 @@ module Make
                                 mapping begin fun arg cont prev ->
                                     let prev = cont prev in
                                     Mod.apply
-                                        ~loc:(comb_location prev.pmod_loc arg.pmod_loc)
+                                        ~loc:(loc_comb prev.pmod_loc arg.pmod_loc)
                                         prev arg
                                 end
                                 -ng -s"," -ng +arg
@@ -104,7 +107,7 @@ module Make
                 end
 
             let functor_ =
-                Named.p "modexpr:functor" begin
+                named "modexpr:functor" begin
                     let tail =
                             mapping begin fun mt me ->
                                 Mod.constraint_ ~loc:me.pmod_loc me mt
@@ -135,13 +138,13 @@ module Make
                 end
 
             let structure =
-                Named.p "modexpr:structure" begin
+                named "modexpr:structure" begin
                     with_loc & hlp Mod.structure
                     -s"{" -ng +structure -ng -s"}"
                 end
 
             let modexpr =
-                Named.p "modexpr" begin
+                named "modexpr" begin
                     functor_ <|> apply <|> structure
                 end
         end : MODEXPR)

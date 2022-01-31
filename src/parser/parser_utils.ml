@@ -1,19 +1,10 @@
 open Base
-open Basic
-open APos
+open Parsetree
+
 open Sigs
 
-module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Parser): UTILS = struct
-    let s =
-        Fix.Memoize.String.memoize @@ fun x ->
-        Named.p ("\'" ^ x ^ "\'") begin
-            begin
-                match String.length x with
-                | 0 -> return ""
-                | 1 -> char x.[0] >>$ x
-                | _ -> string x
-            end
-        end
+module Make (APos: APOS): UTILS = struct
+    open APos
 
     let single_line_comment =
         let p = s"//" >> take_while (function '\n' | '\r' -> false | _ -> true) in
@@ -43,14 +34,13 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
         in
         seq (push_comment single_line_comment <|> push_comment multi_line_comment) >>$ ()
     let ng =
-        Named.p "nongrammar" begin
-            whitespace << comments
-        end
+        memo & named "nongrammar" &
+        whitespace << comments
 
     let ng_no_new_line =
         (
             mapping t2
-            <*> pos << ng <*> pos
+            +pos -ng +pos
         )
         >>=
         fun (p1, p2) ->
@@ -62,7 +52,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
     let ng_new_line =
         (
             mapping t2
-            <*> pos << ng <*> pos
+            +pos -ng +pos
         )
         >>=
         fun (p1, p2) ->
@@ -72,7 +62,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
             | false -> return ()
 
     let del_pos =
-        (mapping t2 <*> pos << ng <*> peek_char)
+        (mapping t2 +pos -ng +peek_char)
         >>=
         fun (p1, c) ->
             let open Angstrom in
@@ -88,7 +78,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
                 | false -> return p1
 
     let del =
-        (mapping t2 <*> pos << ng <*> peek_char)
+        (mapping t2 +pos -ng +peek_char)
         >>=
         fun (p1, c) ->
             let open Angstrom in
@@ -131,12 +121,12 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
 
     let sep = ng >> s"," >> ng
 
-    let ident = Named.p "ident" @@
+    let ident = named "ident" @@
         take_while1 identifier's_character
     let c_ident first = consumed (skip first >> skip_while identifier's_character)
 
-    let l_ident = Named.p "l_ident" @@ (failed @@ k"_") >> c_ident lower
-    let u_ident = Named.p "u_ident" @@ c_ident upper
+    let l_ident = named "l_ident" @@ (failed @@ k"_") >> c_ident lower
+    let u_ident = named "u_ident" @@ c_ident upper
 
     let u_longident =
         fold_left_0_n ~f:begin fun lid str -> Longident.Ldot (lid, str) end
@@ -145,7 +135,7 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
 
     let l_longident =
             mapping (fun a b -> Longident.Ldot (a, b))
-            <*> u_longident << ng << s"." << ng <*> l_ident
+            +u_longident -ng -s"." -ng +l_ident
 
         || l_ident >>| fun s -> Longident.Lident s
 
@@ -175,4 +165,31 @@ module Make (Named: Angstrom_pos.Sigs.NAMED with module Parser = Basic.APos.Pars
     let brackets p = s"[" >> ng >> p << ng << s"]"
     let braces p = s"{" >> ng >> p << ng << s"}"
     let chevrons p = s"<" >> ng >> p << ng << s">"
+
+    let na_hlp (f: ?loc:Warnings.loc -> 'a -> 'b) =
+        return @@ fun a loc -> f ~loc a
+
+    let hlp (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) =
+        return @@ fun a loc -> f ~loc a
+
+    let hlp2 (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) =
+        return @@ fun a b loc -> f ~loc a b
+
+    let hlp3 (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) =
+        return @@ fun a b c loc -> f ~loc a b c
+
+    let hlp4 (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) =
+        return @@ fun a b c d loc -> f ~loc a b c d
+
+    let hlp_a (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) =
+        return @@ fun attrs a loc -> f ~loc ~attrs a
+
+    let hlp2_a (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) =
+        return @@ fun attrs a b loc -> f ~attrs ~loc a b
+
+    let hlp3_a (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) =
+        return @@ fun attrs a b c loc -> f ~attrs ~loc a b c
+
+    let hlp4_a (f: ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) =
+        return @@ fun attrs a b c d loc -> f ~attrs ~loc a b c d
 end

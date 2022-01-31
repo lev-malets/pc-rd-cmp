@@ -4,47 +4,15 @@ open Asttypes
 open Parsetree
 open Ast_helper
 open Basic
-open APos
-
-module Mapping = struct
-    let type_declaration_kind_manifest =
-        mapping begin fun name params manifest priv kind cstrs loc ->
-            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-            Type.mk ~loc
-                ?docs:None ?text:None ?params ?cstrs ~kind ?priv ~manifest name
-        end
-
-    let type_declaration_manifest =
-        mapping begin fun name params priv manifest cstrs loc ->
-            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-            Type.mk ~loc ?params ?cstrs ?priv ~manifest name
-        end
-
-    let type_declaration_kind =
-        mapping begin fun name params priv kind cstrs loc ->
-            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-            Type.mk ~loc ?params ?cstrs ~kind ?priv name
-        end
-
-    let type_declaration_abstract =
-        mapping begin fun name params loc ->
-            Type.mk ~loc ?params name
-        end
-
-    let type_extension =
-        mapping begin fun attrs name params priv hd tail ->
-            let priv = Opt.set Private priv in
-            Te.mk ~attrs ?params ?priv name (hd::tail)
-        end
-end
 
 module Make
-        (Ext: EXT)
+        (APos: APOS)
         (Utils: UTILS) (Constant: CONSTANT) (Core: CORE)
         : TYPE = struct
 
-    open Ext
+    open APos
     open Utils
+    open Constant
     open Core
 
     let x =
@@ -56,7 +24,7 @@ module Make
             let core_type = getter.get @@ fun (module M: TYPE) -> M.core_type
             let core_type_poly = getter.get @@ fun (module M: TYPE) -> M.core_type_poly
             let core_type_package =
-                Named.p "typexpr:package" begin
+                named "typexpr:package" begin
                         with_loc & hlp2 Typ.package
                         +loc u_longident -ng -k"with"
                         +(
@@ -81,7 +49,7 @@ module Make
                 -s"_"
 
             let constr =
-                Named.p "typexpr:constr" begin
+                named "typexpr:constr" begin
                         with_loc & hlp2 Typ.constr
                         +loc l_longident -ng -s"<" -ng +(seq ~n:1 core_type ~sep ~trail) -ng -s">"
 
@@ -98,10 +66,10 @@ module Make
                 +loc (s"()" >>$ Longident.Lident "unit")
 
             let bs_object =
-                Named.p "typexpr:bso" begin
+                named "typexpr:bso" begin
                     let object_field =
                             mapping begin fun attrs name typ -> Otag (name, attrs, typ) end
-                            +attrs_ +loc Constant.String.string -ng -s":" -ng +core_type_poly
+                            +attrs_ +loc string_raw -ng -s":" -ng +core_type_poly
 
                         ||  mapping begin fun typ -> Oinherit typ end
                             -s"..." -ng +core_type
@@ -121,7 +89,7 @@ module Make
                 end
 
             let variant =
-                Named.p "typexpr:variant" begin
+                named "typexpr:variant" begin
                     let constructor_arguments =
                             tuple
                         ||  s"(" >> ng >> core_type << ng << s")"
@@ -164,26 +132,25 @@ module Make
                 end
 
             let core_type_atom =
-                Named.p "typexpr:atom" begin
-                    typ_attrs @@ Peek.first
-                    [ any
-                    ; var
-                    ; unit
-                    ;
-                        with_loc & parens & mapping typ_loc
-                        +core_type
-                    ; tuple
-                    ;
-                        with_loc & mapping typ_loc
-                        -k"module" +parens(core_type_package)
-                    ; bs_object
-                    ; constr
-                    ; variant
-                    ;
-                        with_loc & hlp Typ.extension
-                        +extension
-                    ]
-                end
+                memo & named "typexpr:atom" &
+                typ_attrs & peek_first
+                [ any
+                ; var
+                ; unit
+                ;
+                    with_loc & parens & mapping typ_loc
+                    +core_type
+                ; tuple
+                ;
+                    with_loc & mapping typ_loc
+                    -k"module" +parens(core_type_package)
+                ; bs_object
+                ; constr
+                ; variant
+                ;
+                    with_loc & hlp Typ.extension
+                    +extension
+                ]
 
             let alias p =
                 fold_left_cont_0_1
@@ -195,13 +162,13 @@ module Make
                         -ng -k"as" -ng -s"'" +l_ident +pos
                     )
 
-            let aliased_atom = Named.p "typexpr:alias:atom" @@ alias core_type_atom
+            let aliased_atom = named "typexpr:alias:atom" @@ alias core_type_atom
 
             let arrow =
                 begin
                     let arrow_tail =
                         mapping begin fun typ label arg ->
-                            Typ.arrow ~loc:(comb_location arg.ptyp_loc typ.ptyp_loc) label arg typ
+                            Typ.arrow ~loc:(loc_comb arg.ptyp_loc typ.ptyp_loc) label arg typ
                         end
                         -s"=>" -ng +core_type_arrow
                     in
@@ -237,21 +204,23 @@ module Make
                             -s"," -ng +with_args core_type tail
                     in
 
-                    Named.p "typexpr:arrow:all" begin
+                    named "typexpr:arrow:all" begin
                             typ_attrs & s"(" >> ng >> s"." >> ng >> with_args core_type tail >>| typ_add_attr "bs"
                         ||  typ_attrs & s"(" >> ng >> with_args core_type tail
-                        ||  Named.p "typexpr:arrow:onearg" (with_args aliased_atom arrow_tail)
+                        ||  named "typexpr:arrow:onearg" (with_args aliased_atom arrow_tail)
                     end
                 end
 
             let core_type_arrow =
-                Named.p "typexpr:arrow"
+                memo & named "typexpr:arrow"
                 (arrow <|> core_type_atom)
 
-            let core_type = Named.p "typexpr" @@ alias core_type_arrow
+            let core_type =
+                memo & named "typexpr" &
+                alias core_type_arrow
 
             let core_type_poly =
-                Named.p "typexpr:poly" begin
+                named "typexpr:poly" begin
                         with_loc & hlp2 Typ.poly
                         +seq ~n:1 (s"\'" >> loc l_ident) ~sep:ng -ng -s"." -ng +core_type
 
@@ -259,7 +228,7 @@ module Make
                 end
 
             let label_declaration =
-                Named.p "label_declraration" begin
+                named "label_declraration" begin
                     with_loc & mapping begin fun attrs mut name typ loc ->
                         let mut = Base.Option.map mut ~f:(fun _ -> Asttypes.Mutable) in
                         let typ =
@@ -284,7 +253,7 @@ module Make
 
             let type_kind =
                 let variant =
-                    Named.p "type_kind:variant" begin
+                    named "type_kind:variant" begin
                         let constructor =
                             with_loc & mapping begin fun attrs name args res loc ->
                                 Type.constructor ~loc ~attrs ?info:None ?args:(Some args) ?res name
@@ -302,7 +271,7 @@ module Make
 
                 let open_ = s".." >>$ Ptype_open in
 
-                Named.p "type_kind" begin
+                named "type_kind" begin
                     variant <|> record <|> open_
                 end
 
@@ -329,24 +298,36 @@ module Make
 
 
             let type_declaration =
-                Named.p "type_declaration" begin
-                        Named.p "type_declaration:mankind" &
-                        with_loc & Mapping.type_declaration_kind_manifest
+                named "type_declaration" begin
+                        named "type_declaration:mankind" &
+                        with_loc & mapping begin fun name params manifest priv kind cstrs loc ->
+                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+                            Type.mk ~loc
+                                ?docs:None ?text:None ?params ?cstrs ~kind ?priv ~manifest name
+                        end
                         +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +core_type
                         -ng -s"=" -ng +opt(k"private"-ng) +type_kind +opt(ng >> type_decl_constraints)
 
-                    ||  Named.p "type_declaration:manifest" &
-                        with_loc & Mapping.type_declaration_manifest
+                    ||  named "type_declaration:manifest" &
+                        with_loc & mapping begin fun name params priv manifest cstrs loc ->
+                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+                            Type.mk ~loc ?params ?cstrs ?priv ~manifest name
+                        end
                         +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +opt(k"private"-ng) +core_type
                         +opt(ng >> type_decl_constraints)
 
-                    ||  Named.p "type_declaration:kind" &
-                        with_loc & Mapping.type_declaration_kind
+                    ||  named "type_declaration:kind" &
+                        with_loc & mapping begin fun name params priv kind cstrs loc ->
+                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+                            Type.mk ~loc ?params ?cstrs ~kind ?priv name
+                        end
                         +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +opt(k"private"-ng)
                         +type_kind +opt(ng >> type_decl_constraints)
 
-                    ||  Named.p "type_declaration:abstract" &
-                        with_loc & Mapping.type_declaration_abstract
+                    ||  named "type_declaration:abstract" &
+                        with_loc & mapping begin fun name params loc ->
+                            Type.mk ~loc ?params name
+                        end
                         +loc l_ident +opt(ng >> type_decl_params)
                 end
 
@@ -357,20 +338,22 @@ module Make
                     ||  s":" >> ng >> core_type >>| (fun x -> Pext_decl (Pcstr_tuple [], Some x))
                 in
 
-                Named.p "typexr:constructor:kind" begin
+                named "typexr:constructor:kind" begin
                         ng >> extension_kind
                     ||  return @@ Pext_decl (Pcstr_tuple [], None)
                 end
 
             let type_extension_constructor =
-                Named.p "typext:constructor" begin
+                named "typext:constructor" begin
                     with_loc & hlp2_a (Te.constructor ?docs:None ?info:None)
                     +attrs_ +loc u_ident +_extension_kind
                 end
 
             let type_extension =
-                Named.p "typext" &
-                Mapping.type_extension
+                named "typext" & mapping begin fun attrs name params priv hd tail ->
+                    let priv = Opt.set Private priv in
+                    Te.mk ~attrs ?params ?priv name (hd::tail)
+                end
                 +attrs_ -k"type" -ng +loc l_longident -ng +opt(type_decl_params-ng) -s"+=" -ng +opt(k"private"-ng)
                 -opt(s"|"-ng) +type_extension_constructor +seq (ng >> s"|" >> ng >> type_extension_constructor)
         end: TYPE)

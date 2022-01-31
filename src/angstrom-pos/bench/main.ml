@@ -1,6 +1,6 @@
+open Base
 
 module Pos = Angstrom_pos.Make(struct type s = unit end)
-module Stub_trace = Angstrom_pos.Trace.Stub (Pos)
 
 module MemoSpec = struct
     let memo_spec = ["ret"]
@@ -9,62 +9,49 @@ end
 let parse parser contents =
     fun () ->
         match Pos.parse_string (parser ()) () contents with
-        | Ok _ -> ()
+        | Some _ -> ()
         | _ -> failwith "fail to parse"
 
 let parse_nc parser contents =
     fun () ->
         match Pos.parse_string parser () contents with
-        | Ok _ -> ()
+        | Some _ -> ()
         | _ -> failwith "fail to parse"
 
 let returns =
     let open Core_bench in
-    let mk_ret spec =
-        let open Pos.Parser in
-        let open Pos in
-        let module Traced = Angstrom_pos.Trace.Memoized(Pos)(struct let memo_spec = spec end) in
-        Traced.p "n"
-        { p = Angstrom.(return ())
-        ; info = Unknown
-        ; typ = Parser
-        }
-    in
-
     Bench.make_command
     [
         Bench.Test.create ~name:"named-return"
             begin
-                let ret = mk_ret [] in
+                let ret = Pos.return () in
                 parse_nc ret ""
             end;
         Bench.Test.create ~name:"named-return128"
             begin
-                let ret = mk_ret [] in
-                parse_nc (Array.make 127 ret |> Array.fold_left Pos.(>>) ret) ""
+                let ret = Pos.return () in
+                parse_nc (Array.create ~len:127 ret |> Array.fold ~f:Pos.(>>) ~init:ret) ""
             end;
 
         Bench.Test.create ~name:"memo-named-return"
             begin
-                let ret = mk_ret ["n"] in
+                let ret = Pos.(memo @@ return ()) in
                 parse_nc ret ""
             end;
         Bench.Test.create ~name:"memo-named-return128"
             begin
-                let ret = mk_ret ["n"] in
-                parse_nc (Array.make 127 ret |> Array.fold_left Pos.(>>) ret) ""
+                let ret = Pos.(memo @@ return ()) in
+                parse_nc (Array.create ~len:127 ret |> Array.fold ~f:Pos.(>>) ~init:ret) ""
             end;
     ]
 
-module IntMap = Map.Make(struct type t = int;; let compare = compare end)
-
 let random_state = Random.State.make [|1; 2; 3|]
-let random_int () = Random.State.int random_state (Int32.to_int @@ Int32.shift_right Int32.max_int 2)
-let ints10 = lazy (Array.make 10 0 |> Array.map (fun _ -> random_int ()))
-let ints100 = lazy (Array.make 100 0 |> Array.map (fun _ -> random_int ()))
-let ints10000 = lazy (Array.make 10000 0 |> Array.map (fun _ -> random_int ()))
-let ints100000 = lazy (Array.make 100000 0 |> Array.map (fun _ -> random_int ()))
-let ints1000000 = lazy (Array.make 1000000 0 |> Array.map (fun _ -> random_int ()))
+let random_int () = Random.State.int random_state (Int32.to_int_exn @@ Int32.shift_right Int32.max_value 2)
+let ints10 = lazy (Array.create ~len:10 0 |> Array.map ~f:(fun _ -> random_int ()))
+let ints100 = lazy (Array.create ~len:100 0 |> Array.map ~f:(fun _ -> random_int ()))
+let ints10000 = lazy (Array.create ~len:10000 0 |> Array.map ~f:(fun _ -> random_int ()))
+let ints100000 = lazy (Array.create ~len:100000 0 |> Array.map ~f:(fun _ -> random_int ()))
+let ints1000000 = lazy (Array.create ~len:1000000 0 |> Array.map ~f:(fun _ -> random_int ()))
 
 let hash =
     let open Core_bench in
@@ -82,7 +69,7 @@ let hash =
                     fun `init ->
                         let x = mk_x () in
                     fun _ ->
-                        let i = (Obj.magic : _ -> int) @@ Obj.repr x in
+                        let i = (Caml.Obj.magic : _ -> int) @@ Caml.Obj.repr x in
                         let x = (i lsr 4, i land 0xF) in
                         Hashtbl.hash x
                 end;
@@ -140,22 +127,26 @@ let create_vector initial (lazy arr) =
 
 let create_map (lazy arr) =
     let len = Array.length arr in
-    let map = ref IntMap.empty in
+    let map = ref (Map.Using_comparator.empty ~comparator:Int.comparator) in
     let rec loop i =
         if i = len then !map
-        else
-            let _ = map := IntMap.add arr.(i) arr.(i) !map in
+        else begin
+            begin match Map.add ~key:arr.(i) ~data:arr.(i) !map with
+            | `Ok x -> map := x
+            | `Duplicate -> ()
+            end;
             loop (i + 1)
+        end
     in
     loop 0
 
 let create_hashtbl initial (lazy arr) =
     let len = Array.length arr in
-    let table = Hashtbl.create initial in
+    let table = Hashtbl.create (module Int) ~size:initial in
     let rec loop i =
         if i = len then table
         else begin
-            Hashtbl.add table arr.(i) arr.(i);
+            let _ = Hashtbl.add table ~key:arr.(i) ~data:arr.(i) in
             loop @@ i + 1
         end
     in
@@ -165,9 +156,8 @@ let map_hashtable =
     let open Core_bench in
     Bench.make_command
     [
-        Bench.Test.create ~name:"empty:map" @@ (fun () -> IntMap.empty);
-        Bench.Test.create ~name:"empty:hashtbl" @@ (fun () -> Hashtbl.create 0);
-        Bench.Test.create ~name:"empty:hashtbl2" @@ (fun () -> Hashtbl.create 16);
+        Bench.Test.create ~name:"empty:hashtbl" @@ (fun () -> Hashtbl.create (module Int));
+        Bench.Test.create ~name:"empty:hashtbl2" @@ (fun () -> Hashtbl.create (module Int) ~size:16);
 
         Bench.Test.create ~name:"10:map"
             begin fun () -> create_map ints10 end;
@@ -188,28 +178,25 @@ let map_hashtable =
         Bench.Test.create ~name:"10000:hashtbl"
             begin fun () -> create_hashtbl 0 ints10000 end;
 
-        Bench.Test.create ~name:"1000000:hashtbl"
-            begin fun () -> create_hashtbl 0 ints1000000 end;
-
         Bench.Test.create_with_initialization ~name:"find10:map"
-            begin fun `init -> let map = create_map ints10 in fun () -> IntMap.find_opt 745 map end;
+            begin fun `init -> let map = create_map ints10 in fun () -> Map.find map 745 end;
         Bench.Test.create_with_initialization ~name:"find10:hashtbl"
-            begin fun `init -> let table = create_hashtbl 0 ints10 in fun () -> Hashtbl.find_opt table 745 end;
+            begin fun `init -> let table = create_hashtbl 0 ints10 in fun () -> Hashtbl.find table 745 end;
 
         Bench.Test.create_with_initialization ~name:"find100:map"
-            begin fun `init -> let map = create_map ints100 in fun () -> IntMap.find_opt 745 map end;
+            begin fun `init -> let map = create_map ints100 in fun () -> Map.find map 745 end;
         Bench.Test.create_with_initialization ~name:"find100:hashtbl"
-            begin fun `init -> let table = create_hashtbl 0 ints100 in fun () -> Hashtbl.find_opt table 745 end;
+            begin fun `init -> let table = create_hashtbl 0 ints100 in fun () -> Hashtbl.find table 745 end;
 
         Bench.Test.create_with_initialization ~name:"find10000:map"
-            begin fun `init -> let map = create_map ints10000 in fun () -> IntMap.find_opt 745 map end;
+            begin fun `init -> let map = create_map ints10000 in fun () -> Map.find map 745 end;
         Bench.Test.create_with_initialization ~name:"find10000:hashtbl"
-            begin fun `init -> let table = create_hashtbl 0 ints10000 in fun () -> Hashtbl.find_opt table 745 end;
+            begin fun `init -> let table = create_hashtbl 0 ints10000 in fun () -> Hashtbl.find table 745 end;
 
         Bench.Test.create_with_initialization ~name:"find1000000:map"
-            begin fun `init -> let map = create_map ints1000000 in fun () -> IntMap.find_opt 745 map end;
+            begin fun `init -> let map = create_map ints1000000 in fun () -> Map.find map 745 end;
         Bench.Test.create_with_initialization ~name:"find1000000:hashtbl"
-            begin fun `init -> let table = create_hashtbl 0 ints1000000 in fun () -> Hashtbl.find_opt table 745 end;
+            begin fun `init -> let table = create_hashtbl 0 ints1000000 in fun () -> Hashtbl.find table 745 end;
     ]
 
 let list_vector =

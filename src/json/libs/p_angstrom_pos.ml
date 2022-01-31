@@ -1,5 +1,4 @@
 module Angstrom = Angstrom_pos.Make(struct type s = unit end)
-module Peek = Angstrom_pos.Peek.MakePeek(Angstrom)
 
 open Angstrom
 open P_base
@@ -47,7 +46,7 @@ module Json = struct
             >>|
             fun vs -> `List vs
         in
-        Peek.first
+        peek_first
         [ null
         ; _true
         ; _false
@@ -58,12 +57,7 @@ module Json = struct
     )
 end
 
-let parse f str =
-    match parse_string f () str with
-    | Ok a -> Some a
-    | Error msg ->
-        Printf.eprintf "%s\n" msg;
-        None
+let parse f str = parse_string f () str
 
 module Parser = struct
     let parse_json = parse (ws >> Json.json)

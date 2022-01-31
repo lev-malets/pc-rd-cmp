@@ -4,14 +4,14 @@ open Asttypes
 open Parsetree
 open Ast_helper
 open Basic
-open APos
 
 module Make
-        (Ext: EXT)
+        (APos: APOS)
         (Utils: UTILS) (Constant: CONSTANT) (Core: CORE) (Type: TYPE)
         : PATTERN = struct
-    open Ext
+    open APos
     open Utils
+    open Constant
     open Core
     open Type
 
@@ -19,7 +19,7 @@ module Make
         (module struct
             let pattern = getter.get @@ fun (module M: PATTERN) -> M.pattern
             let pattern_constrainted =
-                Named.p "pattern:constraint" begin
+                named "pattern:constraint" begin
                         with_loc & hlp2 Pat.constraint_
                         +pattern -ng -s":" -ng +core_type
 
@@ -27,7 +27,7 @@ module Make
                 end
 
             let pattern_poly_constrainted =
-                Named.p "pattern:constraint:poly" begin
+                named "pattern:constraint:poly" begin
                         with_loc & hlp2 Pat.constraint_
                         +pattern -ng -s":" -ng +core_type_poly
 
@@ -35,13 +35,13 @@ module Make
                 end
 
             let tuple =
-                Named.p "pattern:tuple" begin
+                named "pattern:tuple" begin
                     with_loc & parens & hlp Pat.tuple
                     +(seq ~n:2 pattern_constrainted ~sep ~trail)
                 end
 
             let array =
-                Named.p "pattern:array" begin
+                named "pattern:array" begin
                     with_loc & brackets & hlp Pat.array
                     +(seq pattern_constrainted ~sep ~trail)
                 end
@@ -78,7 +78,7 @@ module Make
                 make_list_helper ~constr:Pat.construct ~tuple:Pat.tuple ~get_loc:(fun x -> x.ppat_loc)
 
             let list =
-                Named.p "pattern:list" begin
+                named "pattern:list" begin
                         with_loc & mapping (list_helper [] None)
                         -s"list{" -ng -s"}"
 
@@ -109,7 +109,7 @@ module Make
             let polyvariant =
                 let tag =
                         ident
-                    ||  Constant.String.string
+                    ||  string_raw
                     ||  take_while1 (function '0'..'9' -> true | _ -> false)
                 in
                 with_loc & hlp2 Pat.variant
@@ -120,7 +120,7 @@ module Make
                 -s"#" -ng -s"..." -ng +loc l_longident
 
             let unpack =
-                Named.p "pattern:unpack" begin
+                named "pattern:unpack" begin
                         with_loc & mapping begin fun m t loc ->
                             let m = Pat.unpack m in
                             Pat.constraint_ ~loc m t
@@ -139,22 +139,22 @@ module Make
                         | Pconst_float (str, suf) ->
                             Pconst_float ("-" ^ str, suf)
                     end
-                    -s"-" +Constant.Number.p
+                    -s"-" +number
 
-                ||  s"+" >> Constant.Number.p
+                ||  s"+" >> number
 
             let number_range =
-                let number = signed_number <|> Constant.Number.p in
+                let number = signed_number <|> number in
 
                 with_loc & hlp2 Pat.interval
                 +number -ng -s".." -ng +number
 
             let js_string =
-                Named.p "pattern:js_string" begin
+                named "pattern:js_string" begin
                     with_loc & mapping begin fun c loc ->
                         Pat.constant ~loc ~attrs:[Hc.attr "res.template"] c
                     end
-                    +Constant.String.multiline ~q:'`'
+                    +string_multiline ~q:"`"
                 end
 
             let true_ =
@@ -165,14 +165,14 @@ module Make
                 +loc_of(k"false")
 
             let pattern_atom =
-                Named.p "pattern:atom" begin
-                    Peek.first
+                named "pattern:atom" begin
+                    peek_first
                     [
                         with_loc & mapping (fun loc -> Pat.any ~loc ())
                         -k"_"
                     ;
                         with_loc & hlp2 Pat.interval
-                        +Constant.Character.p -ng -s".." -ng +Constant.Character.p
+                        +character -ng -s".." -ng +character
                     ; number_range
                     ;
                         with_loc & mapping (fun loc -> Pat.construct ~loc (mkloc ~loc @@ Hc.lid ["()"]) None)
@@ -186,7 +186,7 @@ module Make
                     ; record
                     ;
                         with_loc & hlp Pat.constant
-                        +(signed_number || Constant.p)
+                        +(signed_number || constant)
                     ; js_string
                     ; list
                     ; construct
@@ -219,7 +219,7 @@ module Make
                     primary
                     (
                         mapping begin fun name prev ->
-                            Pat.alias ~loc:(comb_location prev.ppat_loc name.loc) prev name
+                            Pat.alias ~loc:(loc_comb prev.ppat_loc name.loc) prev name
                         end
                         -ng -k"as" -ng +loc l_ident
                     )
@@ -229,12 +229,12 @@ module Make
                     alias
                     (
                         mapping begin fun alias prev ->
-                            Pat.or_ ~loc:(comb_location prev.ppat_loc alias.ppat_loc) prev alias
+                            Pat.or_ ~loc:(loc_comb prev.ppat_loc alias.ppat_loc) prev alias
                         end
                         -ng -s"|" -ng +alias
                     )
 
-            let pattern = Named.p "pattern" or_
+            let pattern = memo & named "pattern" or_
         end: PATTERN)
 
     let pattern = let (module M) = x in M.pattern
