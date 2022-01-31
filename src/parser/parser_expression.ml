@@ -385,7 +385,7 @@ module Make
                             +pos -s"<" -ng +loc (l_ident >>| fun x -> Longident.Lident x) +seq (ng >> arg) -ng -s"/" -ng -s">" +pos
                         end
                     ||  named "jsx:tag" begin
-                            mapping t4
+                            t4
                             +pos -s"<" -ng +loc (l_ident >>| fun x -> Longident.Lident x) +seq (ng >> arg)
                             -ng -s">" -ng +children -ng
                             >>= fun (p1, tag, args, children) ->
@@ -411,7 +411,7 @@ module Make
                             +pos -s"<" -ng +loc longident +seq (ng >> arg) -ng -s"/" -ng -s">" +pos
                         end
                     ||  named "jsx:ce:tag" begin
-                            mapping t4
+                            t4
                             +pos -s"<" -ng +loc longident +seq (ng >> arg) -ng -s">"
                             -ng +children -ng
                             >>= fun (p1, { txt = tag; loc = tag_loc }, args, children) ->
@@ -453,7 +453,7 @@ module Make
             let record =
                 named "expression:record" begin
                     let nb =
-                            mapping t2
+                            t2
                             +loc l_longident -ng -s":" -ng +expression_arrow
 
                         ||  loc l_longident >>| fun lid -> lid, Exp.ident ~loc:lid.loc lid
@@ -499,7 +499,7 @@ module Make
             let interpolated_string qtag =
                 let op = Hc.expr_id ["^"] in
 
-                let cons = mapping cons in
+                let cons = cons in
 
                 let parts = fix @@ fun parts ->
                     cons

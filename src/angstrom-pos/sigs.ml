@@ -161,10 +161,10 @@ module type POS = sig
     val loc : 'a Parser.t -> 'a Location.loc Parser.t
     val loc_of : 'a Parser.t -> Location.t Parser.t
 
-    val t2 : 'a -> 'b -> 'a * 'b
-    val t3 : 'a -> 'b -> 'c -> 'a * 'b * 'c
-    val t4 : 'a -> 'b -> 'c -> 'd -> 'a * 'b * 'c * 'd
-    val cons : 'a -> 'a list -> 'a list
+    val t2 : ('a -> 'b -> 'a * 'b) Parser.t
+    val t3 : ('a -> 'b -> 'c -> 'a * 'b * 'c) Parser.t
+    val t4 : ('a -> 'b -> 'c -> 'd -> 'a * 'b * 'c * 'd) Parser.t
+    val cons : ('a -> 'a list -> 'a list) Parser.t
 
     val exec : (unit -> 'a) -> 'a Parser.t
 
@@ -190,4 +190,6 @@ module type POS = sig
 
     val name_of_id : int -> string
     val name_of : 'a Parser.t -> string
+
+    val print_info : _ Parser.t -> unit
 end

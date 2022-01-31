@@ -1,9 +1,11 @@
 module ParseRes: Pc_syntax.Sigs.PARSE = struct
     let parse_interface ~src ~filename =
-        Some (Res_parse_string.parse_interface ~src ~filename)
+        let x = Res_parse_string.parse_interface ~src ~filename in
+        Some x
 
     let parse_implementation ~src ~filename =
-        Some (Res_parse_string.parse_implementation ~src ~filename)
+        let x = Res_parse_string.parse_implementation ~src ~filename in
+        Some x
 end
 
 let mk_apos ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.APOS) =
@@ -97,101 +99,129 @@ let dump_loc_mapping =
     { default with
         signature_item  = (fun x -> {x with psig_loc = none});
         structure_item  = (fun x -> {x with pstr_loc = none});
-        pattern         = (fun x -> {x with ppat_loc = none});
-        pattern_desc    =
-            { default.pattern_desc with
-                var         = (fun x -> Ppat_var (loc x));
-                alias       = (fun x n -> Ppat_alias (x, loc n));
-                construct   = (fun x a -> Ppat_construct (loc x, a));
-                record      = (fun x f -> Ppat_record (List.map (fun (n, x) -> loc n, x) x, f));
-                type_       = (fun x -> Ppat_type (loc x));
-                unpack      = (fun x -> Ppat_unpack (loc x));
-                extension   = (fun (n, x) -> Ppat_extension (loc n, x));
-                open_       = (fun x p -> Ppat_open (loc x, p));
-            };
-        expression       = (fun x -> {x with pexp_loc = none});
-        expression_desc  =
-            { default.expression_desc with
-                construct    = (fun x a -> Pexp_construct (loc x, a));
-                field        = (fun x f -> Pexp_field (x, loc f));
-                ident        = (fun x -> Pexp_ident (loc x));
-                letmodule    = (fun l x e -> Pexp_letmodule (loc l, x, e));
-                new_         = (fun x -> Pexp_new (loc x));
-                newtype      = (fun l x -> Pexp_newtype (loc l, x));
-                open_        = (fun f n x -> Pexp_open (f, loc n, x));
-                override     = (fun x -> Pexp_override (List.map (fun (m, e) -> loc m, e) x));
-                record       = (fun x e -> Pexp_record (List.map (fun (m, e) -> loc m, e) x, e));
-                send         = (fun x n -> Pexp_send (x, loc n));
-                setfield     = (fun x n y -> Pexp_setfield (x, loc n, y));
-                setinstvar   = (fun n x -> Pexp_setinstvar (loc n, x));
-            };
-        core_type        = (fun x -> {x with ptyp_loc = none});
-        core_type_desc   =
-            { default.core_type_desc with
-                class_    = (fun n x -> Ptyp_class (loc n, x));
-                constr    = (fun n x -> Ptyp_constr (loc n, x));
-                poly      = (fun n x -> Ptyp_poly (List.map (fun n -> loc n) n, x));
-            };
-        module_expr      = (fun x -> {x with pmod_loc = none});
-        module_expr_desc =
-            { default.module_expr_desc with
-                functor_ = (fun n t x -> Pmod_functor (loc n, t, x));
-                ident    = (fun x -> Pmod_ident (loc x));
-            };
-        module_type      = (fun x -> {x with pmty_loc = none});
-        module_type_desc =
-            { default.module_type_desc with
-                alias     = (fun x -> Pmty_alias (loc x));
-                functor_  = (fun n x t -> Pmty_functor (loc n, x, t));
-                ident     = (fun x -> Pmty_ident (loc x));
-            };
+        pattern         =
+            begin fun x ->
+                {x with
+                    ppat_loc = none;
+                    ppat_desc =
+                        begin match x.ppat_desc with
+                        | Ppat_var x            -> Ppat_var (loc x)
+                        | Ppat_alias (x, n)     -> Ppat_alias (x, loc n)
+                        | Ppat_construct (x, a) -> Ppat_construct (loc x, a)
+                        | Ppat_record (x, f)    -> Ppat_record (List.map (fun (n, x) -> loc n, x) x, f)
+                        | Ppat_type x           -> Ppat_type (loc x)
+                        | Ppat_unpack x         -> Ppat_unpack (loc x)
+                        | Ppat_extension (n, x) -> Ppat_extension (loc n, x)
+                        | Ppat_open (x, p)      -> Ppat_open (loc x, p)
+                        | x                     -> x
+                        end;
+                }
+            end;
+        expression       =
+            begin fun x ->
+                {x with
+                    pexp_loc = none;
+                    pexp_desc =
+                        match x.pexp_desc with
+                        | Pexp_construct (x, a)    -> Pexp_construct (loc x, a)
+                        | Pexp_field (x, f)        -> Pexp_field (x, loc f)
+                        | Pexp_ident x             -> Pexp_ident (loc x)
+                        | Pexp_letmodule (l, x, e) -> Pexp_letmodule (loc l, x, e)
+                        | Pexp_new x               -> Pexp_new (loc x)
+                        | Pexp_newtype (l, x)      -> Pexp_newtype (loc l, x)
+                        | Pexp_open (f, n, x)      -> Pexp_open (f, loc n, x)
+                        | Pexp_override x          -> Pexp_override (List.map (fun (m, e) -> loc m, e) x)
+                        | Pexp_record (x, e)       -> Pexp_record (List.map (fun (m, e) -> loc m, e) x, e)
+                        | Pexp_send (x, n)         -> Pexp_send (x, loc n)
+                        | Pexp_setfield (x, n, y)  -> Pexp_setfield (x, loc n, y)
+                        | Pexp_setinstvar (n, x)   -> Pexp_setinstvar (loc n, x)
+                        | x                        -> x
+                }
+            end;
 
-        class_expr            = (fun x -> {x with pcl_loc = none});
-        class_expr_desc       =
-            { default.class_expr_desc with
-                constr      = (fun n x -> Pcl_constr (loc n, x));
-                open_       = (fun f n x -> Pcl_open (f, loc n, x));
-            };
-        class_field           = (fun x -> {x with pcf_loc = none});
-        class_field_desc      =
-            { default.class_field_desc with
-                inherit_     = (fun f x n -> Pcf_inherit (f, x, match n with Some x -> Some (loc x) | None -> None));
-                method_      = (fun n f x -> Pcf_method (loc n, f, x));
-                val_         = (fun n f x -> Pcf_val (loc n, f, x));
-            };
-        class_type            = (fun x -> {x with pcty_loc = none});
-        class_type_desc       =
-            { default.class_type_desc with
-                constr    = (fun n x -> Pcty_constr (loc n, x));
-                open_     = (fun f n x -> Pcty_open (f, loc n, x));
-            };
-        class_type_field      = (fun x -> {x with pctf_loc = none});
-        class_type_field_desc =
-            { default.class_type_field_desc with
-                method_     = (fun n f1 f2 x -> Pctf_method (loc n, f1, f2, x));
-                val_        = (fun n f1 f2 x -> Pctf_val (loc n, f1, f2, x));
-            };
-
-        with_constraint            =
-            {
-                type_     = (fun x y -> Pwith_type (loc x, y));
-                module_   = (fun x y -> Pwith_module (loc x, loc y));
-                typesubst = (fun x y -> Pwith_typesubst (loc x, y));
-                modsubst  = (fun x y -> Pwith_modsubst (loc x, loc y));
-            };
-        object_field               =
-            { default.object_field with
-                tag      = (fun n a t -> Otag (loc n, a, t));
-            };
-        row_field                  =
-            { default.row_field with
-                tag      = (fun n a f l -> Rtag (loc n, a, f, l));
-            };
-        extension_constructor_kind =
-            { default.extension_constructor_kind with
-                rebind = (fun x -> Pext_rebind (loc x));
-            };
-
+        core_type        =
+            begin fun x ->
+                {x with
+                    ptyp_loc = none;
+                    ptyp_desc =
+                    begin match x.ptyp_desc with
+                    | Ptyp_class (n, x)  -> Ptyp_class (loc n, x)
+                    | Ptyp_constr (n, x) -> Ptyp_constr (loc n, x)
+                    | Ptyp_poly (n, x)   -> Ptyp_poly (List.map (fun n -> loc n) n, x)
+                    | x                  -> x
+                    end;
+                }
+            end;
+        module_expr      =
+            begin fun x ->
+                {x with
+                    pmod_loc = none;
+                    pmod_desc =
+                        begin match x.pmod_desc with
+                        | Pmod_functor (n, t, x) -> Pmod_functor (loc n, t, x)
+                        | Pmod_ident x           -> Pmod_ident (loc x)
+                        | x                      -> x
+                    end;
+                }
+            end;
+        module_type      =
+            begin fun x ->
+                {x with
+                    pmty_loc = none;
+                    pmty_desc =
+                        begin match x.pmty_desc with
+                        | Pmty_alias x           -> Pmty_alias (loc x)
+                        | Pmty_functor (n, x, t) -> Pmty_functor (loc n, x, t);
+                        | Pmty_ident x           -> Pmty_ident (loc x)
+                        | x                      -> x
+                        end;
+                }
+            end;
+        class_expr            =
+            begin fun x ->
+                {x with
+                    pcl_loc = none;
+                    pcl_desc =
+                        match x.pcl_desc with
+                        | Pcl_constr (n, x)  -> Pcl_constr (loc n, x)
+                        | Pcl_open (f, n, x) -> Pcl_open (f, loc n, x)
+                        | x                  -> x
+                }
+            end;
+        class_field           =
+            begin fun x ->
+                {x with
+                    pcf_loc = none;
+                    pcf_desc =
+                        match x.pcf_desc with
+                        | Pcf_inherit (f, x, n) -> Pcf_inherit (f, x, match n with Some x -> Some (loc x) | None -> None)
+                        | Pcf_method (n, f, x)  -> Pcf_method (loc n, f, x)
+                        | Pcf_val (n, f, x)     -> Pcf_val (loc n, f, x)
+                        | x                     -> x
+                }
+            end;
+        class_type            =
+            begin fun x ->
+                {x with
+                    pcty_loc = none;
+                    pcty_desc =
+                        match x.pcty_desc with
+                        | Pcty_constr (n, x)  -> Pcty_constr (loc n, x)
+                        | Pcty_open (f, n, x) -> Pcty_open (f, loc n, x)
+                        | x                   -> x
+                }
+            end;
+        class_type_field      =
+            begin fun x ->
+                {x with
+                    pctf_loc = none;
+                    pctf_desc =
+                        match x.pctf_desc with
+                        | Pctf_method (n, f1, f2, x) -> Pctf_method (loc n, f1, f2, x)
+                        | Pctf_val (n, f1, f2, x)    -> Pctf_val (loc n, f1, f2, x)
+                        | x                          -> x
+                }
+            end;
         attribute               = (fun (n, x) -> loc n, x);
         extension               = (fun (n, x) -> loc n, x);
         class_description       = (fun x -> {x with pci_name = loc x.pci_name; pci_loc = none});

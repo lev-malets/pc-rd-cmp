@@ -26,6 +26,10 @@ module Make(T: sig type s end) = struct
 
     module Id = struct
         let fail = 0
+        let t2 = 1
+        let t3 = 2
+        let t4 = 3
+        let cons = 4
 
         let next = ref 1
         let get () = let x = !next in next := x + 1; x
@@ -358,7 +362,6 @@ module Make(T: sig type s end) = struct
             (string "\n" << advance_line)
         <|> (string "\r\n" << advance_line)
 
-
     let whitespace: unit Angstrom.Parser.t =
         { run = fun input pos state more fail succ ->
             let module Input = Angstrom_mod.Input in
@@ -545,10 +548,34 @@ module Make(T: sig type s end) = struct
         mapping make_location
         <*> pos << p <*> pos
 
-    let t2: 'a 'b. 'a -> 'b -> 'a * 'b = fun a b -> a, b
-    let t3: 'a 'b 'c. 'a -> 'b -> 'c -> 'a * 'b * 'c = fun a b c -> a, b, c
-    let t4: 'a 'b 'c 'd. 'a -> 'b -> 'c -> 'd -> 'a * 'b * 'c * 'd = fun a b c d -> a, b, c, d
-    let cons x xs = x :: xs
+    let t2 =
+        let f = fun a b -> a, b in
+        { p = { run = fun input pos state more _fail succ -> succ input pos state more f }
+        ; info = Empty
+        ; typ = Return f
+        ; id = Id.t2
+        }
+    let t3 =
+        let f = fun a b c -> a, b, c in
+        { p = { run = fun input pos state more _fail succ -> succ input pos state more f }
+        ; info = Empty
+        ; typ = Return f
+        ; id = Id.t2
+        }
+    let t4 =
+        let f = fun a b c d -> a, b, c, d in
+        { p = { run = fun input pos state more _fail succ -> succ input pos state more f }
+        ; info = Empty
+        ; typ = Return f
+        ; id = Id.t2
+        }
+    let cons =
+        let f = fun x xs -> x :: xs in
+        { p = { run = fun input pos state more _fail succ -> succ input pos state more f }
+        ; info = Empty
+        ; typ = Return f
+        ; id = Id.t2
+        }
 
     let exec f =
         { p = Angstrom.exec f
@@ -654,13 +681,13 @@ module Make(T: sig type s end) = struct
         type t = int * int * int
 
         let compare (h1, l1, p1) (h2, l2, p2) =
-            let c1 = compare h1 h2 in
+            let c1 = compare p1 p2 in
             if c1 <> 0 then c1 else
 
             let c2 = compare l1 l2 in
             if c2 <> 0 then c2 else
 
-            compare p1 p2
+            compare h1 h2
 
         let sexp_of_t (h, l, p) = sexp_of_list Int.sexp_of_t [h; l; p]
 
@@ -695,11 +722,11 @@ module Make(T: sig type s end) = struct
                     )
                 | None ->
                     let succ' input' pos' state' more' v =
-                        let _ = Hashtbl.add_exn table ~key ~data:(Ok (input', pos', state', more', v)) in
+                        let _ = Hashtbl.add table ~key ~data:(Ok (input', pos', state', more', v)) in
                         succ input' pos' state' more' v
                     in
                     let fail' input' pos' state' more' marks' msg' =
-                        Hashtbl.add_exn table ~key ~data:(Error (input', pos', state', more', marks', msg'));
+                        let _ = Hashtbl.add table ~key ~data:(Error (input', pos', state', more', marks', msg')) in
                         fail input' pos' state' more' marks' msg'
                     in
                     p.p.run input pos state more fail' succ'
@@ -723,7 +750,6 @@ module Make(T: sig type s end) = struct
             | 1 -> char x.[0] >>$ x
             | _ -> string x
         end
-
 
     let rec name_of_id id =
         match Hashtbl.find memoid2id id with

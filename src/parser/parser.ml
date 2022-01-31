@@ -26,10 +26,10 @@ module Make (APos: APOS) = struct
         let open Utils in
 
         let payload = getter.get @@ fun x -> x.payload in
-        let attrubute_id = take_while1 (fun x -> Caml.(||) (identifier's_character x) (Char.equal x '.')) in
+        let attrubute_id = take_while1 Base.(fun x -> identifier's_character x || Char.equal x '.') in
 
         let id_payload_pair start =
-            mapping t2
+            t2
             +loc(s start >> attrubute_id) +payload
         in
 
@@ -369,8 +369,10 @@ module Make (APos: APOS) = struct
                     [
                         with_del & na_hlp Sig.attribute
                         +module_attribute
-                    ; type_ Sig.type_
-                    ; module_rec
+                    ;
+                        type_ Sig.type_
+                    ;
+                        module_rec
                     ;
                         with_del & hlp_a Sig.extension
                         +attrs_ +module_extension
@@ -420,23 +422,27 @@ module Make (APos: APOS) = struct
                         mapping begin fun p1 attrs pat types typ expr vb_attrs vb_loc ->
                             let mapping =
                                 { Parsetree_mapping.default with
-                                    core_type_desc =
-                                        { Parsetree_mapping.default.core_type_desc with
-                                            constr = fun t a ->
-                                                match a with
-                                                | [] ->
-                                                    let rec loop =
-                                                        function
-                                                        | [] -> Ptyp_constr (t, a)
-                                                        | x::xs ->
-                                                            match t.txt with
-                                                            | Longident.Lident t when String.equal t x.txt ->
-                                                                Ptyp_var x.txt
-                                                            | _ -> loop xs
-                                                    in
-                                                    loop types
-                                                | _ -> Ptyp_constr (t, a)
-                                        }
+                                    core_type =
+                                        fun x ->
+                                            match x.ptyp_desc with
+                                            | Ptyp_constr (t, a) ->
+                                                let desc =
+                                                    match a with
+                                                    | [] ->
+                                                        let rec loop =
+                                                            function
+                                                            | [] -> Ptyp_constr (t, a)
+                                                            | x::xs ->
+                                                                match t.txt with
+                                                                | Longident.Lident t when String.equal t x.txt ->
+                                                                    Ptyp_var x.txt
+                                                                | _ -> loop xs
+                                                        in
+                                                        loop types
+                                                    | _ -> Ptyp_constr (t, a)
+                                                in
+                                                {x with ptyp_desc = desc}
+                                            | _ -> x
                                 }
                             in
 
@@ -529,7 +535,7 @@ module Make (APos: APOS) = struct
             in
 
             named "str:mb:rec" begin
-                mapping cons
+                cons
                 +first +seq (ng >> other)
             end
         in
@@ -545,7 +551,8 @@ module Make (APos: APOS) = struct
                 ;
                     with_del & na_hlp Str.rec_module
                     +rec_module_binding
-                ; value_str
+                ;
+                    value_str
                 ;
                     with_del & hlp_a Str.extension
                     +attrs_ +module_extension
@@ -573,7 +580,8 @@ module Make (APos: APOS) = struct
                 ;
                     with_del & na_hlp Str.type_extension
                     +type_extension
-                ; type_ Str.type_
+                ;
+                    type_ Str.type_
                 ;
                     with_del & hlp_a Str.eval
                     +attrs_ +expression_arrow
@@ -589,10 +597,20 @@ module Make (APos: APOS) = struct
             modexpr = (module Modexpr);
         }
 
-    let with_print p = p
-        (*Res_diagnostics.printReport state.diagnostics "TODO";*)
-
     let parse p state ~src ~filename =
+        let p =
+            mapping begin fun x state ->
+                Res_driver.{
+                    filename;
+                    source = src;
+                    parsetree = x;
+                    diagnostics = [];
+                    invalid = false;
+                    comments = List.rev state.State.comments;
+                }
+            end
+            +p +state_get
+        in
         parse_string p state ~filename src
 
     let parse_interface = parse (ng >> parsers.signature << ng) State.default

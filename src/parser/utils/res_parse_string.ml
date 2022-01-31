@@ -25,7 +25,7 @@ let parse ~src ~filename ~parse =
         Res_diagnostics.printReport parse_result.diagnostics parse_result.source;
         exit 1
     end;
-    parse_result.parsetree
+    parse_result
 [@@raises exit]
 
 let parse_implementation ~src ~filename =

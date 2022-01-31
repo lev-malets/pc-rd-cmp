@@ -6,6 +6,8 @@ module Charset = Angstrom_pos.Charset
 
 type 'a parser = 'a Parser.t
 
+type 'a parse_result = ('a, Res_diagnostics.t list) Res_driver.parseResult
+
 module Opt = struct
     let set x =
         function

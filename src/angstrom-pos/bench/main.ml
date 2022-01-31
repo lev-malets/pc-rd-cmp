@@ -47,11 +47,21 @@ let returns =
 
 let random_state = Random.State.make [|1; 2; 3|]
 let random_int () = Random.State.int random_state (Int32.to_int_exn @@ Int32.shift_right Int32.max_value 2)
+let random_char () = Char.of_int_exn @@ Random.State.int random_state 256
+let random_az () = Char.of_int_exn (Random.State.int random_state (Char.to_int 'z' - Char.to_int 'a') + Char.to_int 'a')
+
 let ints10 = lazy (Array.create ~len:10 0 |> Array.map ~f:(fun _ -> random_int ()))
 let ints100 = lazy (Array.create ~len:100 0 |> Array.map ~f:(fun _ -> random_int ()))
 let ints10000 = lazy (Array.create ~len:10000 0 |> Array.map ~f:(fun _ -> random_int ()))
 let ints100000 = lazy (Array.create ~len:100000 0 |> Array.map ~f:(fun _ -> random_int ()))
 let ints1000000 = lazy (Array.create ~len:1000000 0 |> Array.map ~f:(fun _ -> random_int ()))
+
+let chars10 = lazy (Array.init 10 ~f:(fun _ -> random_char ()))
+let az10 = lazy (Array.init 10 ~f:(fun _ -> random_char ()))
+let a10 = lazy (Array.init 10 ~f:(fun _ -> 'a'))
+let chars10000 = lazy (Array.init 10 ~f:(fun _ -> random_char ()))
+let az10000 = lazy (Array.init 10 ~f:(fun _ -> random_char ()))
+let a10000 = lazy (Array.init 10000 ~f:(fun _ -> 'a'))
 
 let hash =
     let open Core_bench in
@@ -234,6 +244,91 @@ let list_vector =
             begin fun () -> create_vector 16384 ints100000 end;
     ]
 
+let condition =
+    let open Core_bench in
+    let module APos = Angstrom_pos.Make(struct type s = unit end) in
+
+    let check_p p str = fun () -> APos.parse_string p () str in
+    let check_fn f = check_p @@ APos.take_while f in
+    let check_arr f =
+        let arr = Array.init 256 ~f:(fun i -> f (Char.of_int_exn i)) in
+        check_p @@ APos.take_while (fun x -> let i = Char.to_int x in arr.(i))
+    in
+    let check fn name len =
+        let str =
+            lazy (
+                let buf = Buffer.create len in
+                let rec loop () =
+                    if Buffer.length buf = len then Buffer.contents buf else
+                    let c = random_char () in
+                    if fn c then Buffer.add_char buf c;
+                    loop ()
+                in
+                loop ()
+            )
+        in
+
+        [
+            Bench.Test.create_with_initialization ~name
+                begin
+                    fun `init ->
+                        let str = Lazy.force str in
+                        check_fn fn str
+                end;
+            Bench.Test.create_with_initialization ~name:(name ^ ":arr")
+                begin
+                    fun `init ->
+                        let str = Lazy.force str in
+                        check_arr fn str
+                end;
+        ]
+    in
+
+    let fn1 = function
+        | '\x00' -> true
+        | _ -> false
+    in
+    let fn2 = function
+        | '\x00' | '\x11' -> true
+        | _ -> false
+    in
+    let fn3 = function
+        | '\x00' | '\x11' | '\x22' | '\x33' -> true
+        | _ -> false
+    in
+    let fn4 = function
+        | '\x00' | '\x11' | '\x22' | '\x33'
+        | '\x44' | '\x55' | '\x66' | '\x77' -> true
+        | _ -> false
+    in
+    let fn5 = function
+        | '\x11'..'\x33' -> true
+        | _ -> false
+    in
+
+    let mk_set name fn =
+        check fn (name ^ ":0") 0
+        @
+        check fn (name ^ ":11") 11
+        @
+        check fn (name ^ ":22") 22
+        @
+        check fn (name ^ ":33") 33
+        @
+        check fn (name ^ ":44") 44
+    in
+
+    Bench.make_command @@
+        mk_set "fn1" fn1
+        @
+        mk_set "fn2" fn2
+        @
+        mk_set "fn3" fn3
+        @
+        mk_set "fn4" fn4
+        @
+        mk_set "fn5" fn5
+
 let () =
     let open Core in
     Command.run @@
@@ -242,4 +337,5 @@ let () =
         "hash", hash;
         "map-and-hashtable", map_hashtable;
         "list-and-vector", list_vector;
+        "condition", condition;
     ]

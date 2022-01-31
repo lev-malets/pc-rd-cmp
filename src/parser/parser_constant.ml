@@ -118,11 +118,11 @@ module Make (APos: APOS) = struct
                 | _ -> true
             in
 
-            mapping cons
+            cons
             +take_while not_escaped
             +(
                     s"\"" >>$ []
-                ||  mapping cons
+                ||  cons
                     +(
                             s"\\" >> escaped >>| String.make 1
                         ||  s"\\\"" >>$ "\""
@@ -136,11 +136,11 @@ module Make (APos: APOS) = struct
         let list =
             s q >>
             fix @@ fun loop ->
-            mapping cons
+            cons
             +take_while (function '\n' | '\\' | '\r' -> false | c -> not (Char.equal c q.[0]))
             +(
                     s q >>$ []
-                ||  mapping cons
+                ||  cons
                     +(new_line <|> s"\\\"" <|> s"\\\\" <|> s"\\")
                     +loop
             )

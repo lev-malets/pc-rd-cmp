@@ -7,39 +7,55 @@ module Make (APos: APOS): UTILS = struct
     open APos
 
     let single_line_comment =
-        let p = s"//" >> take_while (function '\n' | '\r' -> false | _ -> true) in
-        loc (consumed p)
-        >>|
-        fun {txt; loc} -> Res_comment.makeSingleLineComment ~loc txt
+        let p = s"//" >> loc @@ take_while (function '\n' | '\r' -> false | _ -> true) in
+        p >>| fun {txt; loc} -> Res_comment.makeSingleLineComment ~loc txt
 
     let multi_line_comment =
-        let loop = fix @@ fun loop ->
-            take_while (function '*' | '\n' | '\r' -> false | _ -> true) >> (
-                (new_line >> loop)
-                <|>
-                (s"*/" >>$ "*/")
-                <|>
-                (advance 1 >> loop)
+        let parts =
+            fix @@ fun parts ->
+
+            cons
+            +take_while (function '*' | '\n' | '/' | '\r' -> false | _ -> true)
+            +(
+                    s"*/" >>$ []
+                ||  (cons +new_line +parts)
+                ||  (mapping (fun l tail -> "/*" :: (l @ "*/" :: tail) ) -s"/*" +parts +parts)
+                ||  (cons +(any_char >>| String.make 1) +parts)
             )
         in
-        let p = s"/*" >> loop in
-        loc (consumed p)
+        let p = s"/*" >> parts in
+        loc (p >>| String.concat)
         >>|
         fun {txt; loc} -> Res_comment.makeMultiLineComment ~loc txt
 
+    let comment =
+        single_line_comment <|> multi_line_comment
+        >>|
+        fun x pos comments -> Res_comment.setPrevTokEndPos x pos; x :: comments
+
     let comments =
-        let push_comment c =
-            c << whitespace >>= fun comment ->
-            (state_map (fun s -> {s with comments = comment :: s.comments})).p
-        in
-        seq (push_comment single_line_comment <|> push_comment multi_line_comment) >>$ ()
+        fold_left_0_n
+            (t2 +comment +pos -whitespace)
+            (t2 +comment +pos -whitespace)
+            ~f:begin fun (f1, p1) (f2, p2) ->
+                (fun pos comments -> f2 p1 @@ f1 pos comments), p2
+            end
     let ng =
         memo & named "nongrammar" &
-        whitespace << comments
+
+        let p = t2 +pos -whitespace +opt(comments) in
+        let p2 =
+            p >>= fun (pos, x) ->
+                match x with
+                | Some (hlp, _) ->
+                    (APos.state_map (fun s -> {s with comments = hlp pos s.comments})).p
+                | _ -> Angstrom.return ()
+        in
+        {p2 with info = p.info}
 
     let ng_no_new_line =
         (
-            mapping t2
+            t2
             +pos -ng +pos
         )
         >>=
@@ -51,7 +67,7 @@ module Make (APos: APOS): UTILS = struct
 
     let ng_new_line =
         (
-            mapping t2
+            t2
             +pos -ng +pos
         )
         >>=
@@ -62,7 +78,7 @@ module Make (APos: APOS): UTILS = struct
             | false -> return ()
 
     let del_pos =
-        (mapping t2 +pos -ng +peek_char)
+        (t2 +pos -ng +peek_char)
         >>=
         fun (p1, c) ->
             let open Angstrom in
@@ -78,7 +94,7 @@ module Make (APos: APOS): UTILS = struct
                 | false -> return p1
 
     let del =
-        (mapping t2 +pos -ng +peek_char)
+        (t2 +pos -ng +peek_char)
         >>=
         fun (p1, c) ->
             let open Angstrom in

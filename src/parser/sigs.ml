@@ -4,8 +4,8 @@ open Basic
 module type APOS = Angstrom_pos.S with module Parser = Basic.Parser
 
 module type PARSE = sig
-    val parse_interface : src:string -> filename:string -> signature option
-    val parse_implementation : src:string -> filename:string -> structure option
+    val parse_interface : src:string -> filename:string -> signature parse_result option
+    val parse_implementation : src:string -> filename:string -> structure parse_result option
 end
 
 module type CORE = sig
@@ -37,9 +37,6 @@ module type CONSTANT = sig
 end
 
 module type UTILS = sig
-    val single_line_comment : Res_comment.t parser
-    val multi_line_comment : Res_comment.t parser
-    val comments : unit parser
     val ng : unit parser
     val ng_no_new_line : unit parser
     val ng_new_line : unit parser

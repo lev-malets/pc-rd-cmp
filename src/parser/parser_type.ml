@@ -30,7 +30,7 @@ module Make
                         +(
                             seq ~n:1 ~sep:(ng >> k"and")
                                 (
-                                    mapping t2
+                                    t2
                                     -ng -k"type" -ng +loc l_longident
                                     -ng -s"=" -ng +core_type_atom
                                 )
@@ -292,7 +292,7 @@ module Make
             let type_decl_constraints =
                 seq ~n:1 ~sep:ng
                 (
-                    with_loc & mapping t3
+                    with_loc & t3
                     -k"constraint" -ng +core_type_atom -ng -s"=" -ng +core_type
                 )
 
