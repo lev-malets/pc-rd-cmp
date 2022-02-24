@@ -1,5 +1,5 @@
 
-module APos_ = Angstrom_pos.Make(Pc_syntax.State)
+module APos_ = Angstrom_pos.Make(Pc_syntax.Basic.LogElement)
 module NotPeek_ = Angstrom_pos.Alt.MakeNotPeek(APos_)
 
 module APos = struct

@@ -9,8 +9,7 @@
 	"remoteUser": "user",
 	"extensions": [
 		"eamodio.gitlens",
-		"mutantdino.resourcemonitor",
-		"ocamllabs.ocaml-platform"
+		"ocamllabs.ocaml-platform",
 	],
 
 	"settings": {

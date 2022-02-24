@@ -1,7 +1,7 @@
 open Parsetree
 open Basic
 
-module type APOS = Angstrom_pos.S with module Parser = Basic.Parser
+module type APOS = Angstrom_pos.S with type s = Basic.LogElement.t
 
 module type PARSE = sig
     val parse_interface : src:string -> filename:string -> signature parse_result option

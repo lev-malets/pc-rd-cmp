@@ -1,10 +1,15 @@
 open Base
 open Parsetree
 
-module Parser = Angstrom_pos.Sigs.MkParser(State)
+module LogElement = struct
+    type t =
+    | Comment of Res_comment.t
+    | Diagnostics of Res_diagnostics.t
+end
+
 module Charset = Angstrom_pos.Charset
 
-type 'a parser = 'a Parser.t
+type 'a parser = 'a Angstrom_pos.Parser.t
 
 type 'a parse_result = ('a, Res_diagnostics.t list) Res_driver.parseResult
 

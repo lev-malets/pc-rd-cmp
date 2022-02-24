@@ -597,22 +597,28 @@ module Make (APos: APOS) = struct
             modexpr = (module Modexpr);
         }
 
-    let parse p state ~src ~filename =
+    let parse p ~src ~filename =
+        let fold_f = begin fun (c, d) ->
+            function
+            | LogElement.Comment x -> (x::c, d)
+            | Diagnostics x -> (c, x::d)
+        end in
+
         let p =
-            mapping begin fun x state ->
+            mapping begin fun x (comments, diagnostics) ->
                 Res_driver.{
                     filename;
                     source = src;
                     parsetree = x;
-                    diagnostics = [];
+                    diagnostics;
                     invalid = false;
-                    comments = List.rev state.State.comments;
+                    comments;
                 }
             end
-            +p +state_get
+            +p +(fold_log ([], []) fold_f)
         in
-        parse_string p state ~filename src
+        parse_string p ~filename src
 
-    let parse_interface = parse (ng >> parsers.signature << ng) State.default
-    let parse_implementation = parse (ng >> parsers.structure << ng) State.default
+    let parse_interface = parse (ng >> parsers.signature << ng)
+    let parse_implementation = parse (ng >> parsers.structure << ng)
 end

@@ -17,3 +17,12 @@
  (name exec_memo_peek)
  (modules exec_memo_peek)
  (libraries pc_syntax))
+
+(executable
+ (name exec_none)
+ (modules exec_none)
+ (libraries syntax))
+
+(executable
+ (name exec_none2)
+ (modules exec_none2))

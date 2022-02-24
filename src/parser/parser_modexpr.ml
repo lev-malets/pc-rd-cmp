@@ -16,12 +16,8 @@ module Make
     open Expression
     open Modtype
 
-    module Parser = APos.Parser
-
     let x = fix_poly @@ fun getter ->
         (module struct
-            module Parser = APos.Parser
-
             let modexpr = getter.get @@ fun (module M: MODEXPR) -> M.modexpr
 
             let modexpr_constrainted =

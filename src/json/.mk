@@ -1,5 +1,3 @@
-include make/base.mk
-
 LIBS := $(patsubst $D/libs/p_%.ml,%,$(wildcard $D/libs/p_*))
 
 TEST_TARGETS := $(addprefix json.test.,$(LIBS))
@@ -8,15 +6,11 @@ BENCH_TARGETS := $(addprefix json.bench.,$(LIBS))
 json.test: $(TEST_TARGETS)
 json.bench: $(BENCH_TARGETS)
 
-define cmd
 $(TEST_TARGETS): json.test.%: $(KEYS)/deps/done $T/test/%/dune $T/test/%/main.ml
-	dune exec $T/test/$$(patsubst json.test.%,%,$$@)/main.exe
+	dune exec $T/test/$(patsubst json.test.%,%,$@)/main.exe
 
 $(BENCH_TARGETS): json.bench.%: $(KEYS)/deps/done $T/bench/%/dune $T/bench/%/main.ml
-	dune exec $T/bench/$$(patsubst json.bench.%,%,$$@)/main.exe
-endef
-
-$(eval $(cmd))
+	dune exec $T/bench/$(patsubst json.bench.%,%,$@)/main.exe
 
 $T/test/%/main.ml:
 	mkdir -p $(dir $@)

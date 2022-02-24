@@ -9,7 +9,7 @@ module ParseRes: Pc_syntax.Sigs.PARSE = struct
 end
 
 let mk_apos ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.APOS) =
-    let module APos = Angstrom_pos.Make(Pc_syntax.State) in
+    let module APos = Angstrom_pos.Make(Pc_syntax.Basic.LogElement) in
     let (module APos: Pc_syntax.Sigs.APOS) =
         if peek then
             (module APos)
@@ -39,8 +39,8 @@ let mk_parse ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.PARSE) =
     (module Pc_syntax.Parser.Make(APos): Pc_syntax.Sigs.PARSE)
 
 
-module type TRACED = module type of Angstrom_pos.Alt.MakeTraced(Angstrom_pos.Make(Pc_syntax.State))
-module type MEAZURED = module type of Angstrom_pos.Alt.MakeMeasured(Angstrom_pos.Make(Pc_syntax.State))
+module type TRACED = module type of Angstrom_pos.Alt.MakeTraced(Angstrom_pos.Make(Pc_syntax.Basic.LogElement))
+module type MEAZURED = module type of Angstrom_pos.Alt.MakeMeasured(Angstrom_pos.Make(Pc_syntax.Basic.LogElement))
 
 let mk_traced ?(peek=false) () =
     let (module APos: Pc_syntax.Sigs.APOS) = mk_apos ~peek ~memo:true () in

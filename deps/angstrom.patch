@@ -1,9 +1,55 @@
+diff --git a/lib/angstrom.ml b/lib/angstrom.ml
+index b025121..aa3a028 100644
+--- a/lib/angstrom.ml
++++ b/lib/angstrom.ml
+@@ -36,6 +36,11 @@ module Bigarray = struct
+    * the internal Bigstring module. *)
+ end
+ 
++module Expose = struct
++  module Input = Input
++  module Parser = Parser
++end
++
+ type bigstring = Bigstringaf.t
+ 
+ 
+@@ -493,9 +498,9 @@ let rec list ps =
+   | p::ps -> lift2 cons p (list ps)
+ 
+ let count n p =
+-  if n < 0 
++  if n < 0
+   then fail "count: n < 0"
+-  else 
++  else
+     let rec loop = function
+       | 0 -> return []
+       | n -> lift2 cons p (loop (n - 1))
+diff --git a/lib/angstrom.mli b/lib/angstrom.mli
+index 6f9a4c1..9fba737 100644
+--- a/lib/angstrom.mli
++++ b/lib/angstrom.mli
+@@ -43,8 +43,12 @@
+     {!skip_while}, Angstrom makes it easy to write efficient, expressive, and
+     reusable parsers suitable for high-performance applications. *)
+ 
++module Expose : sig
++  module Input = Input
++  module Parser = Parser
++end
+ 
+-type +'a t
++type +'a t = 'a Expose.Parser.t
+ (** A parser for values of type ['a]. *)
+ 
+ 
 diff --git a/lib_test/test_json.ml b/lib_test/test_json.ml
 index 98b8a8c..96d720e 100644
 --- a/lib_test/test_json.ml
 +++ b/lib_test/test_json.ml
 @@ -14,6 +14,6 @@ let read f =
-
+ 
  let () =
    let twitter_big = read Sys.argv.(1) in
 -  match Angstrom.(parse_bigstring RFC7159.json twitter_big) with
@@ -17,7 +63,7 @@ index a21173c..e60597a 100644
 @@ -11,8 +11,10 @@ let (_ : int t) =
    in
    2
-
+ 
 +(*
  let (_ : int t) =
    let%mapn (_ : char) = any_char

@@ -1,6 +1,6 @@
 open Base
 
-module Pos = Angstrom_pos.Make(struct type s = unit end)
+module Pos = Angstrom_pos.Make(struct type t end)
 
 module MemoSpec = struct
     let memo_spec = ["ret"]
@@ -8,13 +8,13 @@ end
 
 let parse parser contents =
     fun () ->
-        match Pos.parse_string (parser ()) () contents with
+        match Pos.parse_string (parser ()) contents with
         | Some _ -> ()
         | _ -> failwith "fail to parse"
 
 let parse_nc parser contents =
     fun () ->
-        match Pos.parse_string parser () contents with
+        match Pos.parse_string parser contents with
         | Some _ -> ()
         | _ -> failwith "fail to parse"
 
@@ -63,77 +63,6 @@ let chars10000 = lazy (Array.init 10 ~f:(fun _ -> random_char ()))
 let az10000 = lazy (Array.init 10 ~f:(fun _ -> random_char ()))
 let a10000 = lazy (Array.init 10000 ~f:(fun _ -> 'a'))
 
-let hash =
-    let open Core_bench in
-    let create_tests name mk_x =
-        [
-            Bench.Test.create_with_initialization ~name
-                begin
-                    fun `init ->
-                        let x = mk_x () in
-                    fun _ ->
-                        Hashtbl.hash x
-                end;
-            Bench.Test.create_with_initialization ~name:(name ^ ":repr:magic:lsr")
-                begin
-                    fun `init ->
-                        let x = mk_x () in
-                    fun _ ->
-                        let i = (Caml.Obj.magic : _ -> int) @@ Caml.Obj.repr x in
-                        let x = (i lsr 4, i land 0xF) in
-                        Hashtbl.hash x
-                end;
-        ]
-    in
-
-    Bench.make_command
-    (
-        create_tests "int" random_int
-        @
-        create_tests "parser" (fun _ -> Pos.whitespace)
-        @
-        create_tests "a100000" (fun _ -> Lazy.force ints100000)
-        @
-        [
-            Bench.Test.create_with_initialization ~name:"2ints"
-                begin
-                    fun `init ->
-                        let x = (random_int (), random_int ()) in
-                    fun _ ->
-                        Hashtbl.hash x
-                end;
-            Bench.Test.create_with_initialization ~name:"5ints"
-                begin
-                    fun `init ->
-                        let x = (random_int (), random_int (), random_int (), random_int (), random_int ()) in
-                    fun _ ->
-                        Hashtbl.hash x
-                end;
-        ]
-    )
-
-let create_list (lazy arr) =
-    let len = Array.length arr in
-    let list = ref [] in
-    let rec loop i =
-        if i = len then !list
-        else
-            let _ = list := arr.(i) :: !list in
-            loop (i + 1)
-    in
-    loop 0
-
-let create_vector initial (lazy arr) =
-    let len = Array.length arr in
-    let vector = CCVector.create_with ~capacity:initial 0 in
-    let rec loop i =
-        if i = len then vector
-        else begin
-            CCVector.push vector arr.(i);
-            loop @@ i + 1
-        end
-    in
-    loop 0
 
 let create_map (lazy arr) =
     let len = Array.length arr in
@@ -209,46 +138,11 @@ let map_hashtable =
             begin fun `init -> let table = create_hashtbl 0 ints1000000 in fun () -> Hashtbl.find table 745 end;
     ]
 
-let list_vector =
-    let open Core_bench in
-    Bench.make_command
-    [
-        Bench.Test.create ~name:"10:list"
-            begin fun () -> create_list ints10 end;
-        Bench.Test.create ~name:"10:vector"
-            begin fun () -> create_vector 0 ints10 end;
-        Bench.Test.create ~name:"10:vector2"
-            begin fun () -> create_vector 128 ints10 end;
-
-        Bench.Test.create ~name:"100:list"
-            begin fun () -> create_list ints100 end;
-        Bench.Test.create ~name:"100:vector"
-            begin fun () -> create_vector 0 ints100 end;
-        Bench.Test.create ~name:"100:vector2"
-            begin fun () -> create_vector 128 ints100 end;
-
-        Bench.Test.create ~name:"10000:list"
-            begin fun () -> create_list ints10000 end;
-        Bench.Test.create ~name:"10000:vector"
-            begin fun () -> create_vector 0 ints10000 end;
-        Bench.Test.create ~name:"10000:vector2"
-            begin fun () -> create_vector 128 ints10000 end;
-
-        Bench.Test.create ~name:"100000:list"
-            begin fun () -> create_list ints100000 end;
-        Bench.Test.create ~name:"100000:vector"
-            begin fun () -> create_vector 0 ints100000 end;
-        Bench.Test.create ~name:"100000:vector2"
-            begin fun () -> create_vector 128 ints100000 end;
-        Bench.Test.create ~name:"100000:vector3"
-            begin fun () -> create_vector 16384 ints100000 end;
-    ]
-
 let condition =
     let open Core_bench in
-    let module APos = Angstrom_pos.Make(struct type s = unit end) in
+    let module APos = Angstrom_pos.Make(struct type t end) in
 
-    let check_p p str = fun () -> APos.parse_string p () str in
+    let check_p p str = fun () -> APos.parse_string p str in
     let check_fn f = check_p @@ APos.take_while f in
     let check_arr f =
         let arr = Array.init 256 ~f:(fun i -> f (Char.of_int_exn i)) in
@@ -334,8 +228,6 @@ let () =
     Command.run @@
     Command.group ~summary:"benchmarks" [
         "returns", returns;
-        "hash", hash;
         "map-and-hashtable", map_hashtable;
-        "list-and-vector", list_vector;
         "condition", condition;
     ]

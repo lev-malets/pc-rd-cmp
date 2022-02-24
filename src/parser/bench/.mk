@@ -1,25 +1,24 @@
-include make/base.mk
-
 T := $T/_
 
-tested := $(patsubst %,$T/%/tested,$(base_files) $(syntax_test_files) $(syntax_benchmark_files))
-res := $(patsubst %/tested,%/res,$(tested))
-pc := $(patsubst %/tested,%/pc,$(tested))
+tested := $(patsubst %,$T/file/%/tested,$(syntax_benchmark_files))
+metrics := $(patsubst $T/file/%/tested,$T/file/%/metrics,$(tested))
 
-$D: $(tested)
+$K/done: $T/stats
 
 exe := $D/main.exe
 
-define cmd
-$(DUNE_DIR)/$(exe): force $(KEYS)/deps/done
-	$(call dune,build $(exe))
+_build/default/$(exe): force $(KEYS)/deps/done
+	$(log_err dune build $(exe))
 
-$(tested): $T/%/tested: % $(DUNE_DIR)/$(exe) $D/exec.sh
-	@ mkdir -p $$(dir $$@)
-	@ echo Test $$<
-	@ bash ./$D/exec.sh $$< $$(dir $$@)
-	@ touch $$@
-	@ echo Ok
-endef
+$T/stats: $D/avg.sh $(metrics)
+	. $^ > $@.tmp
+	mv $@.tmp $@
 
-$(eval $(cmd))
+$T/file/%/metrics: $T/file/%/tested $D/metrics.sh
+	. $D/metrics.sh $< > $@
+
+$(tested): $T/file/%/tested: % _build/default/$(exe) $D/exec.sh
+	mkdir -p $(dir $@)
+
+	$(log_err dune exec $(exe) -- --input $<) > $@.tmp
+	mv $@.tmp $@

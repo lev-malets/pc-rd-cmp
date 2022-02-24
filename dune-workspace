@@ -1,7 +1,0 @@
-(lang dune 2.8)
-
-(context (opam (switch 4.06.1+rescript)
- (name default)
- (merlin)
- (env (_
-  (ocamlopt_flags :standard -O3)))))

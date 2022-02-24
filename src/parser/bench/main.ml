@@ -19,21 +19,22 @@ let () =
     let src = Res_io.readFile ~filename in
 
     let test =
-        if String.sub filename ~pos:(String.length filename - 4) ~len:4 = ".res" then
+        match Filename.extension filename with
+        | ".res" ->
             List.map parsers
                 ~f:begin fun (name, fn) ->
                     Core_bench.Bench.Test.create ~name @@ fun () ->
                         let (module P: Pc_syntax.Sigs.PARSE) = fn () in
                         Option.value_exn (P.parse_implementation ~src ~filename)
                 end
-        else if String.sub filename ~pos:(String.length filename - 5) ~len:5 = ".resi" then
+        | ".resi" ->
             List.map parsers
                 ~f:begin fun (name, fn) ->
                     Core_bench.Bench.Test.create ~name @@ fun () ->
                         let (module P: Pc_syntax.Sigs.PARSE) = fn () in
                         Option.value_exn (P.parse_interface ~src ~filename)
                 end
-        else
+        | _ ->
             failwith filename
     in
 

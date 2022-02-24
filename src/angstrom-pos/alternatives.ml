@@ -1,13 +1,13 @@
-open Base
+open Core_kernel
 
 module MakeNotMemoized (Pos : Sigs.POS) = struct
     open Pos
 
     let memo p =
         let id = Id.get() in
-        let _ = Hashtbl.add Pos.memoid2id ~key:id ~data:p.Pos.Parser.id in
-        let _ = Hashtbl.add Pos.id2memoid ~data:id ~key:p.Pos.Parser.id in
-        Pos.Parser.{p with id}
+        let _ = Hashtbl.add Pos.memoid2id ~key:id ~data:p.Parser.id in
+        let _ = Hashtbl.add Pos.id2memoid ~data:id ~key:p.Parser.id in
+        Parser.{p with id}
 end
 
 module MakeNotPeek (Pos : Sigs.POS) = struct
@@ -25,7 +25,7 @@ module MakeMeasured (Pos : Sigs.POS) = struct
     let id2info = Hashtbl.create (module Int)
 
     let measured p =
-        let open Pos.Parser in
+        let open Parser in
         let info = { time = 0; count = 0 } in
         Hashtbl.add_exn id2info ~key:p.id ~data:info;
 
@@ -36,7 +36,7 @@ module MakeMeasured (Pos : Sigs.POS) = struct
         in
         let stop =
             (exec (fun _ ->
-                let time = Int.of_float ((Caml.Sys.time () -. List.hd_exn !start_times) *. 1000000.) in
+                let time = Int.of_float ((Caml.Sys.time () -. List.hd_exn !start_times) *. 1_000_000_000.) in
                 info.time <- info.time + time;
                 info.count <- info.count + 1;
                 start_times := List.tl_exn !start_times))
@@ -48,21 +48,12 @@ module MakeMeasured (Pos : Sigs.POS) = struct
 end
 
 module Exec_info = struct
-    type exit_kind =
-        | Exit of { pos: Lexing.position }
-        | Error
-
-    type stats =
-        { call_count : float
-        ; pos_count : int
-        }
-
-    type stats_table = (int, stats) Hashtbl.t
-
     type entry_info =
         { id: int
         ; enter_pos: Lexing.position
-        ; exit: exit_kind
+        ; exit_pos : Lexing.position
+        ; succeded : bool
+        ; time     : int
         }
 
     type entry =
@@ -75,9 +66,9 @@ module Exec_info = struct
 
     let make _ = { entries = [] }
 
-    let add_entry t ~id ~enter_pos ~exit ~subs =
+    let add_entry t ~id ~enter_pos ~exit_pos ~succeded ~subs ~time =
         let info =
-            { id; enter_pos; exit }
+            { id; enter_pos; exit_pos; succeded; time }
         in
 
         t.entries <- {info; subs} :: t.entries
@@ -93,65 +84,79 @@ module Exec_info = struct
 
             String.compare p1.pos_fname p2.pos_fname
 
-
-        let sexp_of_t p =
-            Sexp.List Lexing.[
-                String.sexp_of_t p.pos_fname;
-                Int.sexp_of_t p.pos_lnum;
-                Int.sexp_of_t p.pos_cnum;
-                Int.sexp_of_t p.pos_bol;
-            ]
-
+        let sexp_of_t _ = failwith ""
         let hash p = p.Lexing.pos_bol
     end
 
-    let to_pos_stats t =
-        let stats = Hashtbl.create (module Int) in
+    module IntStatistics = struct
+        type t =
+            { sum   : int
+            ; min   : int
+            ; max   : int
+            ; count : int
+            }
 
-        let rec collect_stats vec = List.iter ~f:collect_entry_stats vec.entries
-        and collect_entry_stats entry =
-            let info = entry.info in
-            let table =
-                match Hashtbl.find stats info.id with
-                | Some tbl -> tbl
-                | None ->
-                    let tbl = Hashtbl.create (module PosKey) in
-                    let _ = Hashtbl.add stats ~key:info.id ~data:tbl in
-                    tbl
+        let empty =
+            { sum = 0
+            ; min = Int.min_value
+            ; max = Int.max_value
+            ; count = 0
+            }
+
+        let add x t =
+            { sum = t.sum + x
+            ; min = Int.min x t.min
+            ; max = Int.max x t.max
+            ; count = t.count + 1
+            }
+
+        let mean t = (Float.of_int t.sum /. Float.of_int t.count)
+    end
+
+    module Collect = struct
+        type stats =
+            { positions                   : (PosKey.t, unit) Hashtbl.t
+            ; mutable time                : IntStatistics.t
+            ; mutable time_individual     : IntStatistics.t
+            }
+
+        let rec collect_from_entry table e =
+            let stats = Hashtbl.find_or_add table e.info.id
+                ~default:begin fun _ ->
+                    { positions = Hashtbl.create (module PosKey)
+                    ; time = IntStatistics.empty
+                    ; time_individual = IntStatistics.empty
+                    }
+                end
             in
 
-            Hashtbl.update table info.enter_pos ~f:(function Some x -> x + 1 | None -> 1);
-            collect_stats entry.subs
-        in
-        collect_stats t;
-        stats
+            Hashtbl.change stats.positions e.info.enter_pos ~f:(fun _ -> Some ());
+            stats.time <- IntStatistics.add e.info.time stats.time;
+
+            let time_sub = List.fold ~f:(fun acc x -> acc + x.info.time) ~init:0 e.subs.entries in
+            stats.time_individual <- IntStatistics.add (e.info.time - time_sub) stats.time_individual;
+            collect table e.subs
+        and collect table t = List.iter ~f:(collect_from_entry table) t.entries
+    end
+
+    type stats =
+        { call_count               : int
+        ; pos_count                : int
+        ; time                     : IntStatistics.t
+        ; time_individual          : IntStatistics.t
+        }
 
     let to_stats t =
-        let pos_stats = to_pos_stats t in
-        let table = Hashtbl.create (module Int) ~size:(Hashtbl.length pos_stats) in
-        Hashtbl.iteri
-            ~f:begin fun ~key:parser ~data:pos_stats ->
-                if Hashtbl.length pos_stats <> 0 then
+        let table = Hashtbl.create (module Int) in
 
-                let sum = ref 0 in
-                let count = ref 0 in
-
-                Hashtbl.iter
-                    ~f:begin fun count_ ->
-                        sum := !sum + count_;
-                        count := !count + 1;
-                    end
-                    pos_stats;
-
-                let stats =
-                    { call_count = (Float.of_int !sum) /. (Float.of_int !count)
-                    ; pos_count = !count
-                    }
-                in
-                let _ = Hashtbl.add table ~key:parser ~data:stats in ()
-            end
-            pos_stats;
-        table
+        Collect.collect table t;
+        Hashtbl.map table ~f:begin fun stats ->
+            { call_count = stats.Collect.time.count
+            ; pos_count = Hashtbl.length stats.positions
+            ; time = stats.time
+            ; time_individual = stats.time_individual
+            }
+        end
 
     let gt (p1: Lexing.position) (p2: Lexing.position) =
         let c1 = compare p1.pos_lnum p2.pos_lnum in
@@ -189,33 +194,49 @@ module MakeTraced (Pos : Sigs.POS) = struct
     let branch = ref tt
 
     let traced p =
-        Pos.Parser.{ p with p =
-            let open Pos.Angstrom in
-
-            return () >>= fun _ ->
+        Parser.{ p with p =
+            { Pos.Angstrom.Expose.Parser.run = fun input pos more fail succ ->
                 let parent_branch = !branch in
                 let subs = Exec_info.make () in
-
-                let finalize enter_pos exit =
-                    Exec_info.add_entry
-                        parent_branch
-                        ~id:p.id ~enter_pos ~exit ~subs;
-
-                    branch := parent_branch;
-                in
-
                 branch := subs;
 
-                Pos.pos.p
-                >>= fun p1 ->
-                    p.p <|> (exec (fun _ -> finalize p1 Error) >> fail "")
-                >>= fun x ->
-                    Pos.pos.p
-                >>| fun p2 ->
-                    finalize p1 @@ Exit { pos = p2 };
-                    x
+                let enter_pos = Pos.Expose.make_position pos in
+                let enter_time = Sys.time () in
+
+                let finalize pos succeded =
+                    let exit_time = Sys.time () in
+                    let time = Int.of_float_unchecked ((exit_time -. enter_time) *. 1_000_000_000.) in
+                    let exit_pos = Pos.Expose.make_position pos in
+                    Exec_info.add_entry
+                        parent_branch
+                        ~id:p.id ~enter_pos ~exit_pos ~subs ~succeded ~time;
+
+                    branch := parent_branch
+                in
+
+                let succ input' pos' more' v =
+                    finalize pos' true;
+                    succ input' pos' more' v
+                in
+
+                let fail input' pos' more' marks' msg' =
+                    finalize pos' false;
+                    fail input' pos' more' marks' msg'
+                in
+
+                p.p.run input pos more fail succ
+            }
         }
 
     let named name p = traced @@ Pos.named name p
     let memo p = traced @@ Pos.memo p
+
+    let nop = named "nop" @@ Pos.return ()
+    let nop_inner = named "nop-inner" @@ Pos.return ()
+    let nop_outer = named "nop-outer" @@ nop_inner
+
+    let hlp =
+        Pos.(>>)
+        (Array.create ~len:999 nop  |> Array.fold ~init:nop ~f:Pos.(>>))
+        (Array.create ~len:999 nop_outer  |> Array.fold ~init:nop_outer ~f:Pos.(>>))
 end

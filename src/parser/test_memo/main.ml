@@ -42,24 +42,36 @@ let () =
         ~f:begin fun ~key:parser ~data:stats ->
             let name = APosTraced.name_of_id parser in
             if Char.(name.[0] <> '\'') then
-            list := (name, parser, stats) :: !list
+            list := (name, stats) :: !list
         end
         stats;
 
-    let list = List.sort ~compare:(fun (n1, _, _) (n2, _, _) -> String.compare n1 n2) !list in
+    let list = List.sort ~compare:(fun (n1, _) (n2, _) -> String.compare n1 n2) !list in
 
     (*Printf.fprintf ch "memo table size: %d\n\n" (Hashtbl.length Measured.table);*)
-    Printf.fprintf ch "%40s | %10s |  | \n\n" "name" "call count";
+    Printf.fprintf ch "%40s | %16s | %16s | %16s | %16s | %16s | %16s\n\n"
+        "name" "call count" "cc per pos" "time" "s time" "s time per call" "ind time";
 
     List.iter
-        ~f:begin fun (name, parser, stats) ->
-            let info = Hashtbl.find_exn Measured.id2info parser in
+        ~f:begin fun (name, stats) ->
+            let info_time =
+                Hashtbl.find APosMeasured.name2id name
+                |> Option.value_map ~default:(-1)
+                    ~f:(fun id -> (Hashtbl.find_exn Measured.id2info id).time)
+            in
 
-            Printf.fprintf ch "%40s | %16d | %16.4f | %16d | %16.2f\n"
+            Printf.fprintf ch "%40s | %16d | %16.4f | %16d | %16d | %16.2f | %16d\n"
                 name
-                info.count stats.Angstrom_pos.Alt.Exec_info.call_count
-                info.time
-                (float_of_int info.time /. float_of_int info.count)
+                stats.Angstrom_pos.Alt.Exec_info.call_count
+                (
+                    Float.of_int stats.call_count
+                    /.
+                    Float.of_int stats.Angstrom_pos.Alt.Exec_info.pos_count
+                )
+                info_time
+                stats.Angstrom_pos.Alt.Exec_info.time.sum
+                Angstrom_pos.Alt.Exec_info.IntStatistics.(mean stats.time)
+                stats.Angstrom_pos.Alt.Exec_info.time_individual.sum
         end
         list;
     Out_channel.close ch

@@ -19,11 +19,9 @@ module Make
     open Pattern
     open Modexpr
 
-    module Parser = APos.Parser
-
     type arrow_parser_helpers = {
-        args_loop : expression Parser.t;
-        types_loop : expression Parser.t;
+        args_loop : expression parser;
+        types_loop : expression parser;
     }
 
     let x = fix_poly @@ fun getter ->

@@ -31,7 +31,7 @@ module Make (APos: APOS): UTILS = struct
     let comment =
         single_line_comment <|> multi_line_comment
         >>|
-        fun x pos comments -> Res_comment.setPrevTokEndPos x pos; x :: comments
+        fun x pos comments -> Basic.LogElement.Comment (Res_comment.setPrevTokEndPos x pos; x) :: comments
 
     let comments =
         fold_left_0_n
@@ -47,8 +47,7 @@ module Make (APos: APOS): UTILS = struct
         let p2 =
             p >>= fun (pos, x) ->
                 match x with
-                | Some (hlp, _) ->
-                    (APos.state_map (fun s -> {s with comments = hlp pos s.comments})).p
+                | Some (hlp, _) -> Angstrom.log_many (hlp pos [])
                 | _ -> Angstrom.return ()
         in
         {p2 with info = p.info}

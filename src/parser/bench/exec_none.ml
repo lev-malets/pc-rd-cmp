@@ -1,7 +1,4 @@
 
-module APos = Angstrom_pos.Make(Pc_syntax.Basic.LogElement)
-module Parse = Pc_syntax.Parser.Make(APos)
-
 let input = ref ""
 let anon_fun _ = ()
 
@@ -15,6 +12,6 @@ let () =
     let src = Res_io.readFile ~filename in
 
     match Filename.extension filename with
-    | ".res" -> let _ = Parse.parse_implementation ~filename ~src in ()
-    | ".resi" -> let _ = Parse.parse_interface ~filename ~src in ()
+    | ".res" -> assert (String.length src > 0)
+    | ".resi" -> assert (String.length src > 0)
     | _ -> failwith filename

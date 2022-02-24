@@ -1,25 +1,9 @@
-include make/base.mk
+$K/done: $K/tested
 
-T := $T/_
+_build/default/$D/main.exe: force $(KEYS)/deps/done
+	$(log_err dune build $D/main.exe)
 
-tested := $(patsubst %,$T/%/tested,$(base_files) $(syntax_test_files) $(syntax_benchmark_files))
-expected := $(patsubst %/tested,%/expected,$(tested))
-actual := $(patsubst %/tested,%/actual,$(tested))
-
-$D: $(tested)
-
-exe := $D/main.exe
-
-define cmd
-$(DUNE_DIR)/$(exe): force $(KEYS)/deps/done
-	$(call dune,build $(exe))
-
-$(tested): $T/%/tested: % $(DUNE_DIR)/$(exe) $D/exec.sh
-	@ mkdir -p $$(dir $$@)
-	@ echo Test $$<
-	@ bash ./$D/exec.sh $$< $$(dir $$@)
-	@ touch $$@
-	@ echo Ok
-endef
-
-$(eval $(cmd))
+$K/tested: _build/default/$D/main.exe $D/exec.sh
+	@ mkdir -p $(dir $@)
+	@ bash ./$D/exec.sh $T
+	@ touch $@

@@ -5,5 +5,5 @@
 	path = src/angstrom-mod
 	url = https://github.com/lev-malets/angstrom
 [submodule "make"]
-	path = make
+	path = make-helper
 	url = https://github.com/lev-malets/make-helper
