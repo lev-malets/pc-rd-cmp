@@ -42,8 +42,8 @@ let mk_parse ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.PARSE) =
 module type TRACED = module type of Angstrom_pos.Alt.MakeTraced(Angstrom_pos.Make(Pc_syntax.Basic.LogElement))
 module type MEAZURED = module type of Angstrom_pos.Alt.MakeMeasured(Angstrom_pos.Make(Pc_syntax.Basic.LogElement))
 
-let mk_traced ?(peek=false) () =
-    let (module APos: Pc_syntax.Sigs.APOS) = mk_apos ~peek ~memo:true () in
+let mk_traced ?(peek=false) ?(memo=false) () =
+    let (module APos: Pc_syntax.Sigs.APOS) = mk_apos ~peek ~memo () in
 
     let module Traced = Angstrom_pos.Alt.MakeTraced(APos) in
     (module Traced: TRACED)

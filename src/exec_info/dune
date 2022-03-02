@@ -1,2 +1,20 @@
 (library
- (name exec_info))
+ (name ppx_deriving__ord)
+ (kind ppx_rewriter)
+ (modules)
+ (libraries ppx_deriving.ord))
+
+(library
+ (name exec_info)
+ (modules exec_info)
+ (libraries base)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving__ord)))
+
+(library
+ (name exec_info_tests)
+ (modules exec_info_tests)
+ (libraries exec_info)
+ (preprocess
+  (pps ppx_inline_test ppx_assert))
+ (inline_tests))

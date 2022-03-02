@@ -1,4 +1,0 @@
-(executable
- (name main)
- (libraries angstrom_pos)
- (preprocess (pps ppx_deriving.show)))

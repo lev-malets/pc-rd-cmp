@@ -93,7 +93,6 @@ module Make(T: sig type t end) = struct
         let (<|>) p q =
             { Angstrom.Expose.Parser.run = fun input pos more fail succ ->
                 let s = State.get () in
-
                 let fail' input' _pos' more' _marks _msg =
                     State.set s;
                     q.Angstrom.Expose.Parser.run input' pos more' fail succ

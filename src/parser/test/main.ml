@@ -24,12 +24,14 @@ let print_last_pos () =
     match !trace with
     | None -> ()
     | Some ((module Traced), (module APos)) ->
-        let path, pos = Angstrom_pos.Alt.Exec_info.last_pos Traced.tt in
+        let pos = Exec_info.last_pos @@ List.rev !Traced.entries in
+        (*
         let names =
             List.map path ~f:APos.name_of_id
         in
 
         Caml.Printf.printf "%s\n" @@ String.concat ~sep:" |> " names;
+        *)
         Caml.Printf.printf "%s:%d:%d\n" pos.pos_fname pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
 let print_ast ~pp x =

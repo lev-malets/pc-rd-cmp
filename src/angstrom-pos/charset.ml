@@ -4,15 +4,25 @@ type t =
     ; w3 : Int64.t
     ; w4 : Int64.t
     }
+
+type word_no = W1 | W2 | W3 | W4
+
+let word_no_of_code c =
+    match c lsr 6 with
+    | 0 -> W1
+    | 1 -> W2
+    | 2 -> W3
+    | 3 -> W4
+    | _ -> failwith @@ Printf.sprintf "invalid char code: %d" c
 let empty = { w1 = Int64.zero; w2 = Int64.zero; w3 = Int64.zero; w4 = Int64.zero }
 let full = { w1 = Int64.minus_one; w2 = Int64.minus_one; w3 = Int64.minus_one; w4 = Int64.minus_one }
 
 let add_code t code =
-    match [@warning "-8"] code lsr 6 with
-    | 0 -> { t with w1 = Int64.logor t.w1 (Int64.shift_left Int64.one code) }
-    | 1 -> { t with w2 = Int64.logor t.w2 (Int64.shift_left Int64.one (code - 64)) }
-    | 2 -> { t with w3 = Int64.logor t.w3 (Int64.shift_left Int64.one (code - 128)) }
-    | 3 -> { t with w4 = Int64.logor t.w4 (Int64.shift_left Int64.one (code - 192)) }
+    match word_no_of_code code with
+    | W1 -> { t with w1 = Int64.logor t.w1 (Int64.shift_left Int64.one code) }
+    | W2 -> { t with w2 = Int64.logor t.w2 (Int64.shift_left Int64.one (code - 64)) }
+    | W3 -> { t with w3 = Int64.logor t.w3 (Int64.shift_left Int64.one (code - 128)) }
+    | W4 -> { t with w4 = Int64.logor t.w4 (Int64.shift_left Int64.one (code - 192)) }
 
 let add t c = add_code t @@ Char.code c
 
@@ -31,23 +41,24 @@ let singleton = add empty
 let range a b =
     let acode = Char.code a in
     let bcode = Char.code b in
+    assert (acode <= bcode);
 
-    match [@warning "-8"] acode lsr 6, bcode lsr 6 with
-    | _, 0 ->
+    match word_no_of_code acode, word_no_of_code bcode with
+    | W1, W1 ->
         { empty with w1 = Int64.(shift_left (shift_left minus_one (bcode - acode + 1) |> lognot) acode) }
-    | 0, 1 ->
+    | W1, W2 ->
         let bcode = bcode - 64 in
         { empty with
             w1 = Int64.(shift_left minus_one acode);
             w2 = Int64.(shift_left minus_one (bcode + 1) |> lognot);
         }
-    | 1, 1 ->
+    | W2, W2 ->
         let bcode = bcode - 64 in
         let acode = acode - 64 in
         { empty with
             w2 = Int64.(shift_left (shift_left minus_one (bcode - acode + 1) |> lognot) acode);
         }
-    | 0, 2 ->
+    | W1, W3 ->
         let bcode = bcode - 128 in
         { empty with
             w1 = Int64.(shift_left minus_one acode);
@@ -55,20 +66,20 @@ let range a b =
             w3 = Int64.(shift_left minus_one (bcode + 1) |> lognot);
 
         }
-    | 1, 2 ->
+    | W2, W3 ->
         let bcode = bcode - 128 in
         let acode = acode - 64 in
         { empty with
             w2 = Int64.(shift_left minus_one acode);
             w3 = Int64.(shift_left minus_one (bcode + 1) |> lognot);
         }
-    | 2, 2 ->
+    | W3, W3 ->
         let bcode = bcode - 128 in
         let acode = acode - 128 in
         { empty with
             w3 = Int64.(shift_left (shift_left minus_one (bcode - acode + 1) |> lognot) acode);
         }
-    | 0, 3 ->
+    | W1, W4 ->
         let bcode = bcode - 192 in
         {
             w1 = Int64.(shift_left minus_one acode);
@@ -76,7 +87,7 @@ let range a b =
             w3 = Int64.minus_one;
             w4 = Int64.(shift_left minus_one (bcode + 1) |> lognot);
         }
-    | 1, 3 ->
+    | W2, W4 ->
         let bcode = bcode - 192 in
         let acode = acode - 64 in
         { empty with
@@ -84,19 +95,20 @@ let range a b =
             w3 = Int64.minus_one;
             w4 = Int64.(shift_left minus_one (bcode + 1) |> lognot);
         }
-    | 2, 3 ->
+    | W3, W4 ->
         let bcode = bcode - 192 in
         let acode = acode - 128 in
         { empty with
             w3 = Int64.(shift_left minus_one acode);
             w4 = Int64.(shift_left minus_one (bcode + 1) |> lognot);
         }
-    | 3, 3 ->
+    | W4, W4 ->
         let bcode = bcode - 192 in
         let acode = acode - 192 in
         { empty with
             w4 = Int64.(shift_left (shift_left minus_one (bcode - acode + 1) |> lognot) acode);
         }
+    | _, _ -> failwith "unreachable"
 
 
 let iter_code f t =
