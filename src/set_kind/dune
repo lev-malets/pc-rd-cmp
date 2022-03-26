@@ -1,0 +1,11 @@
+(library
+ (name ppx_deriving__ord)
+ (kind ppx_rewriter)
+ (modules)
+ (libraries ppx_deriving.ord))
+
+(library
+ (name ppx_deriving__show)
+ (kind ppx_rewriter)
+ (modules)
+ (libraries ppx_deriving.show))

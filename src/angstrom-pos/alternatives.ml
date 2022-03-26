@@ -21,32 +21,6 @@ type measured_info = {
     mutable time: int;
     mutable count: int;
 }
-module MakeMeasured (Pos : Sigs.POS) = struct
-    let id2info = Hashtbl.create (module Int)
-
-    let measured p =
-        let open Parser in
-        let info = { time = 0; count = 0 } in
-        Hashtbl.add_exn id2info ~key:p.id ~data:info;
-
-        let start_times = ref [] in
-        let open Pos.Angstrom in
-        let start =
-            exec (fun _ -> start_times := Caml.Sys.time () :: !start_times)
-        in
-        let stop =
-            (exec (fun _ ->
-                let time = Int.of_float ((Caml.Sys.time () -. List.hd_exn !start_times) *. 1_000_000_000.) in
-                info.time <- info.time + time;
-                info.count <- info.count + 1;
-                start_times := List.tl_exn !start_times))
-        in
-        { p with p = start >> p.p << stop <|> (stop >> fail "") }
-
-    let named name p = measured @@ Pos.named name p
-    let memo p = measured @@ Pos.memo p
-end
-
 
 module MakeTraced (Pos : Sigs.POS) = struct
     let entries = ref []
@@ -54,7 +28,7 @@ module MakeTraced (Pos : Sigs.POS) = struct
 
     let traced p =
         Parser.{ p with p =
-            { Pos.Angstrom.Expose.Parser.run = fun input pos more fail succ ->
+            { Angstrom.Expose.Parser.run = fun input pos more fail succ ->
                 let enter_time = Sys.time () in
                 let enter_pos = Pos.Expose.make_position pos in
                 let d = !depth in

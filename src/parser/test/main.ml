@@ -74,7 +74,7 @@ let () =
 
         begin match x with
         | None -> print_last_pos (); failwith "x"
-        | Some x -> print_ast ~pp: Printast.implementation @@
+        | Some x -> print_ast ~pp:Printast.implementation @@
             {x with parsetree = Pc_syntax.Parsetree_mapping.structure !mapping x.parsetree}
         end
     | ".resi" ->

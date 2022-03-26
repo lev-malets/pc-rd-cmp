@@ -2,6 +2,7 @@ open Core_kernel
 
 module Make(T: sig type t end) = struct
     type s = T.t
+    type log_elem = s
 
     let inc x = x := !x + 1
 
@@ -72,8 +73,13 @@ module Make(T: sig type t end) = struct
             }
     end
 
-    module Angstrom = struct
+    module Simple = struct
         include Angstrom
+
+        let fail =
+            { Angstrom.Expose.Parser.run = fun input pos more fail _succ ->
+                fail input pos more [] ""
+            }
 
         let (>>) = ( *> )
         let (<<) = ( <* )
@@ -99,18 +105,10 @@ module Make(T: sig type t end) = struct
                 in
                 p.Angstrom.Expose.Parser.run input pos more fail' succ
             }
-        let choice ?failure_msg:_ _ = failwith ""
 
         let many p =
             fix (fun m ->
               (lift2 (fun x xs -> x::xs) p m) <|> return [])
-
-        let many1 _ = failwith ""
-        let many_till _ _ = failwith ""
-        let sep_by1 _ _ = failwith ""
-        let sep_by _ _ = failwith ""
-        let skip_many _ = failwith ""
-        let skip_many1 _ = failwith ""
 
         let log x =
             { Angstrom.Expose.Parser.run = fun input pos more _fail succ ->
@@ -166,45 +164,47 @@ module Make(T: sig type t end) = struct
         { p; info; typ; id = Id.get() }
 
     let (>>) p1 p2 =
+        let open Simple in
         match p1.typ, p2.typ with
         | Return _, _ -> p2
         | _, Return v ->
-            mk_parser_cont p1 p2 ~p:Angstrom.(p1.p >>| fun _ -> v) ~typ:(Value { v; p = p1.p })
+            mk_parser_cont p1 p2 ~p:(p1.p >>| fun _ -> v) ~typ:(Value { v; p = p1.p })
         | _, Value { v; _ } ->
-            let p = Angstrom.(p1.p >> p2.p) in
+            let p = (p1.p >> p2.p) in
             mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
         | _, Lift { f; a } ->
-            let a = Angstrom.(p1.p >> a) in
-            mk_parser_cont p1 p2 ~p:Angstrom.(lift f a) ~typ:(Lift { f; a })
+            let a = (p1.p >> a) in
+            mk_parser_cont p1 p2 ~p:(lift f a) ~typ:(Lift { f; a })
         | _, Lift2 { f; a; b } ->
-            let a = Angstrom.(p1.p >> a) in
-            mk_parser_cont p1 p2 ~p:Angstrom.(lift2 f a b) ~typ:(Lift2 { f; a; b })
+            let a = (p1.p >> a) in
+            mk_parser_cont p1 p2 ~p:(lift2 f a b) ~typ:(Lift2 { f; a; b })
         | _, Lift3 { f; a; b; c } ->
-            let a = Angstrom.(p1.p >> a) in
-            mk_parser_cont p1 p2 ~p:Angstrom.(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
+            let a = (p1.p >> a) in
+            mk_parser_cont p1 p2 ~p:(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
         | _ ->
-            mk_parser_cont p1 p2 ~p:Angstrom.(p1.p >> p2.p) ~typ:Parser
+            mk_parser_cont p1 p2 ~p:(p1.p >> p2.p) ~typ:Parser
     let (<<) p1 p2 =
+        let open Simple in
         match p1.typ, p2.typ with
         | _, Return _ -> p1
         | Return v, _ ->
-            mk_parser_cont p1 p2 ~p:Angstrom.(p2.p >>| fun _ -> v) ~typ:(Value { v; p = p2.p })
+            mk_parser_cont p1 p2 ~p:(p2.p >>| fun _ -> v) ~typ:(Value { v; p = p2.p })
         | Value { v; _ }, _ ->
-            let p = Angstrom.(p1.p << p2.p) in
+            let p = (p1.p << p2.p) in
             mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
         | Lift { f; a }, _ ->
-            let a = Angstrom.(<<) a p2.p in
-            mk_parser_cont p1 p2 ~p:Angstrom.(lift f a) ~typ:(Lift { f; a })
+            let a = (<<) a p2.p in
+            mk_parser_cont p1 p2 ~p:(lift f a) ~typ:(Lift { f; a })
         | Lift2 { f; a; b }, _ ->
-            let b = Angstrom.(<<) b p2.p in
-            mk_parser_cont p1 p2 ~p:Angstrom.(lift2 f a b) ~typ:(Lift2 { f; a; b })
+            let b = (<<) b p2.p in
+            mk_parser_cont p1 p2 ~p:(lift2 f a b) ~typ:(Lift2 { f; a; b })
         | Lift3 { f; a; b; c }, _ ->
-            let c = Angstrom.(<<) c p2.p in
-            mk_parser_cont p1 p2 ~p:Angstrom.(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
+            let c = (<<) c p2.p in
+            mk_parser_cont p1 p2 ~p:(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
         | _ ->
-            mk_parser_cont p1 p2 ~p:Angstrom.(p1.p << p2.p) ~typ:Parser
+            mk_parser_cont p1 p2 ~p:(p1.p << p2.p) ~typ:Parser
     let (<|>) p1 p2 =
-        { p = Angstrom.(p1.p <|> p2.p)
+        { p = Simple.(p1.p <|> p2.p)
         ; info =
             begin match p1.info, p2.info with
             | Unknown, _ -> Unknown
@@ -223,23 +223,24 @@ module Make(T: sig type t end) = struct
         }
 
     let (<*>) pf pv =
+        let open Simple in
         match pf.typ with
         | Return f ->
             let a = pv.p in
-            mk_parser_cont pf pv ~p:Angstrom.(lift f a) ~typ:(Lift { f; a })
+            mk_parser_cont pf pv ~p:(lift f a) ~typ:(Lift { f; a })
         | Value { v = f; p } ->
-            let a = Angstrom.(p >> pv.p) in
-            mk_parser_cont pf pv ~p:Angstrom.(lift f a) ~typ:(Lift { f; a })
+            let a = (p >> pv.p) in
+            mk_parser_cont pf pv ~p:(lift f a) ~typ:(Lift { f; a })
         | Lift { f; a } ->
-            mk_parser_cont pf pv ~p:Angstrom.(lift2 f a pv.p) ~typ:(Lift2 { f; a; b = pv.p })
+            mk_parser_cont pf pv ~p:(lift2 f a pv.p) ~typ:(Lift2 { f; a; b = pv.p })
         | Lift2 { f; a; b } ->
-            mk_parser_cont pf pv ~p:Angstrom.(lift3 f a b pv.p) ~typ:(Lift3 { f; a; b; c = pv.p })
+            mk_parser_cont pf pv ~p:(lift3 f a b pv.p) ~typ:(Lift3 { f; a; b; c = pv.p })
         | Lift3 { f; a; b; c } ->
-            mk_parser_cont pf pv ~p:Angstrom.(lift4 f a b c pv.p) ~typ:Parser
+            mk_parser_cont pf pv ~p:(lift4 f a b c pv.p) ~typ:Parser
         | _ ->
-            mk_parser_cont pf pv ~p:Angstrom.(pf.p <*> pv.p) ~typ:Parser
+            mk_parser_cont pf pv ~p:(pf.p <*> pv.p) ~typ:Parser
     let (>>$) pp v =
-        let p = Angstrom.(pp.p >>$ v) in
+        let p = Simple.(pp.p >>$ v) in
         { pp with p
         ; typ =
             Value
@@ -253,14 +254,31 @@ module Make(T: sig type t end) = struct
             | _ -> Unknown
         in
 
-        { p = Angstrom.(p.p >>= f)
+        { p = Simple.(p.p >>= f)
+        ; info
+        ; typ = Parser
+        ; id = Id.get()
+        }
+
+    let run p =
+        let info =
+            match p.info with
+            | Consume { empty = false; _ } as x -> x
+            | _ -> Unknown
+        in
+
+        { p =
+            { run = fun input pos more fail succ ->
+                let succ' input' pos' more' v = v.Angstrom.Expose.Parser.run input' pos' more' fail succ in
+                p.p.run input pos more fail succ'
+            }
         ; info
         ; typ = Parser
         ; id = Id.get()
         }
 
     let (>>|) p f =
-        { p with p = Angstrom.(p.p >>| f)
+        { p with p = Simple.(p.p >>| f)
         ; typ = Parser
         ; id = Id.get()
         }
@@ -304,20 +322,20 @@ module Make(T: sig type t end) = struct
         Lazy.force res
 
     let return x =
-        { p = Angstrom.(return x)
+        { p = Simple.(return x)
         ; info = Empty
         ; typ = Return x
         ; id = Id.get()
         }
     let advance i =
         if i = 0 then
-            { p = Angstrom.(advance 0)
+            { p = Simple.(advance 0)
             ; info = Empty
             ; typ = Return ()
             ; id = Id.get()
             }
         else
-            let p = Angstrom.(advance i) in
+            let p = Simple.(advance i) in
             { p
             ; info = Consume
                 { empty = false
@@ -328,17 +346,14 @@ module Make(T: sig type t end) = struct
             }
 
     let fail =
-        { p =
-            { run = fun input pos more fail _succ ->
-                fail input pos more [] ""
-            }
+        { p = Simple.fail
         ; info = Unknown
         ; typ = Parser
         ; id = Id.fail
         }
 
     let any_char =
-        { p = Angstrom.any_char
+        { p = Simple.any_char
         ; info = Consume
             { empty = false
             ; first = Charset.full
@@ -348,14 +363,14 @@ module Make(T: sig type t end) = struct
         }
 
     let peek_char =
-        { p = Angstrom.peek_char
+        { p = Simple.peek_char
         ; info = Unknown
         ; typ = Parser
         ; id = Id.get()
         }
 
     let char c =
-        let p = Angstrom.char c in
+        let p = Simple.char c in
         { p
         ; info = Consume
             { empty = false
@@ -369,7 +384,7 @@ module Make(T: sig type t end) = struct
         if String.(s = "") then
             return ""
         else
-            let p = Angstrom.string s in
+            let p = Simple.string s in
             { p
             ; info = Consume
                 { empty = false
@@ -394,7 +409,7 @@ module Make(T: sig type t end) = struct
         loop Charset.empty 0
 
     let take_while f =
-        { p = Angstrom.take_while f
+        { p = Simple.take_while f
         ; info = Consume
             { empty = false
             ; first = mk_first_test f
@@ -404,7 +419,7 @@ module Make(T: sig type t end) = struct
         }
 
     let take_while1 f =
-        { p = Angstrom.take_while1 f
+        { p = Simple.take_while1 f
         ; info = Consume
             { empty = false
             ; first = mk_first_test f
@@ -414,7 +429,7 @@ module Make(T: sig type t end) = struct
         }
 
     let skip f =
-        { p = Angstrom.skip f
+        { p = Simple.skip f
         ; info = Consume
             { empty = false
             ; first = mk_first_test f
@@ -424,7 +439,7 @@ module Make(T: sig type t end) = struct
         }
 
     let skip_while f =
-        { p = Angstrom.skip_while f
+        { p = Simple.skip_while f
         ; info = Consume
             { empty = false
             ; first = mk_first_test f
@@ -434,7 +449,7 @@ module Make(T: sig type t end) = struct
         }
 
     let satisfy f =
-        { p = Angstrom.satisfy f
+        { p = Simple.satisfy f
         ; info = Consume
             { empty = false
             ; first = mk_first_test f
@@ -452,6 +467,7 @@ module Make(T: sig type t end) = struct
         ; typ = Parser
         ; id = Id.get()
         }
+    let pos_end = pos
     let advance_line =
         let p =
             { Angstrom.Expose.Parser.run = fun i p m _ s ->
@@ -510,7 +526,7 @@ module Make(T: sig type t end) = struct
     let with_literal p =
         { p with p =
             begin
-                let open Angstrom in
+                let open Simple in
                 return () >>= fun _ ->
                 let res = ref None in
                 consumed (p.p >>| fun v -> res := Some v) >>| fun str ->
@@ -522,13 +538,13 @@ module Make(T: sig type t end) = struct
         }
 
     let consumed p =
-        { p with p = Angstrom.consumed p.p
+        { p with p = Simple.consumed p.p
         ; typ = Parser
         ; id = Id.get()
         }
 
     let exec f =
-        { p = Angstrom.exec f
+        { p = Simple.exec f
         ; info = Empty
         ; typ = Parser
         ; id = Id.get()
@@ -555,7 +571,7 @@ module Make(T: sig type t end) = struct
         }
 
     let opt p =
-        { p = Angstrom.((p.p >>| fun x -> Some x) <|> return None )
+        { p = Simple.((p.p >>| fun x -> Some x) <|> return None )
         ; info =
             begin match p.info with
             | Unknown -> Unknown
@@ -569,10 +585,10 @@ module Make(T: sig type t end) = struct
     let seq ?(n=0) ?sep ?(trail = false) p =
         let pi, si, tail =
             match sep with
-            | None -> p.info, Empty, Angstrom.many p.p
+            | None -> p.info, Empty, Simple.many p.p
             | Some sep ->
                 let tail =
-                    let open Angstrom in
+                    let open Simple in
                     let t = many (sep.p >> p.p) in
                     if trail then t << ((sep.p >>| fun _ -> ()) <|> return ()) else t
                 in
@@ -607,7 +623,7 @@ module Make(T: sig type t end) = struct
 
         { p =
             begin
-                let open Angstrom in
+                let open Simple in
                 let list =
                     map2 p.p tail
                     ~f:begin fun first tail -> first::tail end
@@ -616,7 +632,7 @@ module Make(T: sig type t end) = struct
                 in
                 list >>= fun list ->
                 if List.length list < n then
-                    fail ""
+                    fail
                 else
                     return list
             end
@@ -678,7 +694,7 @@ module Make(T: sig type t end) = struct
 
         { p =
             begin
-                let open Angstrom in
+                let open Simple in
                 let rec loop acc =
                     (p.p >>= fun x -> loop @@ f acc x)
                     <|>
@@ -732,7 +748,7 @@ module Make(T: sig type t end) = struct
         +pos +p +pos
 
     let peek_first expected =
-        let arr = Array.create ~len:256 Angstrom.(fail "") in
+        let arr = Array.create ~len:256 Simple.fail in
         let first = ref Charset.empty in
 
         let rec loop =
@@ -751,12 +767,12 @@ module Make(T: sig type t end) = struct
 
                 p_first |> Charset.iter_code
                     begin fun c ->
-                        arr.(c) <- Angstrom.(p.p <|> arr.(c))
+                        arr.(c) <- Simple.(p.p <|> arr.(c))
                     end
         in
         loop expected;
 
-        { p = Angstrom.(peek_char_fail >>= fun c -> arr.(Char.to_int c))
+        { p = Simple.(peek_char_fail >>= fun c -> arr.(Char.to_int c))
         ; info =
             Consume
             { empty = false
@@ -867,8 +883,11 @@ module Make(T: sig type t end) = struct
         ; id = Id.get()
         }
 
+    let id p = p.id
+    let simple p = p.p
+
     let parse_string p ?(filename = "none") text =
-        let open Angstrom in
+        let open Simple in
         match parse_string ~consume:All (State.init filename >> p.p) text with
         | Ok x -> Some x
         | _ -> None

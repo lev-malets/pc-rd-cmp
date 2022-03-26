@@ -6,22 +6,27 @@ open Ast_helper
 open Basic
 
 module Make
-        (APos: APOS)
-        (Utils: UTILS) (Constant: CONSTANT) (Core: CORE) (Type: TYPE)
-        : PATTERN = struct
-    open APos
-    open Utils
-    open Constant
+        (Basic: BASIC)
+        (Core: CORE with module Comb = Basic.Comb)
+        (Type: TYPE with module Comb = Basic.Comb)
+        = struct
+    open Basic
     open Core
     open Type
+    open Comb
+
+    module Comb = Comb
+    module type THIS = PATTERN with module Comb = Basic.Comb
 
     let x = fix_poly @@ fun getter ->
         (module struct
-            let pattern = getter.get @@ fun (module M: PATTERN) -> M.pattern
+            module Comb = Comb
+
+            let pattern = getter.get @@ fun (module M: THIS) -> M.pattern
             let pattern_constrainted =
                 named "pattern:constraint" begin
                         with_loc & hlp2 Pat.constraint_
-                        +pattern -ng -s":" -ng +core_type
+                        +pattern -ng -colon -ng +core_type
 
                     ||  pattern
                 end
@@ -29,7 +34,7 @@ module Make
             let pattern_poly_constrainted =
                 named "pattern:constraint:poly" begin
                         with_loc & hlp2 Pat.constraint_
-                        +pattern -ng -s":" -ng +core_type_poly
+                        +pattern -ng -colon -ng +core_type_poly
 
                     ||  pattern
                 end
@@ -58,7 +63,7 @@ module Make
                 in
 
                 with_loc & hlp2 Pat.record
-                -s"{" -ng
+                -l_brace -ng
                 +(seq ~n:1 ~sep
                         (
                             mapping begin fun lid pat ->
@@ -66,12 +71,12 @@ module Make
                                 | Some pat -> lid, pat
                                 | None -> lid, let str = lid2str lid in Pat.var ~loc:str.loc str
                             end
-                            +loc l_longident +opt(ng >> s":" >> ng >> pattern_constrainted)
+                            +loc l_longident +opt(ng >> colon >> ng >> pattern_constrainted)
                         )
                 )
                 +(
-                        opt sep >> ng >> s"}" >>$ Closed
-                    ||  sep >> s"_" >> opt sep >> ng >> s"}" >>$ Open
+                        opt sep >> ng >> r_brace >>$ Closed
+                    ||  sep >> _' >> opt sep >> ng >> r_brace >>$ Open
                 )
 
             let list_helper =
@@ -80,44 +85,39 @@ module Make
             let list =
                 named "pattern:list" begin
                         with_loc & mapping (list_helper [] None)
-                        -s"list{" -ng -s"}"
+                        -list -ng -r_brace
 
-                    ||  s"list{" >> ng >> s"..." >> ng >> pattern_constrainted << opt sep << ng << s"}"
+                    ||  list >> ng >> ellipsis >> ng >> pattern_constrainted << opt sep << ng << r_brace
 
                     ||  with_loc & mapping list_helper
-                        -s"list{" -ng +(seq ~n:1 pattern_constrainted ~sep)
+                        -list -ng +(seq ~n:1 pattern_constrainted ~sep)
                         +(
-                                sep >> ng >> s"..." >> ng >> pattern_constrainted >>| Base.Option.some
+                                sep >> ng >> ellipsis >> ng >> pattern_constrainted >>| Base.Option.some
 
                             ||  return None
                         )
-                        -opt(sep) -ng -s"}"
+                        -opt(sep) -ng -r_brace
                 end
 
             let constructor_arguments =
                     tuple
-                ||  s"(" >> ng >> pattern_constrainted << opt sep << ng << s")"
+                ||  l_paren >> ng >> pattern_constrainted << opt sep << ng << r_paren
                 ||  with_loc & mapping begin fun loc ->
                         Pat.construct ~loc (Location.mknoloc @@ Longident.Lident "()") None
                     end
-                    -s"(" -ng -s")"
+                    -l_paren -ng -r_paren
 
             let construct =
                 with_loc & hlp2 Pat.construct
                 +loc u_longident +opt(constructor_arguments)
 
             let polyvariant =
-                let tag =
-                        ident
-                    ||  string_raw
-                    ||  take_while1 (function '0'..'9' -> true | _ -> false)
-                in
                 with_loc & hlp2 Pat.variant
-                -s"#" +tag +opt(constructor_arguments)
+                +variant_tag +opt(constructor_arguments)
 
             let typ =
                 with_loc & hlp Pat.type_
-                -s"#" -ng -s"..." -ng +loc l_longident
+                -hash -ng -ellipsis -ng +loc l_longident
 
             let unpack =
                 named "pattern:unpack" begin
@@ -125,11 +125,11 @@ module Make
                             let m = Pat.unpack m in
                             Pat.constraint_ ~loc m t
                         end
-                        -s"module" -ng -s"(" -ng +loc u_ident
-                        -ng -s":" -ng +core_type_package -ng -s")"
+                        -module'-ng -l_paren -ng +loc u_ident
+                        -ng -colon -ng +core_type_package -ng -r_paren
 
                     ||  with_loc & hlp Pat.unpack
-                        -s"module" -ng -s"(" -ng +loc u_ident -ng -s")"
+                        -module'-ng -l_paren -ng +loc u_ident -ng -r_paren
                 end
 
             let signed_number =
@@ -139,15 +139,15 @@ module Make
                         | Pconst_float (str, suf) ->
                             Pconst_float ("-" ^ str, suf)
                     end
-                    -s"-" +number
+                    -minus +number
 
-                ||  s"+" >> number
+                ||  plus >> number
 
             let number_range =
                 let number = signed_number <|> number in
 
                 with_loc & hlp2 Pat.interval
-                +number -ng -s".." -ng +number
+                +number -ng -dot_dot -ng +number
 
             let js_string =
                 named "pattern:js_string" begin
@@ -159,24 +159,24 @@ module Make
 
             let true_ =
                 with_loc & mapping (fun l loc -> Pat.construct ~loc (mkloc ~loc:l @@ Hc.lid ["true"]) None)
-                +loc_of(k"true")
+                +loc_of(true')
             let false_ =
                 with_loc & mapping (fun l loc -> Pat.construct ~loc (mkloc ~loc:l @@ Hc.lid ["false"]) None)
-                +loc_of(k"false")
+                +loc_of(false')
 
             let pattern_atom =
                 named "pattern:atom" begin
                     peek_first
                     [
                         with_loc & mapping (fun loc -> Pat.any ~loc ())
-                        -k"_"
+                        -_'
                     ;
                         with_loc & hlp2 Pat.interval
-                        +character -ng -s".." -ng +character
+                        +character -ng -dot_dot -ng +character
                     ; number_range
                     ;
                         with_loc & mapping (fun loc -> Pat.construct ~loc (mkloc ~loc @@ Hc.lid ["()"]) None)
-                        -s"(" -ng -s")"
+                        -l_paren -ng -r_paren
                     ; unpack
                     ; tuple
                     ;
@@ -202,7 +202,7 @@ module Make
 
             let pattern_exception =
                     with_loc & hlp Pat.exception_
-                    -k"exception" -ng +pattern_atom
+                    -exception' -ng +pattern_atom
 
                 ||  with_loc & hlp Pat.extension
                     +extension
@@ -211,7 +211,7 @@ module Make
 
             let primary =
                     with_loc & hlp Pat.lazy_
-                    -k"lazy" -ng +pattern_exception
+                    -lazy' -ng +pattern_exception
                 ||  pattern_exception
 
             let alias =
@@ -221,7 +221,7 @@ module Make
                         mapping begin fun name prev ->
                             Pat.alias ~loc:(loc_comb prev.ppat_loc name.loc) prev name
                         end
-                        -ng -k"as" -ng +loc l_ident
+                        -ng -as' -ng +loc l_ident
                     )
 
             let or_ =
@@ -231,11 +231,11 @@ module Make
                         mapping begin fun alias prev ->
                             Pat.or_ ~loc:(loc_comb prev.ppat_loc alias.ppat_loc) prev alias
                         end
-                        -ng -s"|" -ng +alias
+                        -ng -pipe -ng +alias
                     )
 
             let pattern = memo & named "pattern" or_
-        end: PATTERN)
+        end: THIS)
 
     let pattern = let (module M) = x in M.pattern
     let pattern_atom = let (module M) = x in M.pattern_atom

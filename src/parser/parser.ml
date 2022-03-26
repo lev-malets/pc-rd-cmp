@@ -1,45 +1,42 @@
 open Base
 open Basic
 open Parsetree
-open Sigs
 open Ast_helper
 open Asttypes
 
-module Make (APos: APOS) = struct
-    module Utils = Parser_utils.Make(APos)
-
-    open Utils
-    open APos
+module Make (Basic : Sigs.BASIC) = struct
+    open Basic
+    open Comb
 
     type parsers =
         {
-            signature : signature parser;
-            structure : structure parser;
-            payload : payload parser;
+            signature : signature Comb.t;
+            structure : structure Comb.t;
+            payload : payload Comb.t;
 
             modexpr : (module MODEXPR);
         }
 
     let parsers = fix_poly @@ fun getter ->
-        let module Constant = Parser_constant.Make(APos) in
-        let open Constant in
-        let open Utils in
-
         let payload = getter.get @@ fun x -> x.payload in
-        let attrubute_id = take_while1 Base.(fun x -> identifier's_character x || Char.equal x '.') in
 
         let id_payload_pair start =
-            t2
-            +loc(s start >> attrubute_id) +payload
+            mapping begin fun id payload ->
+                let payload = Option.value ~default:(PStr []) payload in
+                id, payload
+            end
+            +loc(start >> attribute_id) +opt(failed ng_not_empty >> payload)
         in
 
-        let module Core: CORE =
+        let module Core: CORE with module Comb = Comb =
             struct
+                module Comb = Comb
+
                 let signature = getter.get @@ fun x -> x.signature
                 let structure = getter.get @@ fun x -> x.structure
 
-                let attribute = named "attribute" @@ id_payload_pair "@"
-                let extension = named "extension" @@ id_payload_pair "%"
+                let attribute = named "attribute" @@ id_payload_pair at
+                let extension = named "extension" @@ id_payload_pair percent
 
                 let attrs_ =
                     memo & named "attrs" &
@@ -107,16 +104,11 @@ module Make (APos: APOS) = struct
                             }
                     end
                     +pos +attrs_ +p
-
-                let variant_tag =
-                    s"#"
-                    >>
-                    (ident <|> string_raw <|> take_while1 (function '0'..'9' -> true | _ -> false))
             end
         in
 
-        let module Type = Parser_type.Make (APos) (Utils) (Constant) (Core) in
-        let module Pattern = Parser_pattern.Make (APos) (Utils) (Constant) (Core) (Type) in
+        let module Type = Parser_type.Make (Basic) (Core) in
+        let module Pattern = Parser_pattern.Make (Basic) (Core) (Type) in
 
         let open Core in
         let open Type in
@@ -125,37 +117,35 @@ module Make (APos: APOS) = struct
         let payload =
             named "payload" begin
                     parens & mapping (fun x -> PPat (x, None))
-                    -s"?" -ng +pattern
+                    -question -ng +pattern
 
                 ||  parens & mapping (fun x -> PSig x)
-                    -s":" -ng -k"sig" +signature
+                    -colon -ng -sig' +signature
 
                 ||  parens & mapping (fun x -> PTyp x)
-                    -s":" -ng +core_type
+                    -colon -ng +core_type
 
                 ||  parens & mapping (fun x -> PStr x)
                     +structure
-
-                ||  return @@ PStr []
             end
         in
 
         let module Modexpr = struct
+            module Comb = Comb
             let modexpr = getter.get @@ fun x -> let (module M) = x.modexpr in M.modexpr
             let modexpr_constrainted = getter.get @@ fun x -> let (module M) = x.modexpr in M.modexpr_constrainted
         end in
 
         let module Expression =
             Parser_expression.Make
-                (APos) (Utils) (Constant)
-                (Core) (Type) (Pattern) (Modexpr)
+                (Basic) (Core) (Type) (Pattern) (Modexpr)
         in
 
         let module Modtype = Parser_modtype.Make
-            (APos) (Utils) (Core) (Type) (Expression) (Modexpr)
+            (Basic) (Core) (Type) (Expression) (Modexpr)
         in
         let module Modexpr = Parser_modexpr.Make
-            (APos) (Utils) (Core) (Type) (Expression) (Modtype)
+            (Basic) (Core) (Type) (Expression) (Modtype)
         in
 
         let open Modtype in
@@ -164,40 +154,40 @@ module Make (APos: APOS) = struct
 
         let module_extension =
             named "module extension" @@
-            id_payload_pair "%%"
+            id_payload_pair percent_percent
         in
 
         let module_attribute =
             named "module attribute" @@
-            id_payload_pair "@@"
+            id_payload_pair at_at
         in
 
-        let open_ =
+        let top_open =
             named "open" &
             with_loc & mapping begin fun attrs override name loc ->
                 Opn.mk ~loc ~attrs ?docs:None ?override name
             end
-            +attrs_ -k"open" +opt(s"!" >>$ Override) -ng +loc u_longident
+            +attrs_ -open'+opt(bang >>$ Override) -ng +loc u_longident
         in
 
-        let exception_ =
+        let top_exception =
             named "top:exception" &
             mapping (fun attrs constr -> {constr with pext_attributes = constr.pext_attributes @ attrs} )
-            +attrs_ -k"exception" -ng +type_extension_constructor
+            +attrs_ -exception' -ng +type_extension_constructor
         in
 
-        let include_ x =
+        let top_include x =
             with_loc & hlp_a (Incl.mk ?docs:None)
-            +attrs_ -k"include" -ng +x
+            +attrs_ -include' -ng +x
         in
 
         let modtype_base =
             named "top:modtype" & with_loc & mapping
                 (fun attrs name typ loc -> Mtd.mk ~attrs ~loc ~typ name)
-            +attrs_ -k"module" -ng -k"type" -ng +loc ident -ng -s"=" -ng +modtype_with
+            +attrs_ -module'-ng -type' -ng +loc ident -ng -eq -ng +modtype_with
         in
 
-        let type_ mk =
+        let top_type mk =
             let first =
                 mapping begin fun attrs eflag rec_flag decl ->
                     let decl =
@@ -207,8 +197,8 @@ module Make (APos: APOS) = struct
                     in
                     rec_flag, {decl with ptype_attributes = attrs @ decl.ptype_attributes}
                 end
-                +attrs_ +opt(loc_of @@ k"export" << ng) -k"type" -ng
-                +(((k"rec" >> ng >>$ Recursive) <|> (k"nonrec" >> ng >>$ Nonrecursive) <|> return Nonrecursive))
+                +attrs_ +opt(loc_of @@ export << ng) -type' -ng
+                +(((rec'>> ng >>$ Recursive) <|> (nonrec'>> ng >>$ Nonrecursive) <|> return Nonrecursive))
                 +type_declaration
             in
 
@@ -221,7 +211,7 @@ module Make (APos: APOS) = struct
                     in
                     {decl with ptype_attributes = attrs @ decl.ptype_attributes}
                 end
-                +attrs_ -k"and" -ng +opt(loc_of @@ k"export" << ng) +type_declaration
+                +attrs_ -and' -ng +opt(loc_of @@ export << ng) +type_declaration
             in
 
             with_del & mapping begin fun (rec_flag, hd) tail loc ->
@@ -230,13 +220,13 @@ module Make (APos: APOS) = struct
             +first +seq (ng >> other)
         in
 
-        let external_ =
+        let top_external =
             named "external" begin
                 with_loc & mapping begin fun attrs name typ prim loc ->
                     Val.mk ~loc ~attrs ?docs:None ~prim name typ
                 end
-                +attrs_ -k"external" -ng +loc l_ident -ng -s":" -ng +core_type_poly
-                -ng -s"=" +seq ~n:1 (ng >> string_raw)
+                +attrs_ -external' -ng +loc l_ident -ng -colon -ng +core_type_poly
+                -ng -eq +seq ~n:1 (ng >> string_raw)
             end
         in
 
@@ -250,26 +240,26 @@ module Make (APos: APOS) = struct
                 mapping (fun n t attrs loc -> Md.mk ~loc ~attrs n t)
                 +loc u_ident -ng
                 +(
-                        s":" >> ng >> modtype_with
-                    ||  s"=" >> ng >> module_alias
+                        colon >> ng >> modtype_with
+                    ||  eq >> ng >> module_alias
                 )
             end
         in
 
-        let module_ =
+        let top_module =
             named "module" & with_loc &
-            attrs_ && k"module" >> ng >> module_decl
+            attrs_ && module' >> ng >> module_decl
         in
 
-        let module_rec =
+        let top_module_rec =
             named "module rec" begin
                 let first =
                     with_loc & attrs_ &&
-                    k"module" >> ng >> k"rec" >> ng >> module_decl
+                    module' >> ng >> rec'>> ng >> module_decl
                 in
                 let other =
                     with_loc & attrs_ &&
-                    k"and" >> ng >> module_decl
+                    and' >> ng >> module_decl
                 in
 
                 with_loc & mapping (fun hd tail loc -> Sig.rec_module ~loc (hd :: tail))
@@ -277,20 +267,20 @@ module Make (APos: APOS) = struct
             end
         in
 
-        let import =
+        let top_import =
             named "import" begin
                 let item =
                     with_loc & mapping begin fun name alias typ loc attrs ->
                         let alias = Option.value alias ~default:name in
                         Val.mk ~loc ~attrs ~prim:[name.txt] alias typ
                     end
-                    +loc l_ident -ng +opt(k"as" >> ng >> loc l_ident << ng) -s":" -ng +core_type_poly
+                    +loc l_ident -ng +opt(as' >> ng >> loc l_ident << ng) -colon -ng +core_type_poly
                 in
 
                 let list = braces & seq ~n:1 item ~sep in
 
                 let scope =
-                    seq ~n:1 ~sep:(ng-s"."-ng)
+                    seq ~n:1 ~sep:(ng-dot-ng)
                     (
                         with_loc & mapping (fun x loc -> Exp.constant ~loc (Const.string x))
                         +ident
@@ -305,7 +295,7 @@ module Make (APos: APOS) = struct
 
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    +attrs_ -k"import" -ng +list -ng -k"from" -ng +loc string_raw
+                    +attrs_ -import -ng +list -ng -from -ng +loc string_raw
 
                 ||  with_loc & mapping begin fun attrs item name loc ->
                         let attr =
@@ -315,7 +305,7 @@ module Make (APos: APOS) = struct
                         let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    +attrs_ -k"import" -ng +item -ng -k"from" -ng +loc string_raw
+                    +attrs_ -import -ng +item -ng -from -ng +loc string_raw
 
                 ||  with_loc & mapping begin fun attrs list names loc ->
                         let attr =
@@ -329,7 +319,7 @@ module Make (APos: APOS) = struct
                         let mod_ = Mod.structure str in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    +attrs_ -k"import" -ng +list -ng -k"from" -ng +loc scope
+                    +attrs_ -import -ng +list -ng -from -ng +loc scope
 
                 ||  with_loc & mapping begin fun attrs item names loc ->
                         let attr =
@@ -341,7 +331,7 @@ module Make (APos: APOS) = struct
                         let mod_ = Mod.structure [Str.primitive @@ item attr] in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    +attrs_ -k"import" -ng +item -ng -k"from" -ng +loc scope
+                    +attrs_ -import -ng +item -ng -from -ng +loc scope
 
                 ||  with_loc & mapping begin fun attrs list loc ->
                         let attr = Location.mknoloc "val", PStr [] in
@@ -350,14 +340,14 @@ module Make (APos: APOS) = struct
                         let mod_ = Mod.structure str in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    +attrs_ -k"import" -ng +list
+                    +attrs_ -import -ng +list
 
                 ||  with_loc & mapping begin fun attrs item loc ->
                         let attr = Location.mknoloc "val", PStr [] in
                         let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
-                    +attrs_ -k"import" -ng +item
+                    +attrs_ -import -ng +item
             end
         in
 
@@ -370,26 +360,26 @@ module Make (APos: APOS) = struct
                         with_del & na_hlp Sig.attribute
                         +module_attribute
                     ;
-                        type_ Sig.type_
+                        top_type Sig.type_
                     ;
-                        module_rec
+                        top_module_rec
                     ;
                         with_del & hlp_a Sig.extension
                         +attrs_ +module_extension
                     ;
                         named "sig:exception" & with_del & na_hlp Sig.exception_
-                        +exception_
+                        +top_exception
                     ;
                         with_del & na_hlp Sig.value
-                        +external_
+                        +top_external
                     ;
                         named "sig:include" & with_del & na_hlp Sig.include_
-                        +include_ modtype_with
+                        +top_include modtype_with
                     ;
                         named "sig:value" & with_del & na_hlp Sig.value
                         +(
                             with_loc & hlp2_a (Val.mk ?docs:None ?prim:None)
-                            +attrs_ -k"let" -ng +loc l_ident -ng -s":" -ng +core_type_poly
+                            +attrs_ -let' -ng +loc l_ident -ng -colon -ng +core_type_poly
                         )
                     ;
                         named "sig:modtype" & with_del & na_hlp Sig.modtype
@@ -397,14 +387,14 @@ module Make (APos: APOS) = struct
                                 modtype_base
 
                             ||  with_loc & hlp_a (Mtd.mk ?docs:None ?text:None ?typ:None)
-                                +attrs_ -k"module" -ng -k"type" -ng +loc u_ident
+                                +attrs_ -module'-ng -type' -ng +loc u_ident
                         )
                     ;
                         with_del & na_hlp Sig.module_
-                        +module_
+                        +top_module
                     ;
                         with_del & na_hlp Sig.open_
-                        +open_
+                        +top_open
                     ;
                         with_del & na_hlp Sig.type_extension
                         +type_extension
@@ -415,7 +405,7 @@ module Make (APos: APOS) = struct
 
         let value_str =
             named "str:value" begin
-                let lat = k"type" >> seq ~n:1 (ng >> loc l_ident) << ng << s"." in
+                let lat = type' >> seq ~n:1 (ng >> loc l_ident) << ng << dot in
 
                 let with_lat =
                     named "str:value:vb:lat" begin
@@ -458,8 +448,8 @@ module Make (APos: APOS) = struct
                             in
                             Vb.mk ~loc:vb_loc ~attrs:vb_attrs pat expr
                         end
-                        +pos +attrs_ +pattern -ng -s":" -ng +lat -ng +core_type_atom
-                        -ng -s"=" -ng +expression_arrow
+                        +pos +attrs_ +pattern -ng -colon -ng +lat -ng +core_type_atom
+                        -ng -eq -ng +expression_fun
                     end
                 in
 
@@ -469,7 +459,7 @@ module Make (APos: APOS) = struct
                     ||  mapping begin fun pattern expr attrs loc ->
                             Vb.mk ~loc ~attrs pattern expr
                         end
-                        +pattern_poly_constrainted -ng -s"=" -ng +expression_arrow
+                        +pattern_poly_constrainted -ng -eq -ng +expression_fun
                 in
 
                 let first =
@@ -483,12 +473,12 @@ module Make (APos: APOS) = struct
                             | None -> Nonrecursive, decl loc
                             | _ -> Recursive, decl loc
                         end
-                        +attrs_ +opt(loc_of(k"export")-ng) -k"let" -ng +opt(k"rec"-ng) +helper
+                        +attrs_ +opt(loc_of(export)-ng) -let' -ng +opt(rec' << ng) +helper
 
                     ||  with_loc & mapping begin fun attrs loc decl decl_loc ->
                             Nonrecursive, decl (Hc.attr "genType" ~loc :: attrs) decl_loc
                         end
-                        +attrs_ +loc_of(k"export") -ng +helper
+                        +attrs_ +loc_of(export) -ng +helper
                 in
                 let other =
                     mapping begin fun attrs p1 eflag x p2 ->
@@ -499,7 +489,7 @@ module Make (APos: APOS) = struct
                         in
                         decl @@ make_location p1 p2
                     end
-                    +attrs_ -k"and" -ng +pos +opt(loc_of(k"export")-ng) +helper +pos
+                    +attrs_ -and' -ng +pos +opt(loc_of(export)-ng) +helper +pos
                 in
 
                 with_del & mapping begin fun (rec_flag, first) others loc ->
@@ -514,24 +504,24 @@ module Make (APos: APOS) = struct
                 let b = Option.value ~default:b (Option.map ~f:(fun t -> Mod.constraint_ b t) t) in
                 Mb.mk ~loc ~attrs a b
             end
-            +loc u_ident -ng +opt(s":" >> ng >> modtype << ng) -o"=" -ng +modexpr
+            +loc u_ident -ng +opt(colon >> ng >> modtype << ng) -eq -ng +modexpr
         in
 
         let module_binding =
             named "str:mb" begin
                 with_loc &
-                attrs_ && k"module" >> ng >> module_binding_helper
+                attrs_ && module'>> ng >> module_binding_helper
             end
         in
 
         let rec_module_binding =
             let first =
                 with_loc &
-                attrs_ && k"module" >> ng >> k"rec" >> ng >> module_binding_helper
+                attrs_ && module'>> ng >> rec'>> ng >> module_binding_helper
             in
             let other =
                 with_loc &
-                attrs_ && k"and" >> ng >> module_binding_helper
+                attrs_ && and' >> ng >> module_binding_helper
             in
 
             named "str:mb:rec" begin
@@ -558,16 +548,16 @@ module Make (APos: APOS) = struct
                     +attrs_ +module_extension
                 ;
                     named "str:exception" & with_del & na_hlp Str.exception_
-                    +exception_
+                    +top_exception
                 ;
                     with_del & na_hlp Str.primitive
-                    +external_
+                    +top_external
                 ;
                     with_del & na_hlp Str.include_
-                    +import
+                    +top_import
                 ;
                     named "str:include" & with_del & na_hlp Str.include_
-                    +include_ modexpr
+                    +top_include modexpr
                 ;
                     with_del & na_hlp Str.module_
                     +module_binding
@@ -576,15 +566,15 @@ module Make (APos: APOS) = struct
                     +modtype_base
                 ;
                     with_del & na_hlp Str.open_
-                    +open_
+                    +top_open
                 ;
                     with_del & na_hlp Str.type_extension
                     +type_extension
                 ;
-                    type_ Str.type_
+                    top_type Str.type_
                 ;
                     with_del & hlp_a Str.eval
-                    +attrs_ +expression_arrow
+                    +attrs_ +expression_fun
                 ]
             )
         in

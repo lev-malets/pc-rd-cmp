@@ -6,33 +6,37 @@ open Ast_helper
 open Basic
 
 module Make
-        (APos: APOS)
-        (Utils: UTILS) (Constant: CONSTANT) (Core: CORE)
-        : TYPE = struct
+        (Basic: BASIC)
+        (Core: CORE with module Comb = Basic.Comb)
+        = struct
 
-    open APos
-    open Utils
-    open Constant
+    open Basic
     open Core
+    open Comb
+
+    module Comb = Comb
+    module type THIS = TYPE with module Comb = Basic.Comb
 
     let x =
 
         fix_poly @@ fun getter ->
         (module struct
-            let core_type_atom = getter.get @@ fun (module M: TYPE) -> M.core_type_atom
-            let core_type_arrow = getter.get @@ fun (module M: TYPE) -> M.core_type_arrow
-            let core_type = getter.get @@ fun (module M: TYPE) -> M.core_type
-            let core_type_poly = getter.get @@ fun (module M: TYPE) -> M.core_type_poly
+            module Comb = Comb
+
+            let core_type_atom = getter.get @@ fun (module M: THIS) -> M.core_type_atom
+            let core_type_fun = getter.get @@ fun (module M) -> M.core_type_fun
+            let core_type = getter.get @@ fun (module M) -> M.core_type
+            let core_type_poly = getter.get @@ fun (module M) -> M.core_type_poly
             let core_type_package =
                 named "typexpr:package" begin
                         with_loc & hlp2 Typ.package
-                        +loc u_longident -ng -k"with"
+                        +loc u_longident -ng -with'
                         +(
-                            seq ~n:1 ~sep:(ng >> k"and")
+                            seq ~n:1 ~sep:(ng >> and')
                                 (
                                     t2
-                                    -ng -k"type" -ng +loc l_longident
-                                    -ng -s"=" -ng +core_type_atom
+                                    -ng -type' -ng +loc l_longident
+                                    -ng -eq -ng +core_type_atom
                                 )
                         )
 
@@ -42,16 +46,16 @@ module Make
 
             let var =
                 with_loc & hlp Typ.var
-                -s"\'" +ident
+                +type_var
 
             let any =
                 with_loc & mapping (fun loc -> Typ.any ~loc ())
-                -s"_"
+                -_'
 
             let constr =
                 named "typexpr:constr" begin
                         with_loc & hlp2 Typ.constr
-                        +loc l_longident -ng -s"<" -ng +(seq ~n:1 core_type ~sep ~trail) -ng -s">"
+                        +loc l_longident -ng -lt -ng +(seq ~n:1 core_type ~sep ~trail) -ng -gt
 
                     ||  with_loc & mapping (fun a loc -> Typ.constr ~loc a [])
                         +loc l_longident
@@ -63,43 +67,43 @@ module Make
 
             let unit =
                 with_loc & mapping (fun a loc -> Typ.constr ~loc a [])
-                +loc (s"()" >>$ Longident.Lident "unit")
+                +loc (l_paren >> ng >> r_paren >>$ Longident.Lident "unit")
 
             let bs_object =
                 named "typexpr:bso" begin
                     let object_field =
                             mapping begin fun attrs name typ -> Otag (name, attrs, typ) end
-                            +attrs_ +loc string_raw -ng -s":" -ng +core_type_poly
+                            +attrs_ +loc string_raw -ng -colon -ng +core_type_poly
 
                         ||  mapping begin fun typ -> Oinherit typ end
-                            -s"..." -ng +core_type
+                            -ellipsis -ng +core_type
                     in
 
                         with_loc & mapping (fun loc -> Typ.object_ ~loc [] Closed)
-                        -s"{" -ng -s"." -ng -s"}"
+                        -l_brace -ng -dot -ng -r_brace
 
                     ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
-                        -s"{" -ng +(seq object_field ~sep ~trail) -ng -s"}"
+                        -l_brace -ng +(seq object_field ~sep ~trail) -ng -r_brace
 
                     ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Open)
-                        -s"{" -ng -s".." -ng +(seq object_field ~sep ~trail) -ng -s"}"
+                        -l_brace -ng -dot_dot -ng +(seq object_field ~sep ~trail) -ng -r_brace
 
                     ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
-                        -s"{" -ng -s"." -ng +(seq object_field ~sep ~trail) -ng -s"}"
+                        -l_brace -ng -dot -ng +(seq object_field ~sep ~trail) -ng -r_brace
                 end
 
             let variant =
                 named "typexpr:variant" begin
                     let constructor_arguments =
                             tuple
-                        ||  s"(" >> ng >> core_type << ng << s")"
+                        ||  l_paren >> ng >> core_type << ng << r_paren
                     in
 
                     let row_field =
                             mapping begin fun attrs tag empty constrs ->
                                 Rtag (tag, attrs, Option.is_some empty, constrs)
                             end
-                            +attrs_ +loc variant_tag -ng +opt(s"&"-ng) +(seq ~n:1 constructor_arguments ~sep:(ng-s"&"-ng))
+                            +attrs_ +loc variant_tag -ng +opt(ampersand-ng) +(seq ~n:1 constructor_arguments ~sep:(ng-ampersand-ng))
 
                         ||  mapping begin fun attrs tag ->
                                 Rtag (tag, attrs, true, [])
@@ -109,26 +113,26 @@ module Make
                         || core_type >>| (fun x -> Rinherit x)
                     in
 
-                    let rows = opt (s"|" << ng) >> seq ~n:1 row_field ~sep:(ng-s"|"-ng) in
+                    let rows = opt (pipe<< ng) >> seq ~n:1 row_field ~sep:(ng-pipe-ng) in
 
                         with_loc & mapping (fun loc -> Typ.variant ~loc [] Open None)
-                        -s"[" -ng -s">" -ng -s"]"
+                        -l_bracket -ng -gt -ng -r_bracket
 
                     ||  with_loc & mapping begin fun list loc ->
                             Typ.variant ~loc list Open None
                         end
-                        -s"[" -ng -s">" -ng +rows -ng -s"]"
+                        -l_bracket -ng -gt -ng +rows -ng -r_bracket
 
                     ||  with_loc & mapping begin fun list tags loc ->
                             let tags = if Option.is_some tags then tags else Some [] in
                             Typ.variant ~loc list Closed tags
                         end
-                        -s"[" -ng -s"<" -ng +rows +opt(ng >> s">" >> seq ~n:1 (ng >> variant_tag)) -ng -s"]"
+                        -l_bracket -ng -lt -ng +rows +opt(ng >> gt >> seq ~n:1 (ng >> variant_tag)) -ng -r_bracket
 
                     ||  with_loc & mapping begin fun list loc ->
                             Typ.variant ~loc list Closed None
                         end
-                        -s"[" -ng +rows -ng -s"]"
+                        -l_bracket -ng +rows -ng -r_bracket
                 end
 
             let core_type_atom =
@@ -143,7 +147,7 @@ module Make
                 ; tuple
                 ;
                     with_loc & mapping typ_loc
-                    -k"module" +parens(core_type_package)
+                    -module'+parens(core_type_package)
                 ; bs_object
                 ; constr
                 ; variant
@@ -159,7 +163,7 @@ module Make
                         mapping begin fun x loc_end prev ->
                             Typ.alias ~loc:{prev.ptyp_loc with loc_end} prev x
                         end
-                        -ng -k"as" -ng -s"'" +l_ident +pos
+                        -ng -as' -ng +type_var +pos
                     )
 
             let aliased_atom = named "typexpr:alias:atom" @@ alias core_type_atom
@@ -170,7 +174,7 @@ module Make
                         mapping begin fun typ label arg ->
                             Typ.arrow ~loc:(loc_comb arg.ptyp_loc typ.ptyp_loc) label arg typ
                         end
-                        -s"=>" -ng +core_type_arrow
+                        -arrow -ng +core_type_fun
                     in
 
                     let with_args typ tail =
@@ -179,7 +183,7 @@ module Make
                                 let x = typ_add_attr "ns.namedArgLoc" ~loc:tag.loc x in
                                 tail label x
                             end
-                            -s"~" -ng +loc l_ident -ng -s":" -ng +typ_attrs typ +opt(ng-s"="-ng-s"?") -ng +tail
+                            -tilda -ng +loc l_ident -ng -colon -ng +typ_attrs typ +opt(ng-eq-ng-question) -ng +tail
 
                         ||  mapping begin fun arg tail ->
                                 tail Nolabel arg
@@ -188,41 +192,41 @@ module Make
                     in
 
                     let tail = fix @@ fun tail ->
-                            s")" >> ng >> arrow_tail
+                            r_paren >> ng >> arrow_tail
 
-                        ||  s"," >> ng >> s")" >> ng >> arrow_tail
+                        ||  comma >> ng >> r_paren >> ng >> arrow_tail
 
                         ||  mapping begin fun typ label arg ->
                                 let typ = typ_add_attr "bs" typ in
                                 Typ.arrow label arg typ
                             end
-                            -s"," -ng -s"." -ng +with_args core_type tail
+                            -comma -ng -dot -ng +with_args core_type tail
 
                         ||  mapping begin fun typ label arg ->
                                 Typ.arrow label arg typ
                             end
-                            -s"," -ng +with_args core_type tail
+                            -comma -ng +with_args core_type tail
                     in
 
                     named "typexpr:arrow:all" begin
-                            typ_attrs & s"(" >> ng >> s"." >> ng >> with_args core_type tail >>| typ_add_attr "bs"
-                        ||  typ_attrs & s"(" >> ng >> with_args core_type tail
+                            typ_attrs & l_paren >> ng >> dot >> ng >> with_args core_type tail >>| typ_add_attr "bs"
+                        ||  typ_attrs & l_paren >> ng >> with_args core_type tail
                         ||  named "typexpr:arrow:onearg" (with_args aliased_atom arrow_tail)
                     end
                 end
 
-            let core_type_arrow =
+            let core_type_fun =
                 memo & named "typexpr:arrow"
                 (arrow <|> core_type_atom)
 
             let core_type =
                 memo & named "typexpr" &
-                alias core_type_arrow
+                alias core_type_fun
 
             let core_type_poly =
                 named "typexpr:poly" begin
                         with_loc & hlp2 Typ.poly
-                        +seq ~n:1 (s"\'" >> loc l_ident) ~sep:ng -ng -s"." -ng +core_type
+                        +seq ~n:1 (loc type_var) ~sep:ng -ng -dot -ng +core_type
 
                     ||  core_type
                 end
@@ -239,7 +243,7 @@ module Make
 
                         Type.field ~loc ~attrs ?info:None ?mut name typ
                     end
-                    +attrs_ +opt(k"mutable"-ng) +loc l_ident +opt(ng >> s":" >> ng >> core_type_poly)
+                    +attrs_ +opt(mutable' -ng) +loc l_ident +opt(ng >> colon >> ng >> core_type_poly)
                 end
 
             let label_declarations =
@@ -258,10 +262,10 @@ module Make
                             with_loc & mapping begin fun attrs name args res loc ->
                                 Type.constructor ~loc ~attrs ?info:None ?args:(Some args) ?res name
                             end
-                            +attrs_ +loc u_ident +((ng >> constr_args) <|> return @@ Pcstr_tuple []) +opt(ng >> s":" >> ng >> core_type_atom)
+                            +attrs_ +loc u_ident +((ng >> constr_args) <|> return @@ Pcstr_tuple []) +opt(ng >> colon >> ng >> core_type_atom)
                         in
 
-                        opt @@ s"|" >> seq ~n:1 (ng >> constructor) ~sep:(ng >> s"|") >>| fun x -> Ptype_variant x
+                        opt @@ pipe>> seq ~n:1 (ng >> constructor) ~sep:(ng >> pipe) >>| fun x -> Ptype_variant x
                     end
                 in
 
@@ -269,16 +273,16 @@ module Make
                     label_declarations >>| fun x -> Ptype_record x
                 in
 
-                let open_ = s".." >>$ Ptype_open in
+                let open'= dot_dot >>$ Ptype_open in
 
                 named "type_kind" begin
-                    variant <|> record <|> open_
+                    variant <|> record <|> open'
                 end
 
             let type_decl_params =
                 let variance =
-                        s"-" >>$ Contravariant << ng
-                    ||  s"+" >>$ Covariant << ng
+                        minus >>$ Contravariant << ng
+                    ||  plus >>$ Covariant << ng
                     ||  return Invariant
                 in
 
@@ -293,7 +297,7 @@ module Make
                 seq ~n:1 ~sep:ng
                 (
                     with_loc & t3
-                    -k"constraint" -ng +core_type_atom -ng -s"=" -ng +core_type
+                    -constraint' -ng +core_type_atom -ng -eq -ng +core_type
                 )
 
 
@@ -305,15 +309,15 @@ module Make
                             Type.mk ~loc
                                 ?docs:None ?text:None ?params ?cstrs ~kind ?priv ~manifest name
                         end
-                        +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +core_type
-                        -ng -s"=" -ng +opt(k"private"-ng) +type_kind +opt(ng >> type_decl_constraints)
+                        +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +core_type
+                        -ng -eq -ng +opt(private' -ng) +type_kind +opt(ng >> type_decl_constraints)
 
                     ||  named "type_declaration:manifest" &
                         with_loc & mapping begin fun name params priv manifest cstrs loc ->
                             let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
                             Type.mk ~loc ?params ?cstrs ?priv ~manifest name
                         end
-                        +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +opt(k"private"-ng) +core_type
+                        +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +opt(private' -ng) +core_type
                         +opt(ng >> type_decl_constraints)
 
                     ||  named "type_declaration:kind" &
@@ -321,7 +325,7 @@ module Make
                             let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
                             Type.mk ~loc ?params ?cstrs ~kind ?priv name
                         end
-                        +loc l_ident -ng +opt(type_decl_params-ng) -s"=" -ng +opt(k"private"-ng)
+                        +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +opt(private' -ng)
                         +type_kind +opt(ng >> type_decl_constraints)
 
                     ||  named "type_declaration:abstract" &
@@ -334,8 +338,8 @@ module Make
             let _extension_kind =
                 let extension_kind =
                         constr_args >>| (fun x -> Pext_decl (x, None))
-                    ||  s"=" >> ng >> loc u_longident >>| (fun x -> Pext_rebind x)
-                    ||  s":" >> ng >> core_type >>| (fun x -> Pext_decl (Pcstr_tuple [], Some x))
+                    ||  eq >> ng >> loc u_longident >>| (fun x -> Pext_rebind x)
+                    ||  colon >> ng >> core_type >>| (fun x -> Pext_decl (Pcstr_tuple [], Some x))
                 in
 
                 named "typexr:constructor:kind" begin
@@ -354,12 +358,12 @@ module Make
                     let priv = Opt.set Private priv in
                     Te.mk ~attrs ?params ?priv name (hd::tail)
                 end
-                +attrs_ -k"type" -ng +loc l_longident -ng +opt(type_decl_params-ng) -s"+=" -ng +opt(k"private"-ng)
-                -opt(s"|"-ng) +type_extension_constructor +seq (ng >> s"|" >> ng >> type_extension_constructor)
-        end: TYPE)
+                +attrs_ -type' -ng +loc l_longident -ng +opt(type_decl_params-ng) -plus_eq -ng +opt(private' -ng)
+                -opt(pipe-ng) +type_extension_constructor +seq (ng >> pipe>> ng >> type_extension_constructor)
+        end: THIS)
 
     let core_type_atom = let (module M) = x in M.core_type_atom
-    let core_type_arrow = let (module M) = x in M.core_type_arrow
+    let core_type_fun = let (module M) = x in M.core_type_fun
     let core_type = let (module M) = x in M.core_type
     let core_type_poly = let (module M) = x in M.core_type_poly
     let core_type_package = let (module M) = x in M.core_type_package

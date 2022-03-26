@@ -8,9 +8,10 @@ module ParseRes: Pc_syntax.Sigs.PARSE = struct
         Some x
 end
 
-let mk_apos ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.APOS) =
+let mk_apos ?(peek=false) ?(memo=false) (): (module Parser_angstrom.APOS) =
     let module APos = Angstrom_pos.Make(Pc_syntax.Basic.LogElement) in
-    let (module APos: Pc_syntax.Sigs.APOS) =
+
+    let (module APos: Parser_angstrom.APOS) =
         if peek then
             (module APos)
         else
@@ -21,7 +22,7 @@ let mk_apos ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.APOS) =
             end)
     in
 
-    let (module APos: Pc_syntax.Sigs.APOS) =
+    let (module APos: Parser_angstrom.APOS) =
         if memo then
             (module APos)
         else
@@ -32,50 +33,35 @@ let mk_apos ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.APOS) =
             end)
     in
 
-    (module APos: Pc_syntax.Sigs.APOS)
+    (module APos)
 
 let mk_parse ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.PARSE) =
     let (module APos) = mk_apos ~peek ~memo () in
-    (module Pc_syntax.Parser.Make(APos): Pc_syntax.Sigs.PARSE)
+    let module Basic = Parser_angstrom.Make(APos) in
+    (module Pc_syntax.Parser.Make(Basic))
 
 
 module type TRACED = module type of Angstrom_pos.Alt.MakeTraced(Angstrom_pos.Make(Pc_syntax.Basic.LogElement))
-module type MEAZURED = module type of Angstrom_pos.Alt.MakeMeasured(Angstrom_pos.Make(Pc_syntax.Basic.LogElement))
 
 let mk_traced ?(peek=false) ?(memo=false) () =
-    let (module APos: Pc_syntax.Sigs.APOS) = mk_apos ~peek ~memo () in
+    let (module APos) = mk_apos ~peek ~memo () in
 
     let module Traced = Angstrom_pos.Alt.MakeTraced(APos) in
+    let module Apos =
+        struct
+            include APos
+            include Traced
+        end
+    in
+    let module Basic = Parser_angstrom.Make(Apos) in
     (module Traced: TRACED)
     ,
-    (module APos: Pc_syntax.Sigs.APOS)
+    (module APos: Parser_angstrom.APOS)
     ,
-    (module Pc_syntax.Parser.Make
-        (
-            struct
-                include APos
-                include Traced
-            end
-        ): Pc_syntax.Sigs.PARSE
+    (
+        module Pc_syntax.Parser.Make(Basic)
+        : Pc_syntax.Sigs.PARSE
     )
-
-let mk_measured ?(peek=false) () =
-    let (module APos: Pc_syntax.Sigs.APOS) = mk_apos ~peek ~memo:true () in
-
-    let module Measured = Angstrom_pos.Alt.MakeMeasured(APos) in
-    (module Measured: MEAZURED)
-    ,
-    (module APos: Pc_syntax.Sigs.APOS)
-    ,
-    (module Pc_syntax.Parser.Make
-        (
-            struct
-                include APos
-                include Measured
-            end
-        ): Pc_syntax.Sigs.PARSE
-    )
-
 
 let input = ref ""
 let output = ref ""

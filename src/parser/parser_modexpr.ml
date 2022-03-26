@@ -5,20 +5,27 @@ open Ast_helper
 open Basic
 
 module Make
-        (APos: APOS)
-        (Utils: UTILS) (Core: CORE) (Type: TYPE) (Expression: EXPRESSION) (Modtype: MODTYPE)
-        : MODEXPR = struct
-
-    open APos
-    open Utils
+        (Basic: BASIC)
+        (Core: CORE with module Comb = Basic.Comb)
+        (Type: TYPE with module Comb = Basic.Comb)
+        (Expression: EXPRESSION with module Comb = Basic.Comb)
+        (Modtype: MODTYPE with module Comb = Basic.Comb)
+        = struct
+    open Basic
     open Core
     open Type
     open Expression
     open Modtype
+    open Comb
+
+    module Comb = Comb
+    module type THIS = MODEXPR with module Comb = Basic.Comb
 
     let x = fix_poly @@ fun getter ->
         (module struct
-            let modexpr = getter.get @@ fun (module M: MODEXPR) -> M.modexpr
+            module Comb = Comb
+
+            let modexpr = getter.get @@ fun (module M: THIS) -> M.modexpr
 
             let modexpr_constrainted =
                 named "modexpr:constrainted" @@
@@ -28,7 +35,7 @@ module Make
                         mapping begin fun typ prev ->
                             Mod.constraint_ ~loc:(loc_comb prev.pmod_loc typ.pmty_loc) prev typ
                         end
-                        -ng -s":" -ng +modtype
+                        -ng -colon -ng +modtype
                     )
 
             let atom =
@@ -40,14 +47,14 @@ module Make
                                 mapping begin fun typ prev ->
                                     Exp.constraint_ ~loc:(loc_comb prev.pexp_loc typ.ptyp_loc) prev typ
                                 end
-                                -ng -s":" -ng +core_type_package
+                                -ng -colon -ng +core_type_package
                             )
                     in
 
                     peek_first
                     [
                         with_loc & hlp Mod.unpack
-                        -k"unpack" -ng -s"(" -ng +unpack_constr -ng -s")"
+                        -unpack -ng -l_paren -ng +unpack_constr -ng -r_paren
                     ;
                         with_loc & hlp Mod.ident
                         +loc u_longident
@@ -64,7 +71,7 @@ module Make
                 named "modexpr:apply" begin
                     let genarg =
                         with_loc & mapping (fun loc -> Mod.structure ~loc [])
-                        -s"(" -ng -s")"
+                        -l_paren -ng -r_paren
                     in
 
                     let arg = genarg <|> modexpr_constrainted in
@@ -86,17 +93,17 @@ module Make
                                         ~loc:(loc_comb prev.pmod_loc arg.pmod_loc)
                                         prev arg
                                 end
-                                -ng -s"," -ng +arg
+                                -ng -comma -ng +arg
                             )
                     in
 
                     let args =
-                            s"(" >> args << opt sep << ng << s")"
+                            l_paren >> args << opt sep << ng << r_paren
 
                         ||  mapping begin fun loc_end prev ->
                                 Mod.apply ~loc:{prev.pmod_loc with loc_end} prev (Mod.structure [])
                             end
-                            -s"(" -ng -s")" +pos
+                            -l_paren -ng -r_paren  +pos
                     in
 
                     mod_attrs & fold_left_cont_0_n atom args
@@ -108,42 +115,42 @@ module Make
                             mapping begin fun mt me ->
                                 Mod.constraint_ ~loc:me.pmod_loc me mt
                             end
-                            -s":" -ng +modtype -ng -s"=>" -ng +modexpr
+                            -colon -ng +modtype -ng -arrow -ng +modexpr
 
-                        ||  s"=>" >> ng >> modexpr
+                        ||  arrow >> ng >> modexpr
                     in
 
                     let arg_loop = fix @@ fun arg_loop ->
                         let tail =
-                                opt (s",") >> ng >> s")" >> ng >> tail
-                            ||  s"," >> ng >> arg_loop
+                                opt comma >> ng >> r_paren >> ng >> tail
+                            ||  comma >> ng >> arg_loop
                         in
 
                             mod_attrs & with_loc & hlp3 Mod.functor_
-                            +loc u_ident +opt(ng >> s":" >> ng >> modtype) -ng +tail
+                            +loc u_ident +opt(ng >> colon >> ng >> modtype) -ng +tail
 
                         ||  mod_attrs & with_loc & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
-                            +loc (s"()" >>$ "*") -ng +tail
+                            +loc (l_paren >> ng >> r_paren >>$ "*") -ng +tail
                     in
 
                         mod_attrs & with_loc & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
-                        +loc (s"()" >>$ "*") -ng +tail
+                        +loc (l_paren >> ng >> r_paren >>$ "*") -ng +tail
 
                     ||  mod_attrs &
-                        s"(" >> ng >> arg_loop
+                        l_paren >> ng >> arg_loop
                 end
 
             let structure =
                 named "modexpr:structure" begin
                     with_loc & hlp Mod.structure
-                    -s"{" -ng +structure -ng -s"}"
+                    -l_brace -ng +structure -ng -r_brace
                 end
 
             let modexpr =
                 named "modexpr" begin
                     functor_ <|> apply <|> structure
                 end
-        end : MODEXPR)
+        end : THIS)
 
     let modexpr = let (module M) = x in M.modexpr
     let modexpr_constrainted = let (module M) = x in M.modexpr_constrainted

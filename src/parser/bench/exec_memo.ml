@@ -7,7 +7,8 @@ module APos = struct
     include NotPeek_
 end
 
-module Parse = Pc_syntax.Parser.Make(APos)
+module Basic = Parser_angstrom.Make(APos)
+module Parse = Pc_syntax.Parser.Make(Basic)
 
 let input = ref ""
 let anon_fun _ = ()

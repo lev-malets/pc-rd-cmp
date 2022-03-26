@@ -45,36 +45,13 @@ let
 
             doCheck = true;
         };
-
-        jupyter = super.buildDunePackage rec {
-            pname = "jupyter";
-            version = "2.7.6";
-
-            useDune2 = true;
-
-            src = pkgs.fetchurl {
-                url = "https://github.com/akabe/ocaml-jupyter/releases/download/v${version}/jupyter-${version}.tbz";
-                sha256 = "sha256:1ce9c25d5282ead24bf47e75605ae0300443b95255e9ff5bdd8173283b4bbc5f";
-            };
-
-            nativeBuildInputs = [ super.findlib ];
-            buildInputs = [
-                ppx_deriving_yojson super.cppo super.merlin
-                super.lwt_ppx super.uuidm super.base64 super.logs super.cryptokit
-                super.zmq-lwt
-            ];
-
-            checkInputs = [ super.ounit2 ];
-
-            doCheck = true;
-        };
     });
 in
 
 
 pkgs.mkShell {
     nativeBuildInputs =
-        (with pkgs; [ git perf-tools linuxPackages.perf ncurses ]) ++
+        (with pkgs; [ git perf-tools linuxPackages.perf ncurses ocamlformat ]) ++
         (with ocamlPackages; [ utop ocaml dune_2 ocaml-lsp core_bench alcotest findlib re ]);
     buildInputs = with ocamlPackages; [ ocamlgraph yojson bigstringaf fix async lwt ocaml-syntax-shims ];
 }

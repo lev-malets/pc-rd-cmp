@@ -1,3 +1,5 @@
 (library
  (name pc_syntax)
- (libraries angstrom_pos core_kernel syntax fix))
+ (libraries pc core_kernel syntax fix))
+
+(ocamllex lexer)

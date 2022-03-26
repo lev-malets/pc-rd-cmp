@@ -21,12 +21,12 @@ module Json = struct
         | '0'..'9' -> true
         | _ -> false
     let number = _number >>= fun str ->
-        let open Angstrom in
+        let open Simple in
         match Caml.int_of_string_opt str with
         | Some a -> return @@ `Int a
         | None -> match Caml.float_of_string_opt str with
             | Some a -> return @@ `Float a
-            | None -> fail "invalid float"
+            | None -> fail
 
     let _string = char '"' >> take_while (fun i -> Char.(i <> '"')) << advance 1
 

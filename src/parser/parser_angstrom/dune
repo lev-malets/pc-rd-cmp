@@ -1,0 +1,3 @@
+(library
+ (name parser_angstrom)
+ (libraries pc_syntax angstrom_pos))

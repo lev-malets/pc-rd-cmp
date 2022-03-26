@@ -11,12 +11,12 @@
 (executable
  (name exec_memo)
  (modules exec_memo)
- (libraries pc_syntax))
+ (libraries parser_angstrom))
 
 (executable
  (name exec_memo_peek)
  (modules exec_memo_peek)
- (libraries pc_syntax))
+ (libraries parser_angstrom))
 
 (executable
  (name exec_none)

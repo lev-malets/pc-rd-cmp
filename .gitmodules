@@ -1,6 +1,3 @@
-[submodule "src/ast-show"]
-	path = src/ast-show
-	url = https://github.com/lev-malets/ocaml-ast-show
 [submodule "src/angstrom-mod"]
 	path = src/angstrom-mod
 	url = https://github.com/lev-malets/angstrom

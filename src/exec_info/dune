@@ -1,10 +1,4 @@
 (library
- (name ppx_deriving__ord)
- (kind ppx_rewriter)
- (modules)
- (libraries ppx_deriving.ord))
-
-(library
  (name exec_info)
  (modules exec_info)
  (libraries base)
