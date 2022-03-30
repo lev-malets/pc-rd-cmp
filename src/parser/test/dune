@@ -4,6 +4,6 @@
  (libraries run_common))
 
 (executable
- (name fast)
- (modules fast)
- (libraries run_common))
+ (name test)
+ (modules test)
+ (libraries run_common alcotest))

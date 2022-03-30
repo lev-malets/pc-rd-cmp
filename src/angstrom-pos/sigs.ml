@@ -15,7 +15,7 @@ module type POS = sig
     val advance : int -> unit t
     val any_char : char t
     val peek_char : char option t
-    val s : string -> string t
+    val s : string -> unit t
 
     val take_while : (char -> bool) -> string t
     val take_while1 : (char -> bool) -> string t

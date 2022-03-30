@@ -4,7 +4,8 @@ open Parsetree
 open Ast_helper
 open Asttypes
 
-module Make (Basic : Sigs.BASIC) = struct
+module Make (BasicBase : Sigs.BASIC_BASE) = struct
+    module Basic = Parser_basic.Make(BasicBase)
     open Basic
     open Comb
 

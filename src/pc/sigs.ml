@@ -10,6 +10,7 @@ module type COMB = sig
         val (<<) : 'a t -> _ t -> 'a t
         val (>>$) : _ t -> 'a -> 'a t
         val (>>|) : 'a t -> ('a -> 'b) -> 'b t
+        val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
         val return : 'a -> 'a t
         val fail : _ t
         val (<|>) : 'a t -> 'a t -> 'a t
@@ -39,7 +40,6 @@ module type COMB = sig
     val fix_poly : ('x getter -> 'x) -> 'x
 
     val return : 'a -> 'a t
-    val advance : int -> unit t
     val fail : _ t
 
     val pos : Lexing.position t
@@ -97,4 +97,8 @@ module type COMB = sig
     val print_info : _ t -> unit
 
     val id : 'a t -> int
+end
+
+module type TRACE = sig
+    val entries : Exec_info.entry list ref
 end

@@ -14,6 +14,11 @@
  (libraries parser_angstrom))
 
 (executable
+ (name exec_mpt)
+ (modules exec_mpt)
+ (libraries parser_tokenized))
+
+(executable
  (name exec_memo_peek)
  (modules exec_memo_peek)
  (libraries parser_angstrom))

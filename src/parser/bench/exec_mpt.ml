@@ -1,13 +1,6 @@
 
-module APos_ = Angstrom_pos.Make(Pc_syntax.Basic.LogElement)
-module NotPeek_ = Angstrom_pos.Alt.MakeNotPeek(APos_)
-
-module APos = struct
-    include APos_
-    include NotPeek_
-end
-
-module Parse = Parser_angstrom.Make(APos)
+module Tpc = Tokenized.Make(Parser_tokenized.Lexer.Make())(Pc_syntax.Basic.LogElement)
+module Parse = Parser_tokenized.Make(Tpc)
 
 let input = ref ""
 let anon_fun _ = ()

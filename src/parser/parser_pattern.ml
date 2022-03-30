@@ -154,7 +154,7 @@ module Make
                     with_loc & mapping begin fun c loc ->
                         Pat.constant ~loc ~attrs:[Hc.attr "res.template"] c
                     end
-                    +string_multiline ~q:"`"
+                    +template_no_template
                 end
 
             let true_ =

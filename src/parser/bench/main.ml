@@ -12,6 +12,7 @@ let () =
         ; "memo", (fun _ -> mk_memoized Pc_syntax.Parser.memo_spec)
         *)
         ; "memo+peek", (fun _ -> mk_parse ~peek:true ~memo:true ())
+        ; "memo+peek+tokenize", (fun _ -> mk_parse ~peek:true ~memo:true ~tokenize:true ())
         ]
     in
 
@@ -38,4 +39,7 @@ let () =
             failwith filename
     in
 
-    Core_bench.Bench.bench (test @ [Core_bench.Bench.Test.create ~name:"init" @@ fun _ -> mk_parse ~peek:true ~memo:true ()]);
+    Core_bench.Bench.bench (
+        test
+        @ [Core_bench.Bench.Test.create ~name:"init" @@ fun _ -> mk_parse ~peek:true ~memo:true ()]
+        @ [Core_bench.Bench.Test.create ~name:"init+t" @@ fun _ -> mk_parse ~peek:true ~memo:true ~tokenize:true ()]);

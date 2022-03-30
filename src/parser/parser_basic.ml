@@ -20,31 +20,27 @@ module Make (Base : Sigs.BASIC_BASE): Sigs.BASIC = struct
             | true -> fail
             | false -> return ()
         end
-        +pos -ng +pos
+        +pos_end -ng +pos
 
     let ng_no_new_line =
-        (
-            t2
-            +pos -ng +pos
-        )
-        >>=
-        fun (p1, p2) ->
+        run & mapping begin fun p1 p2 ->
             let open Simple in
+            let open Lexing in
             match p1.pos_lnum = p2.pos_lnum with
             | true -> return ()
             | false -> fail
+        end
+        +pos_end -ng +pos
 
     let ng_new_line =
-        (
-            t2
-            +pos -ng +pos
-        )
-        >>=
-        fun (p1, p2) ->
+        run & mapping begin fun p1 p2 ->
             let open Simple in
+            let open Lexing in
             match p1.pos_lnum = p2.pos_lnum with
             | true -> fail
             | false -> return ()
+        end
+        +pos_end -ng +pos
 
     let with_del p =
         mapping (fun p1 f p2 -> f (make_location p1 p2))
@@ -53,17 +49,21 @@ module Make (Base : Sigs.BASIC_BASE): Sigs.BASIC = struct
     let sep = ng >> comma >> ng
 
     let u_longident =
+        named "u_longident" &
         fold_left_0_n ~f:begin fun lid str -> Longident.Ldot (lid, str) end
             (u_ident >>| fun str -> Longident.Lident str)
             (ng >> dot >> ng >> u_ident)
 
     let l_longident =
+        named "l_longident" &
             mapping (fun a b -> Longident.Ldot (a, b))
             +u_longident -ng -dot -ng +l_ident
 
         ||  l_ident >>| fun s -> Longident.Lident s
 
     let longident =
+        named "longident" &
+
             mapping begin fun a b ->
                 match b with
                 | None -> a

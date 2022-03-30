@@ -9,3 +9,9 @@
  (kind ppx_rewriter)
  (modules)
  (libraries ppx_deriving.show))
+
+(library
+ (name ppx_deriving__eq)
+ (kind ppx_rewriter)
+ (modules)
+ (libraries ppx_deriving.eq))

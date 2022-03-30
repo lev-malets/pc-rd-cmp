@@ -1,7 +1,6 @@
 
 module APos = Angstrom_pos.Make(Pc_syntax.Basic.LogElement)
-module Basic = Parser_angstrom.Make(APos)
-module Parse = Pc_syntax.Parser.Make(Basic)
+module Parse = Parser_angstrom.Make(APos)
 
 let input = ref ""
 let anon_fun _ = ()

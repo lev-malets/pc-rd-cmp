@@ -846,9 +846,9 @@ module Make(T: sig type t end) = struct
         Fix.Memoize.String.memoize @@ fun x ->
         named ("\'" ^ x ^ "\'") begin
             match String.length x with
-            | 0 -> return ""
-            | 1 -> char x.[0] >>$ x
-            | _ -> string x
+            | 0 -> return ()
+            | 1 -> char x.[0] >>$ ()
+            | _ -> string x >>$ ()
         end
 
     let rec name_of_id id =

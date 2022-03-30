@@ -9,105 +9,104 @@ let identifier's_character = function
     | 'A'..'Z' | 'a'..'z' | '0'..'9' | '_' | '\'' -> true
     | _ -> false
 
-module Make (APos : APOS) = struct
+module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
     module Base = struct
         module Comb = APos
         open Comb
-        open Pc_syntax.Token
 
         let k x = s x >> failed (satisfy identifier's_character)
 
-        let and' = k"and" >>$ And
-        let as' = k"as" >>$ As
-        let mutable' = k"mutable" >>$ Mutable
-        let constraint' = k"constraint" >>$ Constraint
-        let private' = k"private" >>$ Private
-        let unpack = k"unpack" >>$ Unpack
-        let export = k"export" >>$ Export
-        let external' = k"external" >>$ External
-        let import = k"import" >>$ Import
-        let from = k"from" >>$ From
-        let let' = k"let" >>$ Let
-        let module' = k"module" >>$ Module
-        let with' = k"with" >>$ With
-        let open' = k"open" >>$ Open
-        let exception' = k"exception" >>$Exception
-        let switch = k"switch" >>$Switch
-        let try' = k"try" >>$Try
-        let catch = k"catch" >>$Catch
-        let else' = k"else" >>$Else
-        let to' = k"to" >>$To
-        let downto' = k"downto" >>$Downto
-        let for' = k"for" >>$For
-        let of' = k"of" >>$ Of
-        let in' = k"in" >>$ In
-        let if' = k"if" >>$ If
-        let json_tag = k"json" >>$ Json
-        let while' = k"while" >>$ While
-        let assert' = k"assert" >>$ Assert
-        let lazy' = k"lazy" >>$ Lazy
-        let true' = k"true" >>$ True
-        let type' = k"type" >>$ Type
-        let false' = k"false" >>$ False
-        let sig' = k"sig" >>$ Sig
-        let include' = k"include" >>$ Include
-        let rec' = k"rec" >>$ Rec
-        let nonrec' = k"nonrec" >>$ Nonrec
-        let when' = k"when" >>$ When
+        let and' = k"and"
+        let as' = k"as"
+        let mutable' = k"mutable"
+        let constraint' = k"constraint"
+        let private' = k"private"
+        let unpack = k"unpack"
+        let export = k"export"
+        let external' = k"external"
+        let import = k"import"
+        let from = k"from"
+        let let' = k"let"
+        let module' = k"module"
+        let with' = k"with"
+        let open' = k"open"
+        let exception' = k"exception"
+        let switch = k"switch"
+        let try' = k"try"
+        let catch = k"catch"
+        let else' = k"else"
+        let to' = k"to"
+        let downto' = k"downto"
+        let for' = k"for"
+        let of' = k"of"
+        let in' = k"in"
+        let if' = k"if"
+        let json_tag = k"json"
+        let while' = k"while"
+        let assert' = k"assert"
+        let lazy' = k"lazy"
+        let true' = k"true"
+        let type' = k"type"
+        let false' = k"false"
+        let sig' = k"sig"
+        let include' = k"include"
+        let rec' = k"rec"
+        let nonrec' = k"nonrec"
+        let when' = k"when"
 
-        let _' = k"_" >>$ Underscore
+        let _' = k"_"
 
-        let ampersand = s"&" >>$ Ampersand
-        let ampersand_ampersand = s"&&" >>$ AmpersandAmptersand
-        let arrow = s"=>" >>$ Arrow
-        let asterisk = s"*" >>$ Asterisk
-        let asterisk_asterisk = s"**" >>$ AsteriskAsterisk
-        let asterisk_dot = s"*." >>$ AsteriskDot
-        let at = s"@" >>$ At
-        let at_at = s"@@" >>$ AtAt
-        let bang = s"!" >>$ Bang
-        let bang_eq = s"!=" >>$ BangEq
-        let bang_eq_eq = s"!==" >>$ BangEqEq
-        let colon = s":" >>$ Colon
-        let colon_eq = s":=" >>$ ColonEq
-        let colon_gt = s":>" >>$ ColonGt
-        let comma = s"," >>$ Comma
-        let dot = s"." >>$ Dot
-        let dot_dot = s".." >>$ DotDot
-        let ellipsis = s"..." >>$ Ellipsis
-        let eq = s"=" >>$ Eq
-        let eq_eq = s"==" >>$ EqEq
-        let eq_eq_eq = s"===" >>$ EqEqEq
-        let eq_op = failed arrow >> s"=" >>$ Eq
-        let gt = s">" >>$ Gt
-        let gt_eq = s">=" >>$ GtEq
-        let hash = s"#" >>$ Hash
-        let hash_eq = s"#=" >>$ HashEq
-        let l_brace = s"{" >>$ LBrace
-        let l_bracket = s"[" >>$ LBracket
-        let l_paren = s"(" >>$ LParen
-        let list = s"list{" >>$ List
-        let lt = s"<" >>$ Lt
-        let lt_eq = s"<=" >>$ LtEq
-        let minus = s"-" >>$ Minus
-        let minus_dot = s"-." >>$ MinusDot
-        let minus_gt = s"->" >>$ MinusGt
-        let percent = s"%" >>$ Percent
-        let percent_percent = s"%%" >>$ PercentPercent
-        let pipe = s"|" >>$ Pipe
-        let pipe_gt = s"|>" >>$ PipeGt
-        let pipe_pipe = s"||" >>$ PipePipe
-        let plus = s"+" >>$ Plus
-        let plus_dot = s"+." >>$ PlusDot
-        let plus_eq = s"+=" >>$ PlusEq
-        let plus_plus = s"++" >>$ PlusPlus
-        let question = s"?" >>$ Question
-        let r_brace = s"}" >>$ RBrace
-        let r_bracket = s"]" >>$ RBracket
-        let r_paren = s")" >>$ RParen
-        let slash = s"/" >>$ Slash
-        let slash_dot = s"/." >>$ SlashDot
-        let tilda = s"~" >>$ Tilda
+        let ampersand = s"&"
+        let ampersand_ampersand = s"&&"
+        let arrow = s"=>"
+        let asterisk = s"*"
+        let asterisk_asterisk = s"**"
+        let asterisk_dot = s"*."
+        let at = s"@"
+        let at_at = s"@@"
+        let bang = s"!"
+        let bang_eq = s"!="
+        let bang_eq_eq = s"!=="
+        let colon = s":"
+        let colon_eq = s":="
+        let colon_gt = s":>"
+        let comma = s","
+        let dot = s"."
+        let dot_dot = s".."
+        let ellipsis = s"..."
+        let eq = s"="
+        let eq_eq = s"=="
+        let eq_eq_eq = s"==="
+        let eq_op = failed arrow >> s"="
+        let gt = s">"
+        let gt_eq = s">="
+        let hash = s"#"
+        let hash_eq = s"#="
+        let l_brace = s"{"
+        let l_bracket = s"["
+        let l_paren = s"("
+        let list = s"list{"
+        let lt = s"<"
+        let lt_eq = s"<="
+        let minus = s"-"
+        let minus_dot = s"-."
+        let minus_gt = s"->"
+        let percent = s"%"
+        let percent_percent = s"%%"
+        let pipe = s"|"
+        let pipe_gt = s"|>"
+        let pipe_pipe = s"||"
+        let plus = s"+"
+        let plus_dot = s"+."
+        let plus_eq = s"+="
+        let plus_plus = s"++"
+        let question = s"?"
+        let r_brace = s"}"
+        let r_bracket = s"]"
+        let r_paren = s")"
+        let slash = s"/"
+        let slash_dot = s"/."
+        let tilda = s"~"
 
         let exp_sign = skip @@ function '-' | '+' -> true | _ -> false
 
@@ -235,7 +234,7 @@ module Make (APos : APOS) = struct
             in
             parts >>| String.concat
 
-        let string_multiline ~q =
+        let string_ml_helper ~q =
             let list =
                 s q >>
                 fix @@ fun loop ->
@@ -244,32 +243,30 @@ module Make (APos : APOS) = struct
                 +(
                         s q >>$ []
                     ||  cons
-                        +(new_line <|> s ("\\" ^ q) <|> s"\\\\" <|> s"\\")
+                        +(new_line <|> (s ("\\" ^ q) >>$ ("\\" ^ q)) <|> (s"\\\\" >>$ "\\\\") <|> (s"\\" >>$ "\\"))
                         +loop
                 )
             in
             list >>| fun l -> Const.string ~quotation_delimiter:"js" @@ String.concat l
-
-        let string =
-            named "const:string" &
-            string_raw >>| Const.string ~quotation_delimiter:"js"
+        let string_multiline = named "const:string:ml" & string_ml_helper ~q:"\""
+        let template_no_template = string_ml_helper ~q:"`"
 
         let constant =
             peek_first
             [ number
             ; character
-            ; string
+            ; string_multiline
             ]
 
         let upper = function 'A' .. 'Z' -> true | _ -> false
         let lower = function 'a' .. 'z' | '_' -> true | _ -> false
 
-        let ident = named "ident" @@
-            take_while1 identifier's_character
         let c_ident first = consumed (skip first >> skip_while identifier's_character)
 
         let l_ident = named "l_ident" @@ (failed @@ k"_") >> c_ident lower
         let u_ident = named "u_ident" @@ c_ident upper
+        let ident = named "ident" & l_ident || u_ident
+
 
         let type_var = s"\'" >> ident
         let integer =
@@ -362,7 +359,7 @@ module Make (APos : APOS) = struct
                     | true -> fail
                     | false -> return ()
 
-        let interpolated_string ~quote_tag ~expression =
+        let template ~quote_tag ~expression =
             let open Pc_syntax.Basic in
             let open Parsetree in
             let open Ast_helper in
@@ -378,7 +375,7 @@ module Make (APos : APOS) = struct
                     ||  cons +(s"\\`" >>$ "`") +parts
                     ||  cons +(s"\\$" >>$ "$") +parts
                     ||  cons +(s"\\\\" >>$ "\\") +parts
-                    ||  cons +(s"$" << failed l_brace) +parts
+                    ||  cons +(s"$" >> failed l_brace >>$ "$") +parts
                     ||  return []
                 )
             in
@@ -452,5 +449,5 @@ module Make (APos : APOS) = struct
         let string_ident = s"\\" >> string_raw
     end
 
-    include Pc_syntax.Parser_basic.Make(Base)
+    include Pc_syntax.Parser.Make(Base)
 end

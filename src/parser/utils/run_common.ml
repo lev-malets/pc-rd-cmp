@@ -35,33 +35,73 @@ let mk_apos ?(peek=false) ?(memo=false) (): (module Parser_angstrom.APOS) =
 
     (module APos)
 
-let mk_parse ?(peek=false) ?(memo=false) (): (module Pc_syntax.Sigs.PARSE) =
-    let (module APos) = mk_apos ~peek ~memo () in
-    let module Basic = Parser_angstrom.Make(APos) in
-    (module Pc_syntax.Parser.Make(Basic))
+let mk_tpc ?(peek=false) ?(memo=false) (): (module Parser_tokenized.TPC) =
+    let module Tpc = Tokenized.Make(Parser_tokenized.Lexer.Make())(Pc_syntax.Basic.LogElement) in
 
-
-module type TRACED = module type of Angstrom_pos.Alt.MakeTraced(Angstrom_pos.Make(Pc_syntax.Basic.LogElement))
-
-let mk_traced ?(peek=false) ?(memo=false) () =
-    let (module APos) = mk_apos ~peek ~memo () in
-
-    let module Traced = Angstrom_pos.Alt.MakeTraced(APos) in
-    let module Apos =
-        struct
-            include APos
-            include Traced
-        end
+    let (module Tpc: Parser_tokenized.TPC) =
+        if peek then
+            (module Tpc)
+        else
+            let module NotPeek = Tokenized.Alt.MakeNotPeek(Tpc) in
+            (module struct
+                include Tpc
+                include NotPeek
+            end)
     in
-    let module Basic = Parser_angstrom.Make(Apos) in
-    (module Traced: TRACED)
-    ,
-    (module APos: Parser_angstrom.APOS)
-    ,
-    (
-        module Pc_syntax.Parser.Make(Basic)
-        : Pc_syntax.Sigs.PARSE
-    )
+
+    let (module Tpc: Parser_tokenized.TPC) =
+        if memo then
+            (module Tpc)
+        else
+            let module NotMemoized = Tokenized.Alt.MakeNotMemoized(Tpc) in
+            (module struct
+                include Tpc
+                include NotMemoized
+            end)
+    in
+
+    (module Tpc)
+
+let mk_parse ?(peek=false) ?(memo=false) ?(tokenize=false) (): (module Pc_syntax.Sigs.PARSE) =
+    if tokenize then
+        let (module Tpc) = mk_tpc ~peek ~memo () in
+        (module Parser_tokenized.Make(Tpc))
+    else
+        let (module APos) = mk_apos ~peek ~memo () in
+        (module Parser_angstrom.Make(APos))
+
+
+let mk_traced ?(peek=false) ?(memo=false) ?(tokenize=false) () =
+    if tokenize then
+        let (module Tpc) = mk_tpc ~peek ~memo () in
+
+        let module Traced = Tokenized.Alt.MakeTraced(Tpc) in
+        let module Tpc =
+            struct
+                include Tpc
+                include Traced
+            end
+        in
+        (module Traced: Pc.Sigs.TRACE)
+        ,
+        (module Tpc: Pc.Sigs.COMB)
+        ,
+        (module Parser_tokenized.Make(Tpc): Pc_syntax.Sigs.PARSE)
+    else
+        let (module APos) = mk_apos ~peek ~memo () in
+
+        let module Traced = Angstrom_pos.Alt.MakeTraced(APos) in
+        let module Apos =
+            struct
+                include APos
+                include Traced
+            end
+        in
+        (module Traced: Pc.Sigs.TRACE)
+        ,
+        (module APos: Pc.Sigs.COMB)
+        ,
+        (module Parser_angstrom.Make(Apos))
 
 let input = ref ""
 let output = ref ""

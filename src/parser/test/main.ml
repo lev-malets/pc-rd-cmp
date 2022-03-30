@@ -7,11 +7,15 @@ let mapping = ref Pc_syntax.Parsetree_mapping.default
 
 let speclist =
     [ "--parser",
-        Arg.Symbol (["res"; "pc"],
+        Arg.Symbol (["res"; "pc"; "tc"],
             function
             | "res" -> parser := (module ParseRes)
             | "pc" ->
                 let t, a, p = mk_traced ~peek:true () in
+                trace := Some (t, a);
+                parser := p
+            | "tc" ->
+                let t, a, p = mk_traced ~peek:true ~tokenize:true () in
                 trace := Some (t, a);
                 parser := p
             | _ -> failwith "unreachable"

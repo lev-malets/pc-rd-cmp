@@ -1,15 +1,25 @@
 
+type string_info = { value : string; raw : string }
+type number_info = { value : string; suffix : char option }
+type e_cc_info = { code : int; raw : string }
+
 type t =
-    | LIdent of string
-    | UIdent of string
-    | Character of char
-    | CharacterCode of int
-    | String of { value : string; raw : string }
-    | MultilineString of string
-    | Integer of { value : string; suffix : char }
-    | Float of { value : string; suffix : char }
-    | Comment of string
-    | MultilineComment of string
+    | LIdent (* of string *)
+    | UIdent (* of string *)
+    | Character (* of char *)
+    | String (* of string_info *)
+    | MultilineString (* of string *)
+    | Integer (* of number_info *)
+    | Float (* of number_info *)
+    | Comment (* of string *)
+    | MultilineComment (* of string *)
+    | TypeVar (* of string *)
+    | StringIdent (* of string *)
+
+    | TemplatePart (* of string *)
+    | TemplateTail (* of string *)
+
+    | ErrorCharacterCode (* e_cc_info *)
 
     | And
     | As
@@ -73,7 +83,6 @@ type t =
     | EqEq
     | EqEqEq
     | Gt
-    | GtEq
     | Hash
     | HashEq
     | LBrace
@@ -98,7 +107,8 @@ type t =
     | RBrace
     | RBracket
     | RParen
+    | Semicolon
     | Slash
     | SlashDot
     | Tilda
-    [@deriving eq]
+    [@@deriving eq, show]

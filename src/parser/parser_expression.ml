@@ -503,13 +503,13 @@ module Make
             let string =
                 named "expression:string" begin
                     with_loc & hlp Exp.constant
-                    +string_multiline ~q:"\""
+                    +string_multiline
                 end
 
-            let js_string = named "expression:js_string" @@ interpolated_string ~quote_tag:"js" ~expression
+            let js_string = named "expression:js_string" @@ template ~quote_tag:"js" ~expression
             let json_string =
                 named "expression:json_string" &
-                json_tag >> ng >> interpolated_string ~quote_tag:"json" ~expression
+                json_tag >> ng >> template ~quote_tag:"json" ~expression
 
             let constr_args =
                     loc_of (l_paren >> ng >> r_paren) >>| Hc.unit_expr
@@ -557,7 +557,7 @@ module Make
                     ; ident
                     ;
                         with_loc & hlp2 Exp.construct
-                        +loc u_longident +opt(constr_args)
+                        +loc u_longident +opt(ng_no_new_line >> constr_args)
                     ; polyvariant
                     ;
                         with_loc & mapping (fun a loc -> Exp.construct ~loc a None)
@@ -791,11 +791,11 @@ module Make
                     fold_left_cont_0_1 primary set_cont
                 end
 
-            let unops = bang
+            let unops = bang >>$ "not"
 
             let unary = fix @@ fun unary ->
                     with_loc & mapping begin fun op expr ->
-                        let op = unop2longident op in
+                        let op = str2lid op in
                         match expr.pexp_desc with
                         | Pexp_constant (Pconst_integer (str, suf) as c) ->
                             if Char.equal str.[0] '-' then
@@ -809,10 +809,10 @@ module Make
                                 (fun loc -> Exp.constant ~loc (Pconst_float ("-" ^ str, suf)))
                         | _ -> (fun loc -> Exp.apply ~loc (Exp.ident ~loc:op.loc op) [Nolabel, expr])
                     end
-                    +loc (minus_dot <|> minus) -ng +unary
+                    +loc ((minus_dot >>$ "~-.") <|> (minus >>$ "~-")) -ng +unary
 
                 ||  with_loc & mapping begin fun op expr ->
-                        let op = unop2longident op in
+                        let op = str2lid op in
                         match expr.pexp_desc with
                         | Pexp_constant (Pconst_integer (str, suf)) ->
                             (fun loc -> Exp.constant ~loc (Pconst_integer (str, suf)))
@@ -821,10 +821,10 @@ module Make
                         | _ ->
                             (fun loc -> Exp.apply ~loc (Exp.ident ~loc:op.loc op) [Nolabel, expr])
                     end
-                    +loc (plus_dot <|> plus) -ng +unary
+                    +loc ((plus_dot >>$ "~+.") <|> (plus >>$ "~+")) -ng +unary
 
                 ||  with_loc & mapping begin fun op expr loc ->
-                        let op = unop2longident op in
+                        let op = str2lid op in
                         Exp.apply ~loc (Exp.ident ~loc:op.loc op) [Nolabel, expr]
                     end
                     +loc unops -ng +unary
@@ -840,7 +840,7 @@ module Make
             let left_assoc mp ops =
                 let tail =
                     mapping begin fun op right left ->
-                        let op = binop2longident op in
+                        let op = str2lid op in
                         Exp.apply
                             ~loc:(loc_comb left.pexp_loc right.pexp_loc)
                             (Exp.ident ~loc:op.loc op)
@@ -854,7 +854,7 @@ module Make
             let left_assoc2 mp ops =
                 let tail =
                     mapping begin fun op right left ->
-                        let op = binop2longident op in
+                        let op = str2lid op in
                         Exp.apply
                             ~loc:(loc_comb left.pexp_loc right.pexp_loc)
                             (Exp.ident ~loc:op.loc op)
@@ -867,39 +867,39 @@ module Make
 
             let p1 =
                 named "expression:p1" @@
-                left_assoc p0 minus_gt
+                left_assoc p0 (minus_gt >>$ "|.")
             let p2 =
                 named "expression:p2" @@
-                left_assoc p1 asterisk_asterisk
+                left_assoc p1 (asterisk_asterisk >>$ "**")
             let p3 =
                 named "expression:p3" @@
-                left_assoc p2 (asterisk_dot <|> asterisk <|> slash_dot <|> slash)
+                left_assoc p2 ((asterisk_dot >>$ "*.") <|> (asterisk >>$ "*") <|> (slash_dot >>$ "/.") <|> (slash >>$ "/"))
             let p4 =
                 named "expression:p4" @@
                 left_assoc2 p3
                 (
-                        (ng >> loc (plus_plus <|> plus_dot <|> plus))
-                    <|> (failed (ng_new_line >> (minus_dot <|> minus) >> p0) >> ng >> loc (minus_dot <|> minus))
+                        (ng >> loc ((plus_plus >>$ "^") <|> (plus_dot >>$ "+.") <|> (plus >>$ "+")))
+                    <|> (failed (ng_new_line >> (minus_dot <|> minus) >> failed ng_not_empty >> p0) >> ng >> loc ((minus_dot >>$ "-.") <|> (minus >>$ "-")))
                 )
             let p5 =
                 named "expression:p5" @@
                 left_assoc p4
                 (
                     peek_first
-                    [ eq_eq_eq; eq_eq; eq_op
-                    ; bang_eq_eq; bang_eq; lt_eq; gt_eq; pipe_gt
-                    ; failed jsx >> failed (lt >> ng >> slash) >> lt; gt
+                    [ eq_eq_eq >>$ "=="; eq_eq >>$ "="; eq_op >>$ "="
+                    ; bang_eq_eq >>$ "!="; bang_eq >>$ "<>"; lt_eq >>$ "<="; gt_eq >>$ ">="; pipe_gt >>$ "|>"
+                    ; failed jsx >> failed (lt >> ng >> slash) >> lt >>$ "<"; gt >>$ ">"
                     ]
                 )
             let p6 =
                 named "expression:p6" @@
-                left_assoc p5 ampersand_ampersand
+                left_assoc p5 (ampersand_ampersand >>$ "&&")
             let p7 =
                 named "expression:p7" @@
-                left_assoc p6 pipe_pipe
+                left_assoc p6 (pipe_pipe >>$ "||")
             let p8 =
                 memo & named "expression:p8" @@
-                left_assoc p7 (hash_eq <|> colon_eq)
+                left_assoc p7 ((hash_eq >>$ "#=") <|> (colon_eq >>$ ":="))
 
             let ternary =
                 named "expression:ternary" begin

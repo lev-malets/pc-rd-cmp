@@ -80,112 +80,112 @@ end
 module type BASIC_BASE = sig
     module Comb : COMB
 
-    val and' : Token.t Comb.t
-    val as' : Token.t Comb.t
-    val assert' : Token.t Comb.t
-    val catch : Token.t Comb.t
-    val constraint' : Token.t Comb.t
-    val downto' : Token.t Comb.t
-    val else' : Token.t Comb.t
-    val exception' : Token.t Comb.t
-    val export : Token.t Comb.t
-    val external' : Token.t Comb.t
-    val false' : Token.t Comb.t
-    val for' : Token.t Comb.t
-    val from : Token.t Comb.t
-    val if' : Token.t Comb.t
-    val in' : Token.t Comb.t
-    val include' : Token.t Comb.t
-    val import : Token.t Comb.t
-    val json_tag : Token.t Comb.t
-    val lazy' : Token.t Comb.t
-    val let' : Token.t Comb.t
-    val module' : Token.t Comb.t
-    val mutable' : Token.t Comb.t
-    val nonrec' : Token.t Comb.t
-    val of' : Token.t Comb.t
-    val open' : Token.t Comb.t
-    val private' : Token.t Comb.t
-    val rec' : Token.t Comb.t
-    val sig' : Token.t Comb.t
-    val switch : Token.t Comb.t
-    val to' : Token.t Comb.t
-    val true' : Token.t Comb.t
-    val try' : Token.t Comb.t
-    val type' : Token.t Comb.t
-    val unpack : Token.t Comb.t
-    val when' : Token.t Comb.t
-    val while' : Token.t Comb.t
-    val with' : Token.t Comb.t
+    val and' : unit Comb.t
+    val as' : unit Comb.t
+    val assert' : unit Comb.t
+    val catch : unit Comb.t
+    val constraint' : unit Comb.t
+    val downto' : unit Comb.t
+    val else' : unit Comb.t
+    val exception' : unit Comb.t
+    val export : unit Comb.t
+    val external' : unit Comb.t
+    val false' : unit Comb.t
+    val for' : unit Comb.t
+    val from : unit Comb.t
+    val if' : unit Comb.t
+    val in' : unit Comb.t
+    val include' : unit Comb.t
+    val import : unit Comb.t
+    val json_tag : unit Comb.t
+    val lazy' : unit Comb.t
+    val let' : unit Comb.t
+    val module' : unit Comb.t
+    val mutable' : unit Comb.t
+    val nonrec' : unit Comb.t
+    val of' : unit Comb.t
+    val open' : unit Comb.t
+    val private' : unit Comb.t
+    val rec' : unit Comb.t
+    val sig' : unit Comb.t
+    val switch : unit Comb.t
+    val to' : unit Comb.t
+    val true' : unit Comb.t
+    val try' : unit Comb.t
+    val type' : unit Comb.t
+    val unpack : unit Comb.t
+    val when' : unit Comb.t
+    val while' : unit Comb.t
+    val with' : unit Comb.t
 
-    val _' : Token.t Comb.t
+    val _' : unit Comb.t
 
-    val ampersand : Token.t Comb.t
-    val ampersand_ampersand : Token.t Comb.t
-    val arrow : Token.t Comb.t
-    val asterisk : Token.t Comb.t
-    val asterisk_asterisk : Token.t Comb.t
-    val asterisk_dot : Token.t Comb.t
-    val at : Token.t Comb.t
-    val at_at : Token.t Comb.t
-    val bang : Token.t Comb.t
-    val bang_eq : Token.t Comb.t
-    val bang_eq_eq : Token.t Comb.t
-    val colon : Token.t Comb.t
-    val colon_eq : Token.t Comb.t
-    val colon_gt : Token.t Comb.t
-    val comma : Token.t Comb.t
-    val dot : Token.t Comb.t
-    val dot_dot : Token.t Comb.t
-    val ellipsis : Token.t Comb.t
-    val eq : Token.t Comb.t
-    val eq_eq : Token.t Comb.t
-    val eq_eq_eq : Token.t Comb.t
-    val eq_op : Token.t Comb.t
-    val gt : Token.t Comb.t
-    val gt_eq : Token.t Comb.t
-    val hash : Token.t Comb.t
-    val hash_eq : Token.t Comb.t
-    val l_brace : Token.t Comb.t
-    val l_bracket : Token.t Comb.t
-    val l_paren : Token.t Comb.t
-    val list : Token.t Comb.t
-    val lt : Token.t Comb.t
-    val lt_eq : Token.t Comb.t
-    val minus : Token.t Comb.t
-    val minus_dot : Token.t Comb.t
-    val minus_gt : Token.t Comb.t
-    val percent : Token.t Comb.t
-    val percent_percent : Token.t Comb.t
-    val pipe : Token.t Comb.t
-    val pipe_gt : Token.t Comb.t
-    val pipe_pipe : Token.t Comb.t
-    val plus : Token.t Comb.t
-    val plus_dot : Token.t Comb.t
-    val plus_eq : Token.t Comb.t
-    val plus_plus : Token.t Comb.t
-    val question : Token.t Comb.t
-    val r_brace : Token.t Comb.t
-    val r_bracket : Token.t Comb.t
-    val r_paren : Token.t Comb.t
-    val slash : Token.t Comb.t
-    val slash_dot : Token.t Comb.t
-    val tilda : Token.t Comb.t
+    val ampersand : unit Comb.t
+    val ampersand_ampersand : unit Comb.t
+    val arrow : unit Comb.t
+    val asterisk : unit Comb.t
+    val asterisk_asterisk : unit Comb.t
+    val asterisk_dot : unit Comb.t
+    val at : unit Comb.t
+    val at_at : unit Comb.t
+    val bang : unit Comb.t
+    val bang_eq : unit Comb.t
+    val bang_eq_eq : unit Comb.t
+    val colon : unit Comb.t
+    val colon_eq : unit Comb.t
+    val colon_gt : unit Comb.t
+    val comma : unit Comb.t
+    val dot : unit Comb.t
+    val dot_dot : unit Comb.t
+    val ellipsis : unit Comb.t
+    val eq : unit Comb.t
+    val eq_eq : unit Comb.t
+    val eq_eq_eq : unit Comb.t
+    val eq_op : unit Comb.t
+    val gt : unit Comb.t
+    val gt_eq : unit Comb.t
+    val hash : unit Comb.t
+    val hash_eq : unit Comb.t
+    val l_brace : unit Comb.t
+    val l_bracket : unit Comb.t
+    val l_paren : unit Comb.t
+    val list : unit Comb.t
+    val lt : unit Comb.t
+    val lt_eq : unit Comb.t
+    val minus : unit Comb.t
+    val minus_dot : unit Comb.t
+    val minus_gt : unit Comb.t
+    val percent : unit Comb.t
+    val percent_percent : unit Comb.t
+    val pipe : unit Comb.t
+    val pipe_gt : unit Comb.t
+    val pipe_pipe : unit Comb.t
+    val plus : unit Comb.t
+    val plus_dot : unit Comb.t
+    val plus_eq : unit Comb.t
+    val plus_plus : unit Comb.t
+    val question : unit Comb.t
+    val r_brace : unit Comb.t
+    val r_bracket : unit Comb.t
+    val r_paren : unit Comb.t
+    val slash : unit Comb.t
+    val slash_dot : unit Comb.t
+    val tilda : unit Comb.t
 
     val ident : string Comb.t
     val l_ident : string Comb.t
     val u_ident : string Comb.t
     val type_var : string Comb.t
     val string_raw : string Comb.t
-    val interpolated_string : quote_tag:string -> expression:(expression Comb.t) -> expression Comb.t
+    val template : quote_tag:string -> expression:(expression Comb.t) -> expression Comb.t
     val string_ident : string Comb.t
 
     val integer : (string * char option) Comb.t
     val number : constant Comb.t
     val character : constant Comb.t
 
-    val string : constant Comb.t
-    val string_multiline : q:string -> constant Comb.t
+    val string_multiline : constant Comb.t
+    val template_no_template : constant Comb.t
 
     val constant : constant Comb.t
 

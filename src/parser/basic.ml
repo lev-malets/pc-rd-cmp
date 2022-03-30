@@ -79,52 +79,8 @@ let typ_add_attr ?loc n x = {x with ptyp_attributes = Hc.attr ?loc n :: x.ptyp_a
 
 let tdecl_add_attr ?loc n x = {x with ptype_attributes = Hc.attr ?loc n :: x.ptype_attributes}
 
-let unop2longident x =
+let str2lid x =
     let open Location in
-    let open Token in
     { x with txt =
-        Longident.Lident (
-            match x.txt with
-            | Bang -> "not"
-            | MinusDot -> "~-."
-            | Minus -> "~-"
-            | PlusDot -> "~+."
-            | Plus -> "~+"
-            | _ -> failwith "check usage"
-        )
-    }
-
-let binop2longident x =
-    let open Location in
-    let open Token in
-    { x with txt =
-        Longident.Lident (
-            match x.txt with
-            | MinusGt             -> "|."
-            | AsteriskAsterisk    -> "**"
-            | AsteriskDot         -> "*."
-            | Asterisk            -> "*"
-            | SlashDot            -> "/."
-            | Slash               -> "/"
-            | PlusPlus            -> "^"
-            | MinusDot            -> "-."
-            | Minus               -> "-"
-            | PlusDot             -> "+."
-            | Plus                -> "+"
-            | EqEqEq              -> "=="
-            | EqEq                -> "="
-            | Eq                  -> "="
-            | BangEqEq            -> "!="
-            | BangEq              -> "<>"
-            | LtEq                -> "<="
-            | GtEq                -> ">="
-            | PipeGt              -> "|>"
-            | Lt                  -> "<"
-            | Gt                  -> ">"
-            | AmpersandAmptersand -> "&&"
-            | PipePipe            -> "||"
-            | HashEq              -> "#="
-            | ColonEq             -> ":="
-            | _ -> failwith "check usage"
-        )
+        Longident.Lident x.txt
     }
