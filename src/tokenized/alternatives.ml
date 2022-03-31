@@ -49,7 +49,7 @@ module MakeTraced (Pos : Sigs.TPC) = struct
                         }
                     in
 
-                    begin match Hashtbl.find Pos.id2name p.id with
+                    (* begin match Hashtbl.find Pos.id2name p.id with
                     | Some name ->
                         if enter_pos.pos_cnum > (!max_pos).pos_cnum then
                             begin
@@ -59,9 +59,9 @@ module MakeTraced (Pos : Sigs.TPC) = struct
                                 entries := [entry]
                             end
                     | None -> ()
-                    end;
+                    end; *)
 
-                    (* entries := entry :: !entries *);
+                    entries := entry :: !entries
                 in
 
                 let succ state v =

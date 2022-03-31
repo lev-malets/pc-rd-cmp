@@ -57,33 +57,37 @@ module Make
 
                 let with_functor_args = fix @@ fun with_functor_args ->
                     let tail =
-                            r_paren >> ng >> tail
-                        ||  comma >> ng >> r_paren >> ng >> tail
-                        ||  comma >> ng >> with_loc with_functor_args
+                        choice
+                        [ r_paren >> ng >> tail
+                        ; comma >> ng >> r_paren >> ng >> tail
+                        ; comma >> ng >> with_loc with_functor_args
+                        ]
                     in
 
+                    choice [
                         mapping (fun attrs n typ tail loc -> Mty.functor_ ~loc ~attrs n (Some typ) tail)
                         +attrs_ +loc u_ident -ng -colon -ng +modtype -ng +tail
-
-                    ||  mapping (fun attrs n typ tail loc -> Mty.functor_ ~loc ~attrs n typ tail)
+                    ;
+                        mapping (fun attrs n typ tail loc -> Mty.functor_ ~loc ~attrs n typ tail)
                         +attrs_ +loc (_' >>$ "_") +opt(ng >> colon >> ng >> modtype) -ng +tail
-
-                    ||  mapping (fun attrs typ tail loc -> Mty.functor_ ~loc ~attrs (Location.mknoloc "_") (Some typ) tail)
+                    ;
+                        mapping (fun attrs typ tail loc -> Mty.functor_ ~loc ~attrs (Location.mknoloc "_") (Some typ) tail)
                         +attrs_ -ng +modtype -ng +tail
+                    ]
                 in
 
-                named "modtype:functor" begin
-                        mty_attrs & with_loc &
-                        l_paren >> ng >> with_functor_args
-
-                    ||  mty_attrs & with_loc & mapping (fun a b loc -> Mty.functor_ ~loc a None b)
-                        +loc (l_paren >> ng >> r_paren >>$ "*") -ng +tail
-
-                    ||  mty_attrs & with_loc & mapping (fun a b loc -> Mty.functor_ ~loc (Location.mknoloc "_") (Some a) b)
-                        +modtype -ng +tail
-
-                    ||  modtype
-                end
+                named "modtype:functor" & choice [
+                    mty_attrs & with_loc &
+                    l_paren >> ng >> with_functor_args
+                ;
+                    mty_attrs & with_loc & mapping (fun a b loc -> Mty.functor_ ~loc a None b)
+                    +loc (l_paren >> ng >> r_paren >>$ "*") -ng +tail
+                ;
+                    mty_attrs & with_loc & mapping (fun a b loc -> Mty.functor_ ~loc (Location.mknoloc "_") (Some a) b)
+                    +modtype -ng +tail
+                ;
+                    modtype
+                ]
 
             let modtype_with =
                 let type_decl eq =
@@ -96,33 +100,33 @@ module Make
                 in
 
                 let with_constraint =
-                    named "with constraint" begin
-                            mapping begin fun name decl ->
-                                let str = match [@warning "-8"] name.Location.txt with
-                                    | Longident.Lident s -> s
-                                    | Ldot (_, s) -> s
-                                in
-                                let decl = decl @@ Location.mkloc str name.loc in
-                                Pwith_type (name, decl name.loc.loc_start)
-                            end
-                            -type' -ng +loc l_longident -ng +type_decl eq
-
-                        ||  mapping begin fun name decl ->
-                                let str = match [@warning "-8"] name.Location.txt with
-                                    | Longident.Lident s -> s
-                                    | Ldot (_, s) -> s
-                                in
-                                let decl = decl {name with txt = str} in
-                                Pwith_typesubst (name, decl name.loc.loc_start)
-                            end
-                            -type' -ng +loc l_longident -ng +type_decl colon_eq
-
-                        ||  mapping begin fun m1 m2 -> Pwith_module (m1, m2) end
-                            -module'-ng +loc u_longident -ng -eq -ng +loc u_longident
-
-                        ||  mapping begin fun m1 m2 -> Pwith_modsubst (m1, m2) end
-                            -module'-ng +loc u_longident -ng -colon_eq -ng +loc u_longident
-                    end
+                    named "with constraint" & choice [
+                        mapping begin fun name decl ->
+                            let str = match [@warning "-8"] name.Location.txt with
+                                | Longident.Lident s -> s
+                                | Ldot (_, s) -> s
+                            in
+                            let decl = decl @@ Location.mkloc str name.loc in
+                            Pwith_type (name, decl name.loc.loc_start)
+                        end
+                        -type' -ng +loc l_longident -ng +type_decl eq
+                    ;
+                        mapping begin fun name decl ->
+                            let str = match [@warning "-8"] name.Location.txt with
+                                | Longident.Lident s -> s
+                                | Ldot (_, s) -> s
+                            in
+                            let decl = decl {name with txt = str} in
+                            Pwith_typesubst (name, decl name.loc.loc_start)
+                        end
+                        -type' -ng +loc l_longident -ng +type_decl colon_eq
+                    ;
+                        mapping begin fun m1 m2 -> Pwith_module (m1, m2) end
+                        -module'-ng +loc u_longident -ng -eq -ng +loc u_longident
+                    ;
+                        mapping begin fun m1 m2 -> Pwith_modsubst (m1, m2) end
+                        -module'-ng +loc u_longident -ng -colon_eq -ng +loc u_longident
+                    ]
                 in
 
                 with_loc & hlp2 Mty.with_

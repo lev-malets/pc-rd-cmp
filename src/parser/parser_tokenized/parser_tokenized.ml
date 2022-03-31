@@ -115,15 +115,17 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
             >>| fun { value; suffix } -> value, suffix
 
         let number =
-            named "tkn:number" &
+            named "tkn:number" & choice [
                 (
                     tkn_payload Integer
                     >>| fun { value; suffix } -> Pconst_integer (value, suffix)
                 )
-            ||  (
+            ;
+                (
                     tkn_payload Float
                     >>| fun { value; suffix } -> Pconst_float (value, suffix)
                 )
+            ]
 
         let character =
             named "tkn:character" & tkn_payload Character
@@ -134,13 +136,14 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
             >>| fun { value; raw = _ } -> value
 
         let string_multiline =
-            (
-                    (
-                        tkn_payload String
-                        >>| fun { raw; value = _ } -> raw
-                    )
-                ||  tkn_payload MultilineString
-            )
+            choice [
+                (
+                    tkn_payload String
+                    >>| fun { raw; value = _ } -> raw
+                )
+            ;
+                tkn_payload MultilineString
+            ]
             >>| Const.string ~quotation_delimiter:"js"
 
         let template_no_template =
@@ -155,19 +158,20 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
             ]
 
         let l_ident =
-            named "l_ident" &
-                tkn_payload LIdent
-            ||  assert' >>$ "assert"
-            ||  catch >>$ "catch"
-            ||  downto' >>$ "downto"
-            ||  from >>$ "from"
-            ||  json_tag >>$ "json"
-            ||  to' >>$ "to"
-            ||  type' >>$ "type"
-            ||  unpack >>$ "unpack"
-            ||  with' >>$ "with"
+            named "l_ident" & choice
+                [ tkn_payload LIdent
+                ; assert' >>$ "assert"
+                ; catch >>$ "catch"
+                ; downto' >>$ "downto"
+                ; from >>$ "from"
+                ; json_tag >>$ "json"
+                ; to' >>$ "to"
+                ; type' >>$ "type"
+                ; unpack >>$ "unpack"
+                ; with' >>$ "with"
+                ]
         let u_ident = named "u_ident" & tkn_payload UIdent
-        let ident = named "ident" & l_ident || u_ident
+        let ident = named "ident" & l_ident <|> u_ident
 
         let type_var = named "tkn:string:type_var" & tkn_payload TypeVar
         let single_line_comment =
@@ -186,41 +190,41 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
 
         let ng =
             memo & named "nongrammar" &
-            let p = seq comment in
-            let p1 = p >>= Simple.log_many in
+            let p = seq comment >>| Simple.log_many in
+            let p1 = run p in
             {p1 with info = p.info}
 
         let del_pos =
+            choice [
                 pos_end << ng << peek r_brace
-            ||  pos_end << ng << peek r_paren
-            ||  pos_end << ng << eof
-            ||  ng >> tkn_ Semicolon >> pos_end
-            ||  (
-                    run & mapping begin fun p1 p2 ->
-                        let open Simple in
-                        let open Lexing in
-                        match p1.pos_lnum = p2.pos_lnum with
-                        | true -> fail
-                        | false -> return p1
-                    end
-                    +pos_end -ng +pos
-                )
+            ;   pos_end << ng << peek r_paren
+            ;   pos_end << ng << eof
+            ;   ng >> tkn_ Semicolon >> pos_end
+            ;   run & mapping begin fun p1 p2 ->
+                    let open Simple in
+                    let open Lexing in
+                    match p1.pos_lnum = p2.pos_lnum with
+                    | true -> fail
+                    | false -> return p1
+                end
+                +pos_end -ng +pos
+            ]
 
         let del =
+            choice [
                 ng << peek r_brace
-            ||  ng << peek r_paren
-            ||  ng << eof
-            ||  ng << tkn_ Semicolon
-            ||  (
-                    run & mapping begin fun p1 p2 ->
-                        let open Simple in
-                        let open Lexing in
-                        match p1.pos_lnum = p2.pos_lnum with
-                        | true -> fail
-                        | false -> return ()
-                    end
-                    +pos_end -ng +pos
-                )
+            ;   ng << peek r_paren
+            ;   ng << eof
+            ;   ng << tkn_ Semicolon
+            ;   run & mapping begin fun p1 p2 ->
+                    let open Simple in
+                    let open Lexing in
+                    match p1.pos_lnum = p2.pos_lnum with
+                    | true -> fail
+                    | false -> return ()
+                end
+                +pos_end -ng +pos
+            ]
 
         let template ~quote_tag ~expression =
             let open Pc_syntax.Basic in
@@ -236,8 +240,7 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
             in
 
             let tail =
-                fix @@ fun tail ->
-
+                fix @@ fun tail -> choice [
                     mapping begin fun p1 str p2 prev ->
                         let str = mk_const str p1 p2 in
 
@@ -250,8 +253,8 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
                             ]
                     end
                     +pos +template_tail +pos_end
-
-                ||  mapping begin fun p1 str p2 expr tail prev ->
+                ;
+                    mapping begin fun p1 str p2 expr tail prev ->
                         let str = mk_const str p1 p2 in
                         let e1 =
                             Exp.apply
@@ -275,12 +278,14 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
                         tail e2
                     end
                     +pos +template_part +pos_end -ng +expression -ng +tail
+                ]
             in
 
+            choice [
                 mapping begin fun p1 str p2 -> mk_const str p1 p2 end
                 +pos +template_tail +pos_end
-
-            ||  mapping begin fun p1 str p2 expr tail ->
+            ;
+                mapping begin fun p1 str p2 expr tail ->
                     let e0 = mk_const str p1 p2 in
                     let e1 = Exp.apply
                         ~loc:(make_location p1 p2)
@@ -291,6 +296,7 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
                     tail e1
                 end
                 +pos +template_part +pos_end -ng +expression -ng +tail
+            ]
 
         let string_ident: string Comb.t = named "tkn:string_ident" & tkn_payload StringIdent
     end

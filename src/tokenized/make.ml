@@ -1,6 +1,6 @@
 open Base
 
-module Make (Tokenizer : Sigs.TOKENIZER) (Log : sig type t end) = struct
+module Make (Tokenizer : Sigs.TOKENIZER) (Log : sig type t end): Sigs.TPC with type s = Log.t and type tag = Tokenizer.Tag.t = struct
     type s = Log.t
     type log_elem = Log.t
     open Parser
@@ -152,7 +152,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Log : sig type t end) = struct
         let t4 = get ()
         let cons = get ()
         let eof = get ()
-        let any_token = get ()
     end
 
     let mk_parser_cont ~p ~typ p1 p2 =
@@ -257,19 +256,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Log : sig type t end) = struct
         ; id = Id.get()
         }
 
-    let (>>=) p f =
-        let info =
-            match p.info with
-            | Consume { empty = false; _ } as x -> x
-            | _ -> Unknown
-        in
-
-        { p = Simple.(p.p >>= f)
-        ; info
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
     let (>>|) p f =
         { p with p = Simple.(p.p >>| f)
         ; typ = Parser
@@ -314,18 +300,14 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Log : sig type t end) = struct
         ; id = Id.fail
         }
 
-    let peek_token : unit t =
-        { p =
-            { run = fun state fail succ ->
-                if state.pos = Array.length state.tokens then
-                    fail state
-                else
-                    succ { state with pos = state.pos + 1 } ()
-            }
-        ; info = Unknown
-        ; typ = Parser
-        ; id = Id.get()
-        }
+    let choice ps =
+        let rec loop =
+            function
+            | [] -> failwith "check usage"
+            | [x] -> x
+            | x :: xs -> x <|> loop xs
+        in
+        loop ps
 
     let pos: Lexing.position t =
         { p =
@@ -440,7 +422,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Log : sig type t end) = struct
     let trail = true
 
     let make_location loc_start loc_end = Location.{loc_start; loc_end; loc_ghost = false}
-    let comb_location loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
     let loc_comb loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
 
     let (+) = (<*>)
@@ -498,21 +479,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Log : sig type t end) = struct
         ; info = Empty
         ; typ = Value { v = (); p }
         ; id = Id.eof
-        }
-
-    let any_token =
-        let p =
-            { run = fun state fail succ ->
-                if state.pos = Array.length state.tokens then
-                    fail state
-                else
-                    succ { state with pos = Int.succ state.pos } state.tokens.(state.pos).tag
-            }
-        in
-        { p
-        ; info = Empty
-        ; typ = Parser
-        ; id = Id.any_token
         }
 
     let tkn_helper ~f tag =
@@ -620,7 +586,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Log : sig type t end) = struct
     let (&&) v f =
         mapping (fun v f -> f v) <*> v <*> f
 
-    let (||) = (<|>)
     let (&) = (@@)
 
     let with_loc p =

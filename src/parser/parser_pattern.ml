@@ -24,20 +24,20 @@ module Make
 
             let pattern = getter.get @@ fun (module M: THIS) -> M.pattern
             let pattern_constrainted =
-                named "pattern:constraint" begin
-                        with_loc & hlp2 Pat.constraint_
-                        +pattern -ng -colon -ng +core_type
-
-                    ||  pattern
-                end
+                named "pattern:constraint" & choice [
+                    with_loc & hlp2 Pat.constraint_
+                    +pattern -ng -colon -ng +core_type
+                ;
+                    pattern
+                ]
 
             let pattern_poly_constrainted =
-                named "pattern:constraint:poly" begin
-                        with_loc & hlp2 Pat.constraint_
-                        +pattern -ng -colon -ng +core_type_poly
-
-                    ||  pattern
-                end
+                named "pattern:constraint:poly" & choice [
+                    with_loc & hlp2 Pat.constraint_
+                    +pattern -ng -colon -ng +core_type_poly
+                ;
+                    pattern
+                ]
 
             let tuple =
                 named "pattern:tuple" begin
@@ -64,7 +64,7 @@ module Make
 
                 with_loc & hlp2 Pat.record
                 -l_brace -ng
-                +(seq ~n:1 ~sep
+                +seq ~n:1 ~sep
                         (
                             mapping begin fun lid pat ->
                                 match pat with
@@ -73,39 +73,41 @@ module Make
                             end
                             +loc l_longident +opt(ng >> colon >> ng >> pattern_constrainted)
                         )
-                )
-                +(
-                        opt sep >> ng >> r_brace >>$ Closed
-                    ||  sep >> _' >> opt sep >> ng >> r_brace >>$ Open
-                )
+                +choice
+                    [ opt sep >> ng >> r_brace >>$ Closed
+                    ; sep >> _' >> opt sep >> ng >> r_brace >>$ Open
+                    ]
 
             let list_helper =
                 make_list_helper ~constr:Pat.construct ~tuple:Pat.tuple ~get_loc:(fun x -> x.ppat_loc)
 
             let list =
-                named "pattern:list" begin
-                        with_loc & mapping (list_helper [] None)
-                        -list -ng -r_brace
-
-                    ||  list >> ng >> ellipsis >> ng >> pattern_constrainted << opt sep << ng << r_brace
-
-                    ||  with_loc & mapping list_helper
-                        -list -ng +(seq ~n:1 pattern_constrainted ~sep)
-                        +(
-                                sep >> ng >> ellipsis >> ng >> pattern_constrainted >>| Base.Option.some
-
-                            ||  return None
-                        )
-                        -opt(sep) -ng -r_brace
-                end
+                named "pattern:list" & choice [
+                    with_loc & mapping (list_helper [] None)
+                    -list -ng -r_brace
+                ;
+                    list >> ng >> ellipsis >> ng >> pattern_constrainted << opt sep << ng << r_brace
+                ;
+                    with_loc & mapping list_helper
+                    -list -ng +(seq ~n:1 pattern_constrainted ~sep)
+                    +choice
+                        [ sep >> ng >> ellipsis >> ng >> pattern_constrainted >>| Base.Option.some
+                        ; return None
+                        ]
+                    -opt(sep) -ng -r_brace
+                ]
 
             let constructor_arguments =
+                choice [
                     tuple
-                ||  l_paren >> ng >> pattern_constrainted << opt sep << ng << r_paren
-                ||  with_loc & mapping begin fun loc ->
+                ;
+                    l_paren >> ng >> pattern_constrainted << opt sep << ng << r_paren
+                ;
+                    with_loc & mapping begin fun loc ->
                         Pat.construct ~loc (Location.mknoloc @@ Longident.Lident "()") None
                     end
                     -l_paren -ng -r_paren
+                ]
 
             let construct =
                 with_loc & hlp2 Pat.construct
@@ -120,19 +122,20 @@ module Make
                 -hash -ng -ellipsis -ng +loc l_longident
 
             let unpack =
-                named "pattern:unpack" begin
-                        with_loc & mapping begin fun m t loc ->
-                            let m = Pat.unpack m in
-                            Pat.constraint_ ~loc m t
-                        end
-                        -module'-ng -l_paren -ng +loc u_ident
-                        -ng -colon -ng +core_type_package -ng -r_paren
-
-                    ||  with_loc & hlp Pat.unpack
-                        -module'-ng -l_paren -ng +loc u_ident -ng -r_paren
-                end
+                named "pattern:unpack" & choice [
+                    with_loc & mapping begin fun m t loc ->
+                        let m = Pat.unpack m in
+                        Pat.constraint_ ~loc m t
+                    end
+                    -module'-ng -l_paren -ng +loc u_ident
+                    -ng -colon -ng +core_type_package -ng -r_paren
+                ;
+                    with_loc & hlp Pat.unpack
+                    -module'-ng -l_paren -ng +loc u_ident -ng -r_paren
+                ]
 
             let signed_number =
+                choice [
                     mapping begin function [@warning "-8"]
                         | Pconst_integer (str, suf) ->
                             Pconst_integer ("-" ^ str, suf)
@@ -140,8 +143,9 @@ module Make
                             Pconst_float ("-" ^ str, suf)
                     end
                     -minus +number
-
-                ||  plus >> number
+                ;
+                    plus >> number
+                ]
 
             let number_range =
                 let number = signed_number <|> number in
@@ -186,7 +190,7 @@ module Make
                     ; record
                     ;
                         with_loc & hlp Pat.constant
-                        +(signed_number || constant)
+                        +(signed_number <|> constant)
                     ; js_string
                     ; list
                     ; construct
@@ -201,18 +205,23 @@ module Make
                 end
 
             let pattern_exception =
+                choice [
                     with_loc & hlp Pat.exception_
                     -exception' -ng +pattern_atom
-
-                ||  with_loc & hlp Pat.extension
+                ;
+                    with_loc & hlp Pat.extension
                     +extension
-
-                || pattern_atom
+                ;
+                    pattern_atom
+                ]
 
             let primary =
+                choice [
                     with_loc & hlp Pat.lazy_
                     -lazy' -ng +pattern_exception
-                ||  pattern_exception
+                ;
+                    pattern_exception
+                ]
 
             let alias =
                 fold_left_cont_0_n

@@ -29,9 +29,7 @@ module type COMB = sig
     val (>>) : _ t -> 'a t -> 'a t
     val (<<) : 'a t -> _ t -> 'a t
     val (<|>) : 'a t -> 'a t -> 'a t
-
     val (>>$) : _ t -> 'a -> 'a t
-    val (>>=) : 'a t -> ('a -> 'b Simple.t) -> 'b t
     val (>>|) : 'a t -> ('a -> 'b) -> 'b t
 
     val parse_string : 'a t -> ?filename:string -> string -> 'a option
@@ -77,8 +75,8 @@ module type COMB = sig
     val fold_left_cont_0_1 : 'a t -> ('a -> 'a) t -> 'a t
 
     val (&&) : 'a t -> ('a -> 'b) t -> 'b t
-    val (||) : 'a t -> 'a t -> 'a t
     val (&) : ('a -> 'b) -> 'a -> 'b
+    val choice : 'a t list -> 'a t
 
     val with_loc : (Location.t -> 'a) t -> 'a t
     val peek_first : 'a t list -> 'a t

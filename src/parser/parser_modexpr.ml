@@ -98,12 +98,14 @@ module Make
                     in
 
                     let args =
+                        choice [
                             l_paren >> args << opt sep << ng << r_paren
-
-                        ||  mapping begin fun loc_end prev ->
+                        ;
+                            mapping begin fun loc_end prev ->
                                 Mod.apply ~loc:{prev.pmod_loc with loc_end} prev (Mod.structure [])
                             end
                             -l_paren -ng -r_paren  +pos
+                        ]
                     in
 
                     mod_attrs & fold_left_cont_0_n atom args
@@ -112,32 +114,40 @@ module Make
             let functor_ =
                 named "modexpr:functor" begin
                     let tail =
+                        choice [
                             mapping begin fun mt me ->
                                 Mod.constraint_ ~loc:me.pmod_loc me mt
                             end
                             -colon -ng +modtype -ng -arrow -ng +modexpr
-
-                        ||  arrow >> ng >> modexpr
+                        ;
+                            arrow >> ng >> modexpr
+                        ]
                     in
 
                     let arg_loop = fix @@ fun arg_loop ->
                         let tail =
-                                opt comma >> ng >> r_paren >> ng >> tail
-                            ||  comma >> ng >> arg_loop
+                            choice
+                            [ opt comma >> ng >> r_paren >> ng >> tail
+                            ; comma >> ng >> arg_loop
+                            ]
                         in
 
+                        choice [
                             mod_attrs & with_loc & hlp3 Mod.functor_
                             +loc u_ident +opt(ng >> colon >> ng >> modtype) -ng +tail
-
-                        ||  mod_attrs & with_loc & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
+                        ;
+                            mod_attrs & with_loc & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
                             +loc (l_paren >> ng >> r_paren >>$ "*") -ng +tail
+                        ]
                     in
 
+                    choice [
                         mod_attrs & with_loc & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
                         +loc (l_paren >> ng >> r_paren >>$ "*") -ng +tail
-
-                    ||  mod_attrs &
+                    ;
+                        mod_attrs &
                         l_paren >> ng >> arg_loop
+                    ]
                 end
 
             let structure =

@@ -13,8 +13,7 @@ end
 module MakeNotPeek (Pos : Sigs.POS) = struct
     open Pos
 
-    let peek_first expected =
-        List.fold_right ~f:(fun c p -> c <|> p) expected ~init:fail
+    let peek_first expected = choice expected
 end
 
 type measured_info = {

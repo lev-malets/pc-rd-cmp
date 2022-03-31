@@ -7,20 +7,20 @@ open P_base
 let ws = whitespace
 
 module Json = struct
-    let lchar c: char t = char c << ws
+    let lchar c = s c << ws
 
-    let _false: json t = string "false" >>$ `Bool false
-    let _true: json t = string "true" >>$ `Bool true
+    let _false: json t = s"false" >>$ `Bool false
+    let _true: json t = s"true" >>$ `Bool true
 
     let bool = (_false <|> _true)
 
-    let null = string "null" >>$ `Null
+    let null = s"null" >>$ `Null
 
     let _number = take_while1 @@ function
         | '-' | '.' -> true
         | '0'..'9' -> true
         | _ -> false
-    let number = _number >>= fun str ->
+    let number = run & _number >>| fun str ->
         let open Simple in
         match Caml.int_of_string_opt str with
         | Some a -> return @@ `Int a
@@ -28,22 +28,22 @@ module Json = struct
             | Some a -> return @@ `Float a
             | None -> fail
 
-    let _string = char '"' >> take_while (fun i -> Char.(i <> '"')) << advance 1
+    let _string = s"\"" >> take_while (fun i -> Char.(i <> '"')) << advance 1
 
     let string: json t = _string >>| fun s -> `String s
 
     let json: json t = fix (fun json ->
         let mem =
             mapping (fun key value -> (key, value))
-            <*> _string << ws << lchar ':' <*> json
+            +_string -ws -lchar ":" +json
         in
         let obj =
-            (lchar '{' >> seq ~n:1 ~sep:(lchar ',') mem << lchar '}')
+            (lchar "{" >> seq ~n:1 ~sep:(lchar ",") mem << lchar "}")
             >>|
             fun ms -> `Assoc ms
         in
         let arr =
-            (lchar '[' >> seq ~n:1 ~sep:(lchar ',') json << lchar ']')
+            (lchar "[" >> seq ~n:1 ~sep:(lchar ",") json << lchar "]")
             >>|
             fun vs -> `List vs
         in

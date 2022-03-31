@@ -120,11 +120,12 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
             | None -> (float >>$ true) <|> (int >>$ false)
             | Some exp ->
                 let exp = skip exp >> opt exp_sign >> skip digit >> skip_digits in
-
-                    float >> exp >>$ true
-                ||  float >>$ true
-                ||  int >> exp >>$ true
-                ||  int >>$ false
+                choice
+                    [ float >> exp >>$ true
+                    ; float >>$ true
+                    ; int >> exp >>$ true
+                    ; int >>$ false
+                    ]
 
         let value_part_2 = value_part
             (function '0'..'1' -> true | _ -> false)
@@ -222,15 +223,17 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
 
                 cons
                 +take_while not_escaped
-                +(
+                +choice
+                    [
                         s"\"" >>$ []
-                    ||  cons
-                        +(
-                                s"\\" >> escaped >>| String.make 1
-                            ||  s"\\\"" >>$ "\""
-                        )
+                    ;
+                        cons
+                        +choice
+                            [ s"\\" >> escaped >>| String.make 1
+                            ; s"\\\"" >>$ "\""
+                            ]
                         +loop
-                )
+                    ]
             in
             parts >>| String.concat
 
@@ -240,12 +243,14 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
                 fix @@ fun loop ->
                 cons
                 +take_while (function '\n' | '\\' | '\r' -> false | c -> not (Char.equal c q.[0]))
-                +(
+                +choice
+                    [
                         s q >>$ []
-                    ||  cons
+                    ;
+                        cons
                         +(new_line <|> (s ("\\" ^ q) >>$ ("\\" ^ q)) <|> (s"\\\\" >>$ "\\\\") <|> (s"\\" >>$ "\\"))
                         +loop
-                )
+                    ]
             in
             list >>| fun l -> Const.string ~quotation_delimiter:"js" @@ String.concat l
         let string_multiline = named "const:string:ml" & string_ml_helper ~q:"\""
@@ -265,8 +270,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
 
         let l_ident = named "l_ident" @@ (failed @@ k"_") >> c_ident lower
         let u_ident = named "u_ident" @@ c_ident upper
-        let ident = named "ident" & l_ident || u_ident
-
+        let ident = named "ident" & l_ident <|> u_ident
 
         let type_var = s"\'" >> ident
         let integer =
@@ -289,12 +293,12 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
 
                 cons
                 +take_while (function '*' | '\n' | '/' | '\r' -> false | _ -> true)
-                +(
-                        s"*/" >>$ []
-                    ||  (cons +new_line +parts)
-                    ||  (mapping (fun l tail -> "/*" :: (l @ "*/" :: tail)) -s"/*" +parts +parts)
-                    ||  (cons +(any_char >>| String.make 1) +parts)
-                )
+                +choice
+                    [ s"*/" >>$ []
+                    ; cons +new_line +parts
+                    ; mapping (fun l tail -> "/*" :: (l @ "*/" :: tail)) -s"/*" +parts +parts
+                    ; cons +(any_char >>| String.make 1) +parts
+                    ]
             in
             let p = s"/*" >> parts in
             loc (p >>| String.concat)
@@ -316,19 +320,19 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
         let ng =
             memo & named "nongrammar" &
 
-            let p = t2 +pos -whitespace +opt(comments) in
-            let p2 =
-                p >>= fun (pos, x) ->
+            let p =
+                mapping begin fun pos x ->
                     match x with
                     | Some (hlp, _) -> Simple.log_many (hlp pos [])
                     | _ -> Simple.return ()
+                end
+                +pos -whitespace +opt(comments)
             in
+            let p2 = run p in
             {p2 with info = p.info}
 
         let del_pos =
-            (t2 +pos -ng +peek_char)
-            >>=
-            fun (p1, c) ->
+            run & mapping begin fun p1 c ->
                 let open Angstrom in
                 let open Simple in
                 match c with
@@ -341,11 +345,11 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
                     match p1.pos_lnum = p2.pos_lnum with
                     | true -> fail
                     | false -> return p1
+            end
+            +pos -ng +peek_char
 
         let del =
-            (t2 +pos -ng +peek_char)
-            >>=
-            fun (p1, c) ->
+            run & mapping begin fun p1 c ->
                 let open Angstrom in
                 let open Simple in
                 match c with
@@ -355,9 +359,11 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
                 | None -> return ()
                 | _ ->
                     APos.pos.p >>= fun p2 ->
-                    match p1.pos_lnum = p2.pos_lnum with
+                    match p1.Lexing.pos_lnum = p2.pos_lnum with
                     | true -> fail
                     | false -> return ()
+            end
+            +pos -ng +peek_char
 
         let template ~quote_tag ~expression =
             let open Pc_syntax.Basic in
@@ -370,14 +376,14 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
             let parts = fix @@ fun parts ->
                 cons
                 +take_while (function '\n' | '$' | '`' | '\\' | '\r' -> false | _ -> true)
-                +(
-                        cons +new_line +parts
-                    ||  cons +(s"\\`" >>$ "`") +parts
-                    ||  cons +(s"\\$" >>$ "$") +parts
-                    ||  cons +(s"\\\\" >>$ "\\") +parts
-                    ||  cons +(s"$" >> failed l_brace >>$ "$") +parts
-                    ||  return []
-                )
+                +choice
+                    [ cons +new_line +parts
+                    ; cons +(s"\\`" >>$ "`") +parts
+                    ; cons +(s"\\$" >>$ "$") +parts
+                    ; cons +(s"\\\\" >>$ "\\") +parts
+                    ; cons +(s"$" >> failed l_brace >>$ "$") +parts
+                    ; return []
+                    ]
             in
             let string =
                 mapping begin fun l p1 p2 ->
@@ -398,52 +404,51 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
                     -s"${" -ng +expression -ng -r_brace +pos +string_part
                 in
 
-                pos && string &&
-                (
-                        mapping begin fun p2 str p1 prev ->
-                            Exp.apply
-                                ~loc:{prev.pexp_loc with loc_end = p2}
-                                ~attrs:[Hc.attr "res.template"] op
-                                [
-                                        Nolabel, prev;
-                                        Nolabel, str p1 p2;
-                                ]
-                        end
-                        -s"`" +pos
-                    ||  mapping begin fun p2 tail str p1 prev ->
-                            tail @@ Exp.apply
-                                ~loc:{prev.pexp_loc with loc_end = p2}
-                                ~attrs:[Hc.attr "res.template"] op
-                                [
-                                        Nolabel, prev;
-                                        Nolabel, str p1 p2;
-                                ]
-                        end
-                        +pos +tail
-                )
+                pos && string && choice [
+                    mapping begin fun p2 str p1 prev ->
+                        Exp.apply
+                            ~loc:{prev.pexp_loc with loc_end = p2}
+                            ~attrs:[Hc.attr "res.template"] op
+                            [
+                                    Nolabel, prev;
+                                    Nolabel, str p1 p2;
+                            ]
+                    end
+                    -s"`" +pos
+                ;
+                    mapping begin fun p2 tail str p1 prev ->
+                        tail @@ Exp.apply
+                            ~loc:{prev.pexp_loc with loc_end = p2}
+                            ~attrs:[Hc.attr "res.template"] op
+                            [
+                                    Nolabel, prev;
+                                    Nolabel, str p1 p2;
+                            ]
+                    end
+                    +pos +tail
+                ]
             in
 
             pos &&
             (
                 s"`" >>
                 (
-                    string &&
-                    (
-                            mapping (fun p2 str p1 -> str p1 p2)
-                            -s"`" +pos
-
-                        ||  mapping begin fun pos1 expr pos2 tail str p1 ->
-                                let e0 = str p1 pos1 in
-                                let e1 = Exp.apply
-                                    ~loc:(make_location p1 pos2)
-                                    ~attrs:[Hc.attr "res.template"]
-                                    op
-                                    [Nolabel, e0; Nolabel, expr]
-                                in
-                                tail e1
-                            end
-                            +pos -s"${" -ng +expression -ng -r_brace +pos +string_part
-                    )
+                    string && choice [
+                        mapping (fun p2 str p1 -> str p1 p2)
+                        -s"`" +pos
+                    ;
+                        mapping begin fun pos1 expr pos2 tail str p1 ->
+                            let e0 = str p1 pos1 in
+                            let e1 = Exp.apply
+                                ~loc:(make_location p1 pos2)
+                                ~attrs:[Hc.attr "res.template"]
+                                op
+                                [Nolabel, e0; Nolabel, expr]
+                            in
+                            tail e1
+                        end
+                        +pos -s"${" -ng +expression -ng -r_brace +pos +string_part
+                    ]
                 )
             )
         let string_ident = s"\\" >> string_raw

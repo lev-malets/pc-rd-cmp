@@ -28,21 +28,21 @@ module Make
             let core_type = getter.get @@ fun (module M) -> M.core_type
             let core_type_poly = getter.get @@ fun (module M) -> M.core_type_poly
             let core_type_package =
-                named "typexpr:package" begin
-                        with_loc & hlp2 Typ.package
-                        +loc u_longident -ng -with'
-                        +(
-                            seq ~n:1 ~sep:(ng >> and')
-                                (
-                                    t2
-                                    -ng -type' -ng +loc l_longident
-                                    -ng -eq -ng +core_type_atom
-                                )
-                        )
-
-                    ||  with_loc & mapping (fun a loc -> Typ.package ~loc a [])
-                        +loc u_longident
-                end
+                named "typexpr:package" & choice [
+                    with_loc & hlp2 Typ.package
+                    +loc u_longident -ng -with'
+                    +(
+                        seq ~n:1 ~sep:(ng >> and')
+                            (
+                                t2
+                                -ng -type' -ng +loc l_longident
+                                -ng -eq -ng +core_type_atom
+                            )
+                    )
+                ;
+                    with_loc & mapping (fun a loc -> Typ.package ~loc a [])
+                    +loc u_longident
+                ]
 
             let var =
                 with_loc & hlp Typ.var
@@ -53,13 +53,13 @@ module Make
                 -_'
 
             let constr =
-                named "typexpr:constr" begin
-                        with_loc & hlp2 Typ.constr
-                        +loc l_longident -ng -lt -ng +(seq ~n:1 core_type ~sep ~trail) -ng -gt
-
-                    ||  with_loc & mapping (fun a loc -> Typ.constr ~loc a [])
-                        +loc l_longident
-                end
+                named "typexpr:constr" & choice [
+                    with_loc & hlp2 Typ.constr
+                    +loc l_longident -ng -lt -ng +(seq ~n:1 core_type ~sep ~trail) -ng -gt
+                ;
+                    with_loc & mapping (fun a loc -> Typ.constr ~loc a [])
+                    +loc l_longident
+                ]
 
             let tuple =
                 with_loc & parens & hlp Typ.tuple
@@ -70,69 +70,77 @@ module Make
                 +loc (l_paren >> ng >> r_paren >>$ Longident.Lident "unit")
 
             let bs_object =
-                named "typexpr:bso" begin
-                    let object_field =
-                            mapping begin fun attrs name typ -> Otag (name, attrs, typ) end
-                            +attrs_ +loc string_raw -ng -colon -ng +core_type_poly
+                let object_field =
+                    choice [
+                        mapping begin fun attrs name typ -> Otag (name, attrs, typ) end
+                        +attrs_ +loc string_raw -ng -colon -ng +core_type_poly
+                    ;
+                        mapping begin fun typ -> Oinherit typ end
+                        -ellipsis -ng +core_type
+                    ]
+                in
 
-                        ||  mapping begin fun typ -> Oinherit typ end
-                            -ellipsis -ng +core_type
-                    in
-
-                        with_loc & mapping (fun loc -> Typ.object_ ~loc [] Closed)
-                        -l_brace -ng -dot -ng -r_brace
-
-                    ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
-                        -l_brace -ng +(seq object_field ~sep ~trail) -ng -r_brace
-
-                    ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Open)
-                        -l_brace -ng -dot_dot -ng +(seq object_field ~sep ~trail) -ng -r_brace
-
-                    ||  with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
-                        -l_brace -ng -dot -ng +(seq object_field ~sep ~trail) -ng -r_brace
-                end
+                named "typexpr:bso" & choice [
+                    with_loc & mapping (fun loc -> Typ.object_ ~loc [] Closed)
+                    -l_brace -ng -dot -ng -r_brace
+                ;
+                    with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
+                    -l_brace -ng +(seq object_field ~sep ~trail) -ng -r_brace
+                ;
+                    with_loc & mapping (fun a loc -> Typ.object_ ~loc a Open)
+                    -l_brace -ng -dot_dot -ng +(seq object_field ~sep ~trail) -ng -r_brace
+                ;
+                    with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
+                    -l_brace -ng -dot -ng +(seq object_field ~sep ~trail) -ng -r_brace
+                ]
 
             let variant =
                 named "typexpr:variant" begin
                     let constructor_arguments =
-                            tuple
-                        ||  l_paren >> ng >> core_type << ng << r_paren
+                        choice
+                        [ tuple
+                        ; l_paren >> ng >> core_type << ng << r_paren
+                        ]
                     in
 
                     let row_field =
+                        choice [
                             mapping begin fun attrs tag empty constrs ->
                                 Rtag (tag, attrs, Option.is_some empty, constrs)
                             end
                             +attrs_ +loc variant_tag -ng +opt(ampersand-ng) +(seq ~n:1 constructor_arguments ~sep:(ng-ampersand-ng))
-
-                        ||  mapping begin fun attrs tag ->
+                        ;
+                            mapping begin fun attrs tag ->
                                 Rtag (tag, attrs, true, [])
                             end
                             +attrs_ +loc variant_tag
-
-                        || core_type >>| (fun x -> Rinherit x)
+                        ;
+                           core_type >>| (fun x -> Rinherit x)
+                        ]
                     in
 
                     let rows = opt (pipe<< ng) >> seq ~n:1 row_field ~sep:(ng-pipe-ng) in
 
+                    choice [
                         with_loc & mapping (fun loc -> Typ.variant ~loc [] Open None)
                         -l_bracket -ng -gt -ng -r_bracket
-
-                    ||  with_loc & mapping begin fun list loc ->
+                    ;
+                        with_loc & mapping begin fun list loc ->
                             Typ.variant ~loc list Open None
                         end
                         -l_bracket -ng -gt -ng +rows -ng -r_bracket
-
-                    ||  with_loc & mapping begin fun list tags loc ->
+                    ;
+                        with_loc & mapping begin fun list tags loc ->
                             let tags = if Option.is_some tags then tags else Some [] in
                             Typ.variant ~loc list Closed tags
                         end
                         -l_bracket -ng -lt -ng +rows +opt(ng >> gt >> seq ~n:1 (ng >> variant_tag)) -ng -r_bracket
-
-                    ||  with_loc & mapping begin fun list loc ->
+                    ;
+                        with_loc & mapping begin fun list loc ->
                             Typ.variant ~loc list Closed None
                         end
                         -l_bracket -ng +rows -ng -r_bracket
+                    ]
                 end
 
             let core_type_atom =
@@ -178,41 +186,47 @@ module Make
                     in
 
                     let with_args typ tail =
+                        choice [
                             typ_attrs & mapping begin fun tag x opt tail ->
                                 let label = if Option.is_some opt then Optional tag.txt else Labelled tag.txt in
                                 let x = typ_add_attr "ns.namedArgLoc" ~loc:tag.loc x in
                                 tail label x
                             end
                             -tilda -ng +loc l_ident -ng -colon -ng +typ_attrs typ +opt(ng-eq-ng-question) -ng +tail
-
-                        ||  mapping begin fun arg tail ->
+                        ;
+                            mapping begin fun arg tail ->
                                 tail Nolabel arg
                             end
                             +typ -ng +tail
+                        ]
                     in
 
                     let tail = fix @@ fun tail ->
+                        choice [
                             r_paren >> ng >> arrow_tail
-
-                        ||  comma >> ng >> r_paren >> ng >> arrow_tail
-
-                        ||  mapping begin fun typ label arg ->
+                        ;
+                            comma >> ng >> r_paren >> ng >> arrow_tail
+                        ;
+                            mapping begin fun typ label arg ->
                                 let typ = typ_add_attr "bs" typ in
                                 Typ.arrow label arg typ
                             end
                             -comma -ng -dot -ng +with_args core_type tail
-
-                        ||  mapping begin fun typ label arg ->
+                        ;
+                            mapping begin fun typ label arg ->
                                 Typ.arrow label arg typ
                             end
                             -comma -ng +with_args core_type tail
+                        ]
                     in
 
-                    named "typexpr:arrow:all" begin
-                            typ_attrs & l_paren >> ng >> dot >> ng >> with_args core_type tail >>| typ_add_attr "bs"
-                        ||  typ_attrs & l_paren >> ng >> with_args core_type tail
-                        ||  named "typexpr:arrow:onearg" (with_args aliased_atom arrow_tail)
-                    end
+                    named "typexpr:arrow:all" & choice [
+                        typ_attrs & l_paren >> ng >> dot >> ng >> with_args core_type tail >>| typ_add_attr "bs"
+                    ;
+                        typ_attrs & l_paren >> ng >> with_args core_type tail
+                    ;
+                        named "typexpr:arrow:onearg" (with_args aliased_atom arrow_tail)
+                    ]
                 end
 
             let core_type_fun =
@@ -224,12 +238,12 @@ module Make
                 alias core_type_fun
 
             let core_type_poly =
-                named "typexpr:poly" begin
-                        with_loc & hlp2 Typ.poly
-                        +seq ~n:1 (loc type_var) ~sep:ng -ng -dot -ng +core_type
-
-                    ||  core_type
-                end
+                named "typexpr:poly" & choice [
+                    with_loc & hlp2 Typ.poly
+                    +seq ~n:1 (loc type_var) ~sep:ng -ng -dot -ng +core_type
+                ;
+                    core_type
+                ]
 
             let label_declaration =
                 named "label_declraration" begin
@@ -250,10 +264,13 @@ module Make
                 braces & seq ~n:1 label_declaration ~sep ~trail
 
             let constr_args =
+                choice [
                     parens & mapping (fun x -> Pcstr_record x)
                     +label_declarations -opt sep
-                ||  parens & mapping (fun x -> Pcstr_tuple x)
+                ;
+                    parens & mapping (fun x -> Pcstr_tuple x)
                     +seq ~n:1 core_type ~sep ~trail
+                ]
 
             let type_kind =
                 let variant =
@@ -281,9 +298,11 @@ module Make
 
             let type_decl_params =
                 let variance =
-                        minus >>$ Contravariant << ng
-                    ||  plus >>$ Covariant << ng
-                    ||  return Invariant
+                    choice
+                    [ minus >>$ Contravariant << ng
+                    ; plus >>$ Covariant << ng
+                    ; return Invariant
+                    ]
                 in
 
                 let param =
@@ -302,50 +321,53 @@ module Make
 
 
             let type_declaration =
-                named "type_declaration" begin
-                        named "type_declaration:mankind" &
-                        with_loc & mapping begin fun name params manifest priv kind cstrs loc ->
-                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            Type.mk ~loc
-                                ?docs:None ?text:None ?params ?cstrs ~kind ?priv ~manifest name
-                        end
-                        +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +core_type
-                        -ng -eq -ng +opt(private' -ng) +type_kind +opt(ng >> type_decl_constraints)
-
-                    ||  named "type_declaration:manifest" &
-                        with_loc & mapping begin fun name params priv manifest cstrs loc ->
-                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            Type.mk ~loc ?params ?cstrs ?priv ~manifest name
-                        end
-                        +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +opt(private' -ng) +core_type
-                        +opt(ng >> type_decl_constraints)
-
-                    ||  named "type_declaration:kind" &
-                        with_loc & mapping begin fun name params priv kind cstrs loc ->
-                            let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
-                            Type.mk ~loc ?params ?cstrs ~kind ?priv name
-                        end
-                        +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +opt(private' -ng)
-                        +type_kind +opt(ng >> type_decl_constraints)
-
-                    ||  named "type_declaration:abstract" &
-                        with_loc & mapping begin fun name params loc ->
-                            Type.mk ~loc ?params name
-                        end
-                        +loc l_ident +opt(ng >> type_decl_params)
-                end
+                named "type_declaration" & choice [
+                    named "type_declaration:mankind" &
+                    with_loc & mapping begin fun name params manifest priv kind cstrs loc ->
+                        let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+                        Type.mk ~loc
+                            ?docs:None ?text:None ?params ?cstrs ~kind ?priv ~manifest name
+                    end
+                    +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +core_type
+                    -ng -eq -ng +opt(private' -ng) +type_kind +opt(ng >> type_decl_constraints)
+                ;
+                    named "type_declaration:manifest" &
+                    with_loc & mapping begin fun name params priv manifest cstrs loc ->
+                        let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+                        Type.mk ~loc ?params ?cstrs ?priv ~manifest name
+                    end
+                    +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +opt(private' -ng) +core_type
+                    +opt(ng >> type_decl_constraints)
+                ;
+                    named "type_declaration:kind" &
+                    with_loc & mapping begin fun name params priv kind cstrs loc ->
+                        let priv = Base.Option.map priv ~f:(fun _ -> Asttypes.Private) in
+                        Type.mk ~loc ?params ?cstrs ~kind ?priv name
+                    end
+                    +loc l_ident -ng +opt(type_decl_params-ng) -eq -ng +opt(private' -ng)
+                    +type_kind +opt(ng >> type_decl_constraints)
+                ;
+                    named "type_declaration:abstract" &
+                    with_loc & mapping begin fun name params loc ->
+                        Type.mk ~loc ?params name
+                    end
+                    +loc l_ident +opt(ng >> type_decl_params)
+                ]
 
             let _extension_kind =
                 let extension_kind =
-                        constr_args >>| (fun x -> Pext_decl (x, None))
-                    ||  eq >> ng >> loc u_longident >>| (fun x -> Pext_rebind x)
-                    ||  colon >> ng >> core_type >>| (fun x -> Pext_decl (Pcstr_tuple [], Some x))
+                    choice
+                    [ constr_args >>| (fun x -> Pext_decl (x, None))
+                    ; eq >> ng >> loc u_longident >>| (fun x -> Pext_rebind x)
+                    ; colon >> ng >> core_type >>| (fun x -> Pext_decl (Pcstr_tuple [], Some x))
+                    ]
                 in
 
-                named "typexr:constructor:kind" begin
-                        ng >> extension_kind
-                    ||  return @@ Pext_decl (Pcstr_tuple [], None)
-                end
+                named "typexr:constructor:kind" & choice [
+                    ng >> extension_kind
+                ;
+                    return @@ Pext_decl (Pcstr_tuple [], None)
+                ]
 
             let type_extension_constructor =
                 named "typext:constructor" begin

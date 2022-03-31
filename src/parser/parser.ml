@@ -116,19 +116,19 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
         let open Pattern in
 
         let payload =
-            named "payload" begin
-                    parens & mapping (fun x -> PPat (x, None))
-                    -question -ng +pattern
-
-                ||  parens & mapping (fun x -> PSig x)
-                    -colon -ng -sig' +signature
-
-                ||  parens & mapping (fun x -> PTyp x)
-                    -colon -ng +core_type
-
-                ||  parens & mapping (fun x -> PStr x)
-                    +structure
-            end
+            named "payload" & choice [
+                parens & mapping (fun x -> PPat (x, None))
+                -question -ng +pattern
+            ;
+                parens & mapping (fun x -> PSig x)
+                -colon -ng -sig' +signature
+            ;
+                parens & mapping (fun x -> PTyp x)
+                -colon -ng +core_type
+            ;
+                parens & mapping (fun x -> PStr x)
+                +structure
+            ]
         in
 
         let module Modexpr = struct
@@ -240,10 +240,10 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
 
                 mapping (fun n t attrs loc -> Md.mk ~loc ~attrs n t)
                 +loc u_ident -ng
-                +(
-                        colon >> ng >> modtype_with
-                    ||  eq >> ng >> module_alias
-                )
+                +choice
+                    [ colon >> ng >> modtype_with
+                    ; eq >> ng >> module_alias
+                    ]
             end
         in
 
@@ -288,6 +288,7 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                     )
                 in
 
+                choice [
                     with_loc & mapping begin fun attrs list name loc ->
                         let attr = Location.mkloc "genType.import" name.loc, PStr [Str.eval @@ Exp.constant @@ Const.string name.txt] in
                         let list = List.map ~f:(fun x -> x [attr]) list in
@@ -297,8 +298,8 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
                     +attrs_ -import -ng +list -ng -from -ng +loc string_raw
-
-                ||  with_loc & mapping begin fun attrs item name loc ->
+                ;
+                    with_loc & mapping begin fun attrs item name loc ->
                         let attr =
                             Location.mkloc "genType.import" name.loc,
                             PStr [Str.eval @@ Exp.tuple [Exp.constant @@ Const.string name.txt; Exp.constant @@ Const.string "default"]]
@@ -307,8 +308,8 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
                     +attrs_ -import -ng +item -ng -from -ng +loc string_raw
-
-                ||  with_loc & mapping begin fun attrs list names loc ->
+                ;
+                    with_loc & mapping begin fun attrs list names loc ->
                         let attr =
                             [ Location.mknoloc "val", PStr []
                             ; Location.mkloc "scope" names.loc,
@@ -321,8 +322,8 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
                     +attrs_ -import -ng +list -ng -from -ng +loc scope
-
-                ||  with_loc & mapping begin fun attrs item names loc ->
+                ;
+                    with_loc & mapping begin fun attrs item names loc ->
                         let attr =
                             [ Location.mknoloc "val", PStr []
                             ; Location.mkloc "scope" names.loc,
@@ -333,8 +334,8 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
                     +attrs_ -import -ng +item -ng -from -ng +loc scope
-
-                ||  with_loc & mapping begin fun attrs list loc ->
+                ;
+                    with_loc & mapping begin fun attrs list loc ->
                         let attr = Location.mknoloc "val", PStr [] in
                         let list = List.map ~f:(fun x -> x [attr]) list in
                         let str = List.map ~f:Str.primitive list in
@@ -342,13 +343,14 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
                     +attrs_ -import -ng +list
-
-                ||  with_loc & mapping begin fun attrs item loc ->
+                ;
+                    with_loc & mapping begin fun attrs item loc ->
                         let attr = Location.mknoloc "val", PStr [] in
                         let mod_ = Mod.structure [Str.primitive @@ item [attr]] in
                         Incl.mk ~loc ~attrs:(Hc.attr "ns.jsFfi" :: attrs) mod_
                     end
                     +attrs_ -import -ng +item
+                ]
             end
         in
 
@@ -384,12 +386,13 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                         )
                     ;
                         named "sig:modtype" & with_del & na_hlp Sig.modtype
-                        +(
+                        +choice
+                            [
                                 modtype_base
-
-                            ||  with_loc & hlp_a (Mtd.mk ?docs:None ?text:None ?typ:None)
+                            ;
+                                with_loc & hlp_a (Mtd.mk ?docs:None ?text:None ?typ:None)
                                 +attrs_ -module'-ng -type' -ng +loc u_ident
-                        )
+                            ]
                     ;
                         with_del & na_hlp Sig.module_
                         +top_module
@@ -455,15 +458,18 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                 in
 
                 let helper =
+                    choice [
                         with_lat
-
-                    ||  mapping begin fun pattern expr attrs loc ->
+                    ;
+                        mapping begin fun pattern expr attrs loc ->
                             Vb.mk ~loc ~attrs pattern expr
                         end
                         +pattern_poly_constrainted -ng -eq -ng +expression_fun
+                    ]
                 in
 
                 let first =
+                    choice [
                         with_loc & mapping begin fun attrs eflag rec_flag decl loc ->
                             let decl =
                                 match eflag with
@@ -475,11 +481,12 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                             | _ -> Recursive, decl loc
                         end
                         +attrs_ +opt(loc_of(export)-ng) -let' -ng +opt(rec' << ng) +helper
-
-                    ||  with_loc & mapping begin fun attrs loc decl decl_loc ->
+                    ;
+                        with_loc & mapping begin fun attrs loc decl decl_loc ->
                             Nonrecursive, decl (Hc.attr "genType" ~loc :: attrs) decl_loc
                         end
                         +attrs_ +loc_of(export) -ng +helper
+                    ]
                 in
                 let other =
                     mapping begin fun attrs p1 eflag x p2 ->

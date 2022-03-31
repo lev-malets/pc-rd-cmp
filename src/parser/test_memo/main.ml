@@ -3,18 +3,20 @@ open Run_common
 
 let input = ref ""
 let output = ref ""
+let tokenize = ref false
 let anon_fun _ = ()
 
 let speclist =
     [ "--input", Arg.Set_string input, ""
     ; "--output", Arg.Set_string output, ""
+    ; "--tokenize", Arg.Set tokenize, ""
     ]
 
 
 let () =
     Arg.parse speclist anon_fun "";
 
-    let (module Traced), (module APosTraced), (module ParseTraced) = mk_traced ~peek:true ~memo:true () in
+    let (module Traced), (module APosTraced), (module ParseTraced) = mk_traced ~peek:true ~memo:true ~tokenize:!tokenize () in
 
     let filename = !input in
     let src = read_file ~filename in

@@ -1,29 +1,8 @@
 open Core_kernel
 
-module Make(T: sig type t end) = struct
+module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
     type s = T.t
     type log_elem = s
-
-    let inc x = x := !x + 1
-
-    let magic_id x: int = Caml.Obj.magic (Caml.Obj.repr x)
-
-    module MemoKey = struct
-        type t = int * int
-
-        let compare (h1, p1) (h2, p2) =
-            let c1 = Int.compare p1 p2 in
-            if c1 <> 0 then c1 else
-
-            Int.compare h1 h2
-
-        let sexp_of_t (h, p) = sexp_of_list Int.sexp_of_t [h; p]
-
-        let hash (h, p) =
-            let hash = Hash.alloc () in
-            let hash = Hash.fold_int hash h in
-            Hash.fold_int hash p |> Hash.get_hash_value
-    end
 
     module State = struct
         module Line = struct
@@ -245,18 +224,6 @@ module Make(T: sig type t end) = struct
         ; typ =
             Value
             { v; p }
-        ; id = Id.get()
-        }
-    let (>>=) p f =
-        let info =
-            match p.info with
-            | Consume { empty = false; _ } as x -> x
-            | _ -> Unknown
-        in
-
-        { p = Simple.(p.p >>= f)
-        ; info
-        ; typ = Parser
         ; id = Id.get()
         }
 
@@ -644,7 +611,6 @@ module Make(T: sig type t end) = struct
     let trail = true
 
     let make_location loc_start loc_end = Location.{loc_start; loc_end; loc_ghost = false}
-    let comb_location loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
     let loc_comb loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
 
     let (+) = (<*>)
@@ -740,12 +706,20 @@ module Make(T: sig type t end) = struct
     let (&&) v f =
         mapping (fun v f -> f v) <*> v <*> f
 
-    let (||) = (<|>)
     let (&) = (@@)
 
     let with_loc p =
         mapping begin fun p1 f p2 -> f (make_location p1 p2) end
         +pos +p +pos
+
+    let choice ps =
+        let rec loop =
+            function
+            | [] -> failwith "check usage"
+            | [x] -> x
+            | x :: xs -> x <|> loop xs
+        in
+        loop ps
 
     let peek_first expected =
         let arr = Array.create ~len:256 Simple.fail in
