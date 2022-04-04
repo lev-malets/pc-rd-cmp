@@ -9,9 +9,10 @@ let identifier's_character = function
     | 'A'..'Z' | 'a'..'z' | '0'..'9' | '_' | '\'' -> true
     | _ -> false
 
-module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
+module Make (APos : APOS): Pc_syntax.Sigs.PARSER = struct
     module Base = struct
         module Comb = APos
+        open Pc
         open Comb
 
         let k x = s x >> failed (satisfy identifier's_character)
@@ -142,7 +143,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
 
         let value_part =
             let nondec =
-                s"0" >> peek_first
+                s"0" >> choice ~name:"pa:value_part:0"
                     [ s"b" >> value_part_2
                     ; s"B" >> value_part_2
                     ; s"o" >> value_part_8
@@ -158,7 +159,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
         let suffix_part = opt @@ satisfy (function 'g'..'z' | 'G'..'Z' -> true | _ -> false)
 
         let number =
-            memo & named "const:number" &
+            named "pa:number" &
             mapping begin fun (is_float, value) suffix ->
                 match is_float with
                 | true -> Pconst_float (value, suffix)
@@ -194,7 +195,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
                 +octal_code +octal_code
             in
 
-            peek_first
+            choice ~name:"pa:char:escaped"
             [ s"\\" >>$ '\\'; s"\'" >>$ '\''; s" " >>$ ' '
             ; s"n" >>$ '\n'; s"t" >>$ '\t' ; s"b" >>$ '\b'; s"r" >>$ '\r'
             ; hex_cc; dec_cc; oct_cc
@@ -257,7 +258,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
         let template_no_template = string_ml_helper ~q:"`"
 
         let constant =
-            peek_first
+            choice ~name:"pa:constant"
             [ number
             ; character
             ; string_multiline
@@ -318,7 +319,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
                     (fun pos comments -> f2 p1 @@ f1 pos comments), p2
                 end
         let ng =
-            memo & named "nongrammar" &
+            named "pa:nongrammar" &
 
             let p =
                 mapping begin fun pos x ->
@@ -388,7 +389,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
             let string =
                 mapping begin fun l p1 p2 ->
                     let str = String.concat l in
-                    Exp.constant ~loc:(make_location p1 p2) ~attrs:[Hc.attr "res.template"] @@
+                    Exp.constant ~loc:(loc_mk p1 p2) ~attrs:[Hc.attr "res.template"] @@
                     Const.string ~quotation_delimiter:quote_tag str
                 end
                 +parts
@@ -399,7 +400,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
 
                 let tail =
                     mapping begin fun expr pos tail prev ->
-                        tail (Exp.apply ~loc:(make_location prev.pexp_loc.loc_start pos) op [Nolabel, prev; Nolabel, expr])
+                        tail (Exp.apply ~loc:(loc_mk prev.pexp_loc.loc_start pos) op [Nolabel, prev; Nolabel, expr])
                     end
                     -s"${" -ng +expression -ng -r_brace +pos +string_part
                 in
@@ -440,7 +441,7 @@ module Make (APos : APOS): Pc_syntax.Sigs.PARSE = struct
                         mapping begin fun pos1 expr pos2 tail str p1 ->
                             let e0 = str p1 pos1 in
                             let e1 = Exp.apply
-                                ~loc:(make_location p1 pos2)
+                                ~loc:(loc_mk p1 pos2)
                                 ~attrs:[Hc.attr "res.template"]
                                 op
                                 [Nolabel, e0; Nolabel, expr]

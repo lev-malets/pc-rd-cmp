@@ -1,18 +1,15 @@
 
-module Tpc = Tokenized.Make(Parser_tokenized.Lexer.Make())(Pc_syntax.Basic.LogElement)
-module Parse = Parser_tokenized.Make(Tpc)
+open Run_common
 
 let input = ref ""
 let anon_fun _ = ()
-
-let speclist =
-    [ "--input", Arg.Set_string input, "" ]
 
 let () =
     Arg.parse speclist anon_fun "";
 
     let filename = !input in
-    let src = Res_io.readFile ~filename in
+    let src = read_file ~filename in
+    let (module Parse) = mk_parse ~tokenize:!tokenize () in
 
     match Filename.extension filename with
     | ".res" -> let _ = Parse.parse_implementation ~filename ~src in ()

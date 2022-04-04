@@ -1,38 +1,38 @@
 open Core_kernel
 open Run_common
 
-let input = ref ""
-let output = ref ""
 let tokenize = ref false
 let anon_fun _ = ()
 
 let speclist =
-    [ "--input", Arg.Set_string input, ""
-    ; "--output", Arg.Set_string output, ""
-    ; "--tokenize", Arg.Set tokenize, ""
-    ]
+    [ "--tokenize", Arg.Set tokenize, ""
+    ] @ speclist
 
 
 let () =
     Arg.parse speclist anon_fun "";
 
-    let (module Traced), (module APosTraced), (module ParseTraced) = mk_traced ~peek:true ~memo:true ~tokenize:!tokenize () in
+    let (module Parse) = mk_parse ~tokenize:!tokenize () in
 
     let filename = !input in
     let src = read_file ~filename in
 
-    begin match Filename.extension filename with
-    | ".res" ->
-        let _ = ParseTraced.parse_implementation ~src ~filename in
-        ()
-    | ".resi" ->
-        let _ = ParseTraced.parse_interface ~src ~filename in
-        ()
-    | _ ->
-        failwith filename
-    end;
+    let entries =
+        let open Parse in
+        let open Comb in
+        begin match Filename.extension filename with
+        | ".res" ->
+            let _, x = parse_string_with_trace structure_parser ~filename src in
+            x
+        | ".resi" ->
+            let _, x = parse_string_with_trace signature_parser ~filename src in
+            x
+        | _ ->
+            failwith filename
+        end
+    in
 
-    let stats = Exec_info.to_stats @@ List.rev !Traced.entries in
+    let stats = Exec_info.to_stats entries in
     let list = ref [] in
     let ind_time_sum = ref 0. in
 
@@ -41,7 +41,7 @@ let () =
     Hashtbl.iteri
         ~f:begin fun ~key:parser ~data ->
             ind_time_sum := !ind_time_sum +. data.time_individual.sum;
-            let name = APosTraced.name_of_id parser in
+            let name = Parse.Comb.name_of_id parser in
             if Char.(name.[0] <> '\'') || true then
             list := (name, data) :: !list
         end

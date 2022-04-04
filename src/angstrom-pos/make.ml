@@ -1,8 +1,7 @@
 open Core_kernel
 
-module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
-    type s = T.t
-    type log_elem = s
+module Make(Conf: Pc.CONF): Sigs.POS with type s = Conf.Log.elem = struct
+    type s = Conf.Log.elem
 
     module State = struct
         module Line = struct
@@ -50,61 +49,10 @@ module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
                     };
                 succ input pos more ()
             }
+
+        let trace_depth = ref 0
+        let trace_entries = ref []
     end
-
-    module Simple = struct
-        include Angstrom
-
-        let fail =
-            { Angstrom.Expose.Parser.run = fun input pos more fail _succ ->
-                fail input pos more [] ""
-            }
-
-        let (>>) = ( *> )
-        let (<<) = ( <* )
-
-        let (>>$) p v =
-            Angstrom.Expose.Parser.
-            { run = fun input pos more fail succ ->
-                let succ input pos more _ = succ input pos more v in
-                p.run input pos more fail succ
-            }
-
-        let exec f =
-            { Angstrom.Expose.Parser.run = fun input pos more _fail succ ->
-                succ input pos more (f ())
-            }
-
-        let (<|>) p q =
-            { Angstrom.Expose.Parser.run = fun input pos more fail succ ->
-                let s = State.get () in
-                let fail' input' _pos' more' _marks _msg =
-                    State.set s;
-                    q.Angstrom.Expose.Parser.run input' pos more' fail succ
-                in
-                p.Angstrom.Expose.Parser.run input pos more fail' succ
-            }
-
-        let many p =
-            fix (fun m ->
-              (lift2 (fun x xs -> x::xs) p m) <|> return [])
-
-        let log x =
-            { Angstrom.Expose.Parser.run = fun input pos more _fail succ ->
-                State.map (fun s -> { s with log = x :: s.log });
-                succ input pos more ();
-            }
-
-        let log_many log =
-            { Angstrom.Expose.Parser.run = fun input pos more _fail succ ->
-                State.map (fun s -> {s with log; log_parts = s.log :: s.log_parts});
-                succ input pos more ();
-            }
-    end
-
-    include Parser
-
-    type 'b getter = { get: 'a. ('b -> 'a t) -> 'a t }
 
     module Id = struct
         let next = ref 0
@@ -115,229 +63,588 @@ module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
         let t3 = get ()
         let t4 = get ()
         let cons = get ()
+        let trace_entries = get ()
     end
 
-    let print_info p =
-        Caml.print_endline @@
-        match p.info with
-        | Unknown -> "unknown"
-        | Empty -> "empty"
-        | Consume { empty = true; _ } -> "consume+empty"
-        | _ -> "consume"
+    module Basic = struct
+        type log_elem = s
 
-    let mk_parser_cont ~p ~typ p1 p2 =
-        let info =
-            match p1.info with
-            | Unknown -> Unknown
-            | Empty -> p2.info
-            | Consume { empty; first } as p1 ->
-                if empty then
-                    match p2.info with
-                    | Unknown -> Unknown
-                    | Empty -> p1
-                    | Consume p2 -> Consume { p2 with first = Charset.union first p2.first }
-                else
-                   p1
-        in
+        module Simple = struct
+            include Angstrom
 
-        { p; info; typ; id = Id.get() }
-
-    let (>>) p1 p2 =
-        let open Simple in
-        match p1.typ, p2.typ with
-        | Return _, _ -> p2
-        | _, Return v ->
-            mk_parser_cont p1 p2 ~p:(p1.p >>| fun _ -> v) ~typ:(Value { v; p = p1.p })
-        | _, Value { v; _ } ->
-            let p = (p1.p >> p2.p) in
-            mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
-        | _, Lift { f; a } ->
-            let a = (p1.p >> a) in
-            mk_parser_cont p1 p2 ~p:(lift f a) ~typ:(Lift { f; a })
-        | _, Lift2 { f; a; b } ->
-            let a = (p1.p >> a) in
-            mk_parser_cont p1 p2 ~p:(lift2 f a b) ~typ:(Lift2 { f; a; b })
-        | _, Lift3 { f; a; b; c } ->
-            let a = (p1.p >> a) in
-            mk_parser_cont p1 p2 ~p:(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
-        | _ ->
-            mk_parser_cont p1 p2 ~p:(p1.p >> p2.p) ~typ:Parser
-    let (<<) p1 p2 =
-        let open Simple in
-        match p1.typ, p2.typ with
-        | _, Return _ -> p1
-        | Return v, _ ->
-            mk_parser_cont p1 p2 ~p:(p2.p >>| fun _ -> v) ~typ:(Value { v; p = p2.p })
-        | Value { v; _ }, _ ->
-            let p = (p1.p << p2.p) in
-            mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
-        | Lift { f; a }, _ ->
-            let a = (<<) a p2.p in
-            mk_parser_cont p1 p2 ~p:(lift f a) ~typ:(Lift { f; a })
-        | Lift2 { f; a; b }, _ ->
-            let b = (<<) b p2.p in
-            mk_parser_cont p1 p2 ~p:(lift2 f a b) ~typ:(Lift2 { f; a; b })
-        | Lift3 { f; a; b; c }, _ ->
-            let c = (<<) c p2.p in
-            mk_parser_cont p1 p2 ~p:(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
-        | _ ->
-            mk_parser_cont p1 p2 ~p:(p1.p << p2.p) ~typ:Parser
-    let (<|>) p1 p2 =
-        { p = Simple.(p1.p <|> p2.p)
-        ; info =
-            begin match p1.info, p2.info with
-            | Unknown, _ -> Unknown
-            | _, Unknown -> Unknown
-            | Empty, Empty -> Empty
-            | Empty, Consume p2 -> Consume {p2 with empty = true}
-            | Consume p1, Empty -> Consume {p1 with empty = true}
-            | Consume p1, Consume p2 ->
-                Consume
-                { empty = p1.empty || p2.empty
-                ; first = Charset.union p1.first p2.first
+            let fail =
+                { Angstrom.Expose.Parser.run = fun input pos more fail _succ ->
+                    fail input pos more [] ""
                 }
-            end
-        ; typ = Parser
-        ; id = Id.get()
-        }
 
-    let (<*>) pf pv =
-        let open Simple in
-        match pf.typ with
-        | Return f ->
-            let a = pv.p in
-            mk_parser_cont pf pv ~p:(lift f a) ~typ:(Lift { f; a })
-        | Value { v = f; p } ->
-            let a = (p >> pv.p) in
-            mk_parser_cont pf pv ~p:(lift f a) ~typ:(Lift { f; a })
-        | Lift { f; a } ->
-            mk_parser_cont pf pv ~p:(lift2 f a pv.p) ~typ:(Lift2 { f; a; b = pv.p })
-        | Lift2 { f; a; b } ->
-            mk_parser_cont pf pv ~p:(lift3 f a b pv.p) ~typ:(Lift3 { f; a; b; c = pv.p })
-        | Lift3 { f; a; b; c } ->
-            mk_parser_cont pf pv ~p:(lift4 f a b c pv.p) ~typ:Parser
-        | _ ->
-            mk_parser_cont pf pv ~p:(pf.p <*> pv.p) ~typ:Parser
-    let (>>$) pp v =
-        let p = Simple.(pp.p >>$ v) in
-        { pp with p
-        ; typ =
-            Value
-            { v; p }
-        ; id = Id.get()
-        }
+            let (>>) = ( *> )
+            let (<<) = ( <* )
 
-    let run p =
-        let info =
+            let (>>$) p v =
+                Angstrom.Expose.Parser.
+                { run = fun input pos more fail succ ->
+                    let succ input pos more _ = succ input pos more v in
+                    p.run input pos more fail succ
+                }
+
+            let exec f =
+                { Angstrom.Expose.Parser.run = fun input pos more _fail succ ->
+                    succ input pos more (f ())
+                }
+
+            let (<|>) p q =
+                { Angstrom.Expose.Parser.run = fun input pos more fail succ ->
+                    let s = State.get () in
+                    let fail' input' _pos' more' _marks _msg =
+                        State.set s;
+                        q.Angstrom.Expose.Parser.run input' pos more' fail succ
+                    in
+                    p.Angstrom.Expose.Parser.run input pos more fail' succ
+                }
+
+            let many p =
+                fix (fun m ->
+                (lift2 (fun x xs -> x::xs) p m) <|> return [])
+
+            let log x =
+                { Angstrom.Expose.Parser.run = fun input pos more _fail succ ->
+                    State.map (fun s -> { s with log = x :: s.log });
+                    succ input pos more ();
+                }
+
+            let log_many log =
+                { Angstrom.Expose.Parser.run = fun input pos more _fail succ ->
+                    State.map (fun s -> {s with log; log_parts = s.log :: s.log_parts});
+                    succ input pos more ();
+                }
+        end
+
+        include Parser
+
+        type 'b getter = { get: 'a. ('b -> 'a t) -> 'a t }
+
+        let print_info p =
+            Caml.print_endline @@
             match p.info with
-            | Consume { empty = false; _ } as x -> x
-            | _ -> Unknown
-        in
+            | Unknown -> "unknown"
+            | Empty -> "empty"
+            | Consume { empty = true; _ } -> "consume+empty"
+            | _ -> "consume"
 
-        { p =
-            { run = fun input pos more fail succ ->
-                let succ' input' pos' more' v = v.Angstrom.Expose.Parser.run input' pos' more' fail succ in
-                p.p.run input pos more fail succ'
-            }
-        ; info
-        ; typ = Parser
-        ; id = Id.get()
-        }
+        let mk_parser_cont ~p ~typ p1 p2 =
+            let info =
+                match p1.info with
+                | Unknown -> Unknown
+                | Empty -> p2.info
+                | Consume { empty; first } as p1 ->
+                    if empty then
+                        match p2.info with
+                        | Unknown -> Unknown
+                        | Empty -> p1
+                        | Consume p2 -> Consume { p2 with first = Charset.union first p2.first }
+                    else
+                    p1
+            in
 
-    let (>>|) p f =
-        { p with p = Simple.(p.p >>| f)
-        ; typ = Parser
-        ; id = Id.get()
-        }
+            { p; info; typ; id = Id.get() }
 
-    let make_position pos =
-        let open State in
-        let {line; info; _} = State.get () in
-        let (pos_lnum, pos_bol, pos_cnum) =
-            (line.no, line.start, pos)
-        in
-
-        let open Lexing in
-        { info.default_position with
-            pos_lnum;
-            pos_bol;
-            pos_cnum;
-        }
-
-    let fix f =
-        let rec p = lazy (f r)
-        and r =
-            { p = { run = fun i -> (Lazy.force p).p.run i }
-            ; info = Unknown
+        let (>>) p1 p2 =
+            let open Simple in
+            match p1.typ, p2.typ with
+            | Return _, _ -> p2
+            | _, Return v ->
+                mk_parser_cont p1 p2 ~p:(p1.p >>| fun _ -> v) ~typ:(Value { v; p = p1.p })
+            | _, Value { v; _ } ->
+                let p = (p1.p >> p2.p) in
+                mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
+            | _, Lift { f; a } ->
+                let a = (p1.p >> a) in
+                mk_parser_cont p1 p2 ~p:(lift f a) ~typ:(Lift { f; a })
+            | _, Lift2 { f; a; b } ->
+                let a = (p1.p >> a) in
+                mk_parser_cont p1 p2 ~p:(lift2 f a b) ~typ:(Lift2 { f; a; b })
+            | _, Lift3 { f; a; b; c } ->
+                let a = (p1.p >> a) in
+                mk_parser_cont p1 p2 ~p:(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
+            | _ ->
+                mk_parser_cont p1 p2 ~p:(p1.p >> p2.p) ~typ:Parser
+        let (<<) p1 p2 =
+            let open Simple in
+            match p1.typ, p2.typ with
+            | _, Return _ -> p1
+            | Return v, _ ->
+                mk_parser_cont p1 p2 ~p:(p2.p >>| fun _ -> v) ~typ:(Value { v; p = p2.p })
+            | Value { v; _ }, _ ->
+                let p = (p1.p << p2.p) in
+                mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
+            | Lift { f; a }, _ ->
+                let a = (<<) a p2.p in
+                mk_parser_cont p1 p2 ~p:(lift f a) ~typ:(Lift { f; a })
+            | Lift2 { f; a; b }, _ ->
+                let b = (<<) b p2.p in
+                mk_parser_cont p1 p2 ~p:(lift2 f a b) ~typ:(Lift2 { f; a; b })
+            | Lift3 { f; a; b; c }, _ ->
+                let c = (<<) c p2.p in
+                mk_parser_cont p1 p2 ~p:(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
+            | _ ->
+                mk_parser_cont p1 p2 ~p:(p1.p << p2.p) ~typ:Parser
+        let (<|>) p1 p2 =
+            { p = Simple.(p1.p <|> p2.p)
+            ; info =
+                begin match p1.info, p2.info with
+                | Unknown, _ -> Unknown
+                | _, Unknown -> Unknown
+                | Empty, Empty -> Empty
+                | Empty, Consume p2 -> Consume {p2 with empty = true}
+                | Consume p1, Empty -> Consume {p1 with empty = true}
+                | Consume p1, Consume p2 ->
+                    Consume
+                    { empty = p1.empty || p2.empty
+                    ; first = Charset.union p1.first p2.first
+                    }
+                end
             ; typ = Parser
             ; id = Id.get()
             }
-        in
-        Lazy.force p
 
-    let fix_poly f =
-        let rec res = lazy (f getter)
-        and getter =
-            { get = fun get ->
-                { p = { run = fun i -> (get @@ Lazy.force res).p.run i }
+        let (<*>) pf pv =
+            let open Simple in
+            match pf.typ with
+            | Return f ->
+                let a = pv.p in
+                mk_parser_cont pf pv ~p:(lift f a) ~typ:(Lift { f; a })
+            | Value { v = f; p } ->
+                let a = (p >> pv.p) in
+                mk_parser_cont pf pv ~p:(lift f a) ~typ:(Lift { f; a })
+            | Lift { f; a } ->
+                mk_parser_cont pf pv ~p:(lift2 f a pv.p) ~typ:(Lift2 { f; a; b = pv.p })
+            | Lift2 { f; a; b } ->
+                mk_parser_cont pf pv ~p:(lift3 f a b pv.p) ~typ:(Lift3 { f; a; b; c = pv.p })
+            | Lift3 { f; a; b; c } ->
+                mk_parser_cont pf pv ~p:(lift4 f a b c pv.p) ~typ:Parser
+            | _ ->
+                mk_parser_cont pf pv ~p:(pf.p <*> pv.p) ~typ:Parser
+        let (>>$) pp v =
+            let p = Simple.(pp.p >>$ v) in
+            { pp with p
+            ; typ =
+                Value
+                { v; p }
+            ; id = Id.get()
+            }
+
+        let run p =
+            let info =
+                match p.info with
+                | Consume { empty = false; _ } as x -> x
+                | _ -> Unknown
+            in
+
+            { p =
+                { run = fun input pos more fail succ ->
+                    let succ' input' pos' more' v = v.Angstrom.Expose.Parser.run input' pos' more' fail succ in
+                    p.p.run input pos more fail succ'
+                }
+            ; info
+            ; typ = Parser
+            ; id = Id.get()
+            }
+
+        let (>>|) p f =
+            { p with p = Simple.(p.p >>| f)
+            ; typ = Parser
+            ; id = Id.get()
+            }
+
+        let make_position pos =
+            let open State in
+            let {line; info; _} = State.get () in
+            let (pos_lnum, pos_bol, pos_cnum) =
+                (line.no, line.start, pos)
+            in
+
+            let open Lexing in
+            { info.default_position with
+                pos_lnum;
+                pos_bol;
+                pos_cnum;
+            }
+
+        let fix f =
+            let rec p = lazy (f r)
+            and r =
+                { p = { run = fun i -> (Lazy.force p).p.run i }
                 ; info = Unknown
                 ; typ = Parser
                 ; id = Id.get()
                 }
-            }
-        in
-        Lazy.force res
+            in
+            Lazy.force p
 
-    let return x =
-        { p = Simple.(return x)
-        ; info = Empty
-        ; typ = Return x
-        ; id = Id.get()
-        }
-    let advance i =
-        if i = 0 then
-            { p = Simple.(advance 0)
-            ; info = Empty
-            ; typ = Return ()
-            ; id = Id.get()
-            }
-        else
-            let p = Simple.(advance i) in
-            { p
-            ; info = Consume
-                { empty = false
-                ; first = Charset.full
+        let fix_poly f =
+            let rec res = lazy (f getter)
+            and getter =
+                { get = fun get ->
+                    { p = { run = fun i -> (get @@ Lazy.force res).p.run i }
+                    ; info = Unknown
+                    ; typ = Parser
+                    ; id = Id.get()
+                    }
                 }
-            ; typ = Value { v = (); p }
+            in
+            Lazy.force res
+
+        let return x =
+            { p = Simple.(return x)
+            ; info = Empty
+            ; typ = Return x
             ; id = Id.get()
             }
 
-    let fail =
-        { p = Simple.fail
-        ; info = Unknown
-        ; typ = Parser
-        ; id = Id.fail
-        }
-
-    let any_char =
-        { p = Simple.any_char
-        ; info = Consume
-            { empty = false
-            ; first = Charset.full
+        let fail =
+            { p = Simple.fail
+            ; info = Unknown
+            ; typ = Parser
+            ; id = Id.fail
             }
-        ; typ = Parser
-        ; id = Id.get()
-        }
 
-    let peek_char =
-        { p = Simple.peek_char
-        ; info = Unknown
-        ; typ = Parser
-        ; id = Id.get()
-        }
+        let pos =
+            { p =
+                { run = fun i p m _ s ->
+                    s i p m (make_position p)
+                }
+            ; info = Empty
+            ; typ = Parser
+            ; id = Id.get()
+            }
+        let pos_end = pos
+
+        let exec f =
+            { p = Simple.exec f
+            ; info = Empty
+            ; typ = Parser
+            ; id = Id.get()
+            }
+
+        let failed p =
+            { p =
+                { Angstrom.Expose.Parser.run = fun input pos more fail succ ->
+                    let s = State.get () in
+                    let succ' input' _ more' _ =
+                        State.set s;
+                        fail input' pos more' [] ""
+                    in
+                    let fail' input' _ more' _ _ =
+                        State.set s;
+                        succ input' pos more' ()
+                    in
+
+                    p.p.run input pos more fail' succ'
+                }
+            ; info = Empty
+            ; typ = Parser
+            ; id = Id.get()
+            }
+
+        let opt p =
+            { p = Simple.((p.p >>| fun x -> Some x) <|> return None )
+            ; info =
+                begin match p.info with
+                | Unknown -> Unknown
+                | Empty -> Empty
+                | Consume p -> Consume {p with empty = true}
+                end
+            ; typ = Parser
+            ; id = Id.get()
+            }
+
+        let seq ?(n=0) ?sep ?(trail = false) p =
+            let pi, si, tail =
+                match sep with
+                | None -> p.info, Empty, Simple.many p.p
+                | Some sep ->
+                    let tail =
+                        let open Simple in
+                        let t = many (sep.p >> p.p) in
+                        if trail then t << ((sep.p >>| fun _ -> ()) <|> return ()) else t
+                    in
+
+                    p.info, sep.info, tail
+            in
+
+            let info =
+                match pi, si with
+                | Unknown, _ -> Unknown
+                | _, Unknown -> Unknown
+                | Empty, Empty -> failwith "Endless sequence"
+                | Empty, Consume {empty = true; _} -> failwith "Endless sequence"
+                | Empty, Consume p2 ->
+                    Consume
+                    { p2 with empty = n < 2 }
+                | Consume {empty = true; _}, Empty -> failwith "Endless sequence"
+                | Consume p1, Empty ->
+                    Consume
+                    { p1 with empty = n = 0 }
+                | Consume {empty = true; _}, Consume {empty = true; _} -> failwith "Endless sequence"
+                | Consume p1, Consume p2 ->
+                    if p1.empty then
+                        Consume
+                        { empty = p1.empty && n = 1
+                        ; first = Charset.union p1.first p2.first
+                        }
+                    else
+                        Consume
+                        { p1 with empty = n = 0 }
+            in
+
+            { p =
+                begin
+                    let open Simple in
+                    let list =
+                        map2 p.p tail
+                        ~f:begin fun first tail -> first::tail end
+                        <|>
+                        return []
+                    in
+                    list >>= fun list ->
+                    if List.length list < n then
+                        fail
+                    else
+                        return list
+                end
+            ; info
+            ; typ = Parser
+            ; id = Id.get()
+            }
+
+        let t2 =
+            let f = fun a b -> a, b in
+            { p = { run = fun input pos more _fail succ -> succ input pos more f }
+            ; info = Empty
+            ; typ = Return f
+            ; id = Id.t2
+            }
+        let t3 =
+            let f = fun a b c -> a, b, c in
+            { p = { run = fun input pos more _fail succ -> succ input pos more f }
+            ; info = Empty
+            ; typ = Return f
+            ; id = Id.t3
+            }
+        let t4 =
+            let f = fun a b c d -> a, b, c, d in
+            { p = { run = fun input pos more _fail succ -> succ input pos more f }
+            ; info = Empty
+            ; typ = Return f
+            ; id = Id.t4
+            }
+        let cons =
+            let f = fun x xs -> x :: xs in
+            { p = { run = fun input pos more _fail succ -> succ input pos more f }
+            ; info = Empty
+            ; typ = Return f
+            ; id = Id.cons
+            }
+
+        let trace_entries =
+            { p =
+                { run = fun input pos more _fail succ ->
+                    succ input pos more !(State.trace_entries)
+                }
+            ; info = Empty
+            ; typ = Parser
+            ; id = Id.trace_entries
+            }
+
+        let touch p = { p with id = Id.get () }
+        let modify ~simple p =
+            match p.typ with
+            | Parser ->
+                { p = simple
+                ; id = Id.get ()
+                ; typ = Parser
+                ; info = p.info
+                }
+            | _ -> failwith "check usage"
+        let not_empty p =
+            match p.info with
+            | Consume { empty = false; _ } -> true
+            | _ -> false
+
+        let peek_first expected =
+            let arr = Array.create ~len:256 Simple.fail in
+            let first = ref Charset.empty in
+
+            let rec loop =
+                function
+                | [] -> ()
+                | p::xs ->
+                    let p_first =
+                        match p.info with
+                        | Consume {empty=false; first} -> first
+                        | _ -> failwith ""
+                    in
+
+                    first := Charset.union !first p_first;
+
+                    loop xs;
+
+                    p_first |> Charset.iter_code
+                        begin fun c ->
+                            arr.(c) <- Simple.(p.p <|> arr.(c))
+                        end
+            in
+            loop expected;
+
+            { p = Simple.(peek_char_fail >>= fun c -> arr.(Char.to_int c))
+            ; info =
+                Consume
+                { empty = false
+                ; first = !first
+                }
+            ; typ = Parser
+            ; id = Id.get()
+            }
+
+        let memo p =
+            let id = Id.get() in
+            { p with
+                id;
+                p = { run = fun input pos more fail succ ->
+                    let s = State.get () in
+
+                    let table = Hashtbl.find_or_add s.memo_tables id ~default:(fun _ -> Hashtbl.create (module Int)) in
+
+                    match Hashtbl.find table pos with
+                    | Some t ->
+                        let  (x, log, line) = Obj.obj t in
+                        State.set { s with
+                            line; log;
+                            log_parts = s.log :: s.log_parts;
+                        };
+
+                        begin match x with
+                        | Ok (input', pos', more', v) -> succ input' pos' more' v
+                        | Error (input', pos', more', marks', msg') -> fail input' pos' more' marks' msg'
+                        end
+                    | None ->
+                        let set_data x =
+                            let s = State.get () in
+                            Hashtbl.add_exn table ~key:pos ~data:(Obj.repr (x, s.log, s.line))
+                        in
+
+                        let succ' input' pos' more' v =
+                            set_data @@ Ok (input', pos', more', v);
+                            succ input' pos' more' v
+                        in
+                        let fail' input' pos' more' marks' msg' =
+                            set_data @@ Error (input', pos', more', marks', msg');
+                            fail input' pos' more' marks' msg'
+                        in
+
+                        State.set { s with
+                            log = [];
+                            log_parts = s.log :: s.log_parts;
+                        };
+                        p.p.run input pos more fail' succ'
+                };
+            }
+
+        let traced p =
+            let id = Id.get () in
+            { p with id; p =
+                { Angstrom.Expose.Parser.run = fun input pos more fail succ ->
+                    let enter_time = Sys.time () in
+                    let enter_pos = make_position pos in
+                    let depth = State.trace_depth in
+                    let entries = State.trace_entries in
+                    let d = !depth in
+                    depth := d + 1;
+
+                    let finalize pos succeded =
+                        depth := d;
+
+                        let exit_pos = make_position pos in
+                        let exit_time = Sys.time () in
+
+                        let entry =
+                            Exec_info.{
+                                id;
+                                enter_time;
+                                enter_pos;
+                                exit_time;
+                                exit_pos;
+                                succeded;
+                                depth = d;
+                            }
+                        in
+
+                        entries := entry :: !entries;
+                    in
+
+                    let succ input' pos' more' v =
+                        finalize pos' true;
+                        succ input' pos' more' v
+                    in
+
+                    let fail input' pos' more' marks' msg' =
+                        finalize pos' false;
+                        fail input' pos' more' marks' msg'
+                    in
+
+                    p.p.run input pos more fail succ
+                }
+            }
+
+        let fold_log init f =
+            { p =
+                { run = fun i p m _ succ ->
+                    let s = State.get () in
+
+                    let init = List.fold_left ~init ~f s.log in
+
+                    let res =
+                        List.fold_left s.log_parts ~init
+                            ~f:(fun init -> List.fold_left ~init ~f)
+                    in
+
+                    succ i p m res
+                }
+            ; info = Empty
+            ; typ = Parser
+            ; id = Id.get()
+            }
+
+        let id p = p.id
+        let simple p = p.p
+
+        let eof =
+            { p = Angstrom.end_of_input
+            ; id = Id.get ()
+            ; info = Unknown
+            ; typ = Parser
+            }
+
+
+        let parse_string p ?(filename = "none") text =
+            let open Simple in
+            match parse_string ~consume:All (State.init filename >> p.p) text with
+            | Ok x -> Some x
+            | _ -> None
+
+        let parse_string_with_trace p ?(filename = "none") text =
+            let p = t2 <*> opt (p << eof) <*> trace_entries in
+            let open Simple in
+            match parse_string ~consume:Prefix (State.init filename >> p.p) text with
+            | Ok (x, es) -> x, List.rev es
+            | _ -> failwith "unreachable"
+    end
+
+    include Pc.Make(Basic)(Conf)
+    open Parser
 
     let char c =
-        let p = Simple.char c in
+        let p = Angstrom.char c in
         { p
         ; info = Consume
             { empty = false
@@ -351,7 +658,7 @@ module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
         if String.(s = "") then
             return ""
         else
-            let p = Simple.string s in
+            let p = Angstrom.string s in
             { p
             ; info = Consume
                 { empty = false
@@ -360,85 +667,10 @@ module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
             ; typ = Value { v = s; p }
             ; id = Id.get()
             }
-
-    let mk_first_test f =
-        let rec loop set =
-            function
-            | 256 -> set
-            | i ->
-                let c = Char.of_int_exn i in
-                let newset =
-                    if f c then Charset.add set c
-                    else set
-                in
-                loop newset @@ i + 1
-        in
-        loop Charset.empty 0
-
-    let take_while f =
-        { p = Simple.take_while f
-        ; info = Consume
-            { empty = false
-            ; first = mk_first_test f
-            }
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let take_while1 f =
-        { p = Simple.take_while1 f
-        ; info = Consume
-            { empty = false
-            ; first = mk_first_test f
-            }
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let skip f =
-        { p = Simple.skip f
-        ; info = Consume
-            { empty = false
-            ; first = mk_first_test f
-            }
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let skip_while f =
-        { p = Simple.skip_while f
-        ; info = Consume
-            { empty = false
-            ; first = mk_first_test f
-            }
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let satisfy f =
-        { p = Simple.satisfy f
-        ; info = Consume
-            { empty = false
-            ; first = mk_first_test f
-            }
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let pos =
-        { p =
-            { run = fun i p m _ s ->
-                s i p m (make_position p)
-            }
-        ; info = Empty
-        ; typ = Parser
-        ; id = Id.get()
-        }
-    let pos_end = pos
     let advance_line =
         let p =
             { Angstrom.Expose.Parser.run = fun i p m _ s ->
-                State.map (fun s -> {s with line = {no = s.line.no + 1; start = p}});
+                State.map (fun s -> {s with line = {no = Int.(s.line.no + 1); start = p}});
                 s i p m ()
             }
         in
@@ -454,6 +686,8 @@ module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
 
     let whitespace =
         { Angstrom.Expose.Parser.run = fun input pos more fail succ ->
+            let (+) = Int.(+) in
+            let (&&) = Base.(&&) in
             let module Input = Angstrom.Expose.Input in
             let len = Input.length input in
             let char = Input.unsafe_get_char input in
@@ -496,7 +730,7 @@ module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
                 let open Simple in
                 return () >>= fun _ ->
                 let res = ref None in
-                consumed (p.p >>| fun v -> res := Some v) >>| fun str ->
+                Angstrom.consumed (p.p >>| fun v -> res := Some v) >>| fun str ->
                 let [@warning "-8"] Some v = !res in
                 (v, str)
             end
@@ -505,316 +739,10 @@ module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
         }
 
     let consumed p =
-        { p with p = Simple.consumed p.p
+        { p with p = Angstrom.consumed p.p
         ; typ = Parser
         ; id = Id.get()
         }
-
-    let exec f =
-        { p = Simple.exec f
-        ; info = Empty
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let failed p =
-        { p =
-            { Angstrom.Expose.Parser.run = fun input pos more fail succ ->
-                let s = State.get () in
-                let succ' input' _ more' _ =
-                    State.set s;
-                    fail input' pos more' [] ""
-                in
-                let fail' input' _ more' _ _ =
-                    State.set s;
-                    succ input' pos more' ()
-                in
-
-                p.p.run input pos more fail' succ'
-            }
-        ; info = Empty
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let opt p =
-        { p = Simple.((p.p >>| fun x -> Some x) <|> return None )
-        ; info =
-            begin match p.info with
-            | Unknown -> Unknown
-            | Empty -> Empty
-            | Consume p -> Consume {p with empty = true}
-            end
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let seq ?(n=0) ?sep ?(trail = false) p =
-        let pi, si, tail =
-            match sep with
-            | None -> p.info, Empty, Simple.many p.p
-            | Some sep ->
-                let tail =
-                    let open Simple in
-                    let t = many (sep.p >> p.p) in
-                    if trail then t << ((sep.p >>| fun _ -> ()) <|> return ()) else t
-                in
-
-                p.info, sep.info, tail
-        in
-
-        let info =
-            match pi, si with
-            | Unknown, _ -> Unknown
-            | _, Unknown -> Unknown
-            | Empty, Empty -> failwith "Endless sequence"
-            | Empty, Consume {empty = true; _} -> failwith "Endless sequence"
-            | Empty, Consume p2 ->
-                Consume
-                { p2 with empty = n < 2 }
-            | Consume {empty = true; _}, Empty -> failwith "Endless sequence"
-            | Consume p1, Empty ->
-                Consume
-                { p1 with empty = n = 0 }
-            | Consume {empty = true; _}, Consume {empty = true; _} -> failwith "Endless sequence"
-            | Consume p1, Consume p2 ->
-                if p1.empty then
-                    Consume
-                    { empty = p1.empty && n = 1
-                    ; first = Charset.union p1.first p2.first
-                    }
-                else
-                    Consume
-                    { p1 with empty = n = 0 }
-        in
-
-        { p =
-            begin
-                let open Simple in
-                let list =
-                    map2 p.p tail
-                    ~f:begin fun first tail -> first::tail end
-                    <|>
-                    return []
-                in
-                list >>= fun list ->
-                if List.length list < n then
-                    fail
-                else
-                    return list
-            end
-        ; info
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let trail = true
-
-    let make_location loc_start loc_end = Location.{loc_start; loc_end; loc_ghost = false}
-    let loc_comb loc1 loc2 = make_location loc1.Location.loc_start loc2.Location.loc_end
-
-    let (+) = (<*>)
-    let (-) = (<<)
-
-    let mapping = return
-
-    let loc p =
-        mapping begin fun p1 x p2 -> Location.mkloc x @@ make_location p1 p2 end
-        <*> pos <*> p <*> pos
-
-    let loc_of p =
-        mapping make_location
-        <*> pos << p <*> pos
-
-    let t2 =
-        let f = fun a b -> a, b in
-        { p = { run = fun input pos more _fail succ -> succ input pos more f }
-        ; info = Empty
-        ; typ = Return f
-        ; id = Id.t2
-        }
-    let t3 =
-        let f = fun a b c -> a, b, c in
-        { p = { run = fun input pos more _fail succ -> succ input pos more f }
-        ; info = Empty
-        ; typ = Return f
-        ; id = Id.t3
-        }
-    let t4 =
-        let f = fun a b c d -> a, b, c, d in
-        { p = { run = fun input pos more _fail succ -> succ input pos more f }
-        ; info = Empty
-        ; typ = Return f
-        ; id = Id.t4
-        }
-    let cons =
-        let f = fun x xs -> x :: xs in
-        { p = { run = fun input pos more _fail succ -> succ input pos more f }
-        ; info = Empty
-        ; typ = Return f
-        ; id = Id.cons
-        }
-
-    let fold_left_0_n ~f nil p =
-        let info = (nil >> seq p).info in
-
-        { p =
-            begin
-                let open Simple in
-                let rec loop acc =
-                    (p.p >>= fun x -> loop @@ f acc x)
-                    <|>
-                    return acc
-                in
-                nil.p >>= loop
-            end
-        ; info
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let fold_left_0_1 ~f nil p =
-            (mapping f <*> nil <*> p)
-        <|> nil
-
-    let fold_left_cont_0_n nil cont =
-        let tail = fix @@ fun tail ->
-            mapping begin fun cont tail ->
-                fun prev ->
-                    match tail with
-                    | None -> cont prev
-                    | Some tail -> tail (cont prev)
-            end
-            +cont +opt(tail)
-        in
-
-        mapping begin fun x tail ->
-            match tail with
-            | None -> x
-            | Some tail -> tail x
-        end
-        +nil +opt(tail)
-
-    let fold_left_cont_0_1 nil cont =
-        mapping begin fun x cont ->
-            match cont with
-            | None -> x
-            | Some cont -> cont x
-        end
-        +nil +opt(cont)
-
-    let (&&) v f =
-        mapping (fun v f -> f v) <*> v <*> f
-
-    let (&) = (@@)
-
-    let with_loc p =
-        mapping begin fun p1 f p2 -> f (make_location p1 p2) end
-        +pos +p +pos
-
-    let choice ps =
-        let rec loop =
-            function
-            | [] -> failwith "check usage"
-            | [x] -> x
-            | x :: xs -> x <|> loop xs
-        in
-        loop ps
-
-    let peek_first expected =
-        let arr = Array.create ~len:256 Simple.fail in
-        let first = ref Charset.empty in
-
-        let rec loop =
-            function
-            | [] -> ()
-            | p::xs ->
-                let p_first =
-                    match p.info with
-                    | Consume {empty=false; first} -> first
-                    | _ -> failwith ""
-                in
-
-                first := Charset.union !first p_first;
-
-                loop xs;
-
-                p_first |> Charset.iter_code
-                    begin fun c ->
-                        arr.(c) <- Simple.(p.p <|> arr.(c))
-                    end
-        in
-        loop expected;
-
-        { p = Simple.(peek_char_fail >>= fun c -> arr.(Char.to_int c))
-        ; info =
-            Consume
-            { empty = false
-            ; first = !first
-            }
-        ; typ = Parser
-        ; id = Id.get()
-        }
-
-    let memoid2id = Hashtbl.create (module Int)
-    let id2memoid: (int, int) Hashtbl.t = Hashtbl.create (module Int)
-
-    let memo p =
-        let id = Id.get() in
-
-        let _ = Hashtbl.add memoid2id ~key:id ~data:p.id in
-        let _ = Hashtbl.add id2memoid ~data:id ~key:p.id in
-
-        { p with
-            id;
-            p = { run = fun input pos more fail succ ->
-                let s = State.get () in
-
-                let table = Hashtbl.find_or_add s.memo_tables id ~default:(fun _ -> Hashtbl.create (module Int)) in
-
-                match Hashtbl.find table pos with
-                | Some t ->
-                    let  (x, log, line) = Obj.obj t in
-                    State.set { s with
-                        line; log;
-                        log_parts = s.log :: s.log_parts;
-                    };
-
-                    begin match x with
-                    | Ok (input', pos', more', v) -> succ input' pos' more' v
-                    | Error (input', pos', more', marks', msg') -> fail input' pos' more' marks' msg'
-                    end
-                | None ->
-                    let set_data x =
-                        let s = State.get () in
-                        Hashtbl.add_exn table ~key:pos ~data:(Obj.repr (x, s.log, s.line))
-                    in
-
-                    let succ' input' pos' more' v =
-                        set_data @@ Ok (input', pos', more', v);
-                        succ input' pos' more' v
-                    in
-                    let fail' input' pos' more' marks' msg' =
-                        set_data @@ Error (input', pos', more', marks', msg');
-                        fail input' pos' more' marks' msg'
-                    in
-
-                    State.set { s with
-                        log = [];
-                        log_parts = s.log :: s.log_parts;
-                    };
-                    p.p.run input pos more fail' succ'
-            };
-        }
-
-    let name2id = Hashtbl.create (module String)
-    let id2name = Hashtbl.create (module Int)
-
-    let named (name: string) p =
-        let id = Id.get() in
-        Hashtbl.add_exn name2id ~key:name ~data:id;
-        Hashtbl.add_exn id2name ~key:id ~data:name;
-        {p with id}
 
     let s =
         Fix.Memoize.String.memoize @@ fun x ->
@@ -824,49 +752,102 @@ module Make(T: sig type t end): Sigs.POS with type s = T.t = struct
             | 1 -> char x.[0] >>$ ()
             | _ -> string x >>$ ()
         end
-
-    let rec name_of_id id =
-        match Hashtbl.find memoid2id id with
-        | Some id ->
-            let name = name_of_id id in
-            name ^ "*"
-        | None ->
-            begin match Hashtbl.find id2name id with
-            | Some x -> x
-            | None -> "_unnamed_"
-            end
-
-    let name_of p = name_of_id p.id
-
-    let fold_log init f =
-        { p =
-            { run = fun i p m _ succ ->
-                let s = State.get () in
-
-                let init = List.fold_left ~init ~f s.log in
-
-                let res =
-                    List.fold_left s.log_parts ~init
-                        ~f:(fun init -> List.fold_left ~init ~f)
-                in
-
-                succ i p m res
+    let advance i =
+        if i = 0 then
+            { p = Angstrom.(advance 0)
+            ; info = Empty
+            ; typ = Return ()
+            ; id = Id.get()
             }
-        ; info = Empty
+        else
+            let p = Angstrom.(advance i) in
+            { p
+            ; info = Consume
+                { empty = false
+                ; first = Charset.full
+                }
+            ; typ = Value { v = (); p }
+            ; id = Id.get()
+            }
+
+    let mk_first_test f =
+        let rec loop set =
+            function
+            | 256 -> set
+            | i ->
+                let c = Char.of_int_exn i in
+                let newset =
+                    if f c then Charset.add set c
+                    else set
+                in
+                loop newset Int.(i + 1)
+        in
+        loop Charset.empty 0
+
+    let take_while f =
+        { p = Angstrom.take_while f
+        ; info = Consume
+            { empty = false
+            ; first = mk_first_test f
+            }
         ; typ = Parser
         ; id = Id.get()
         }
 
-    let id p = p.id
-    let simple p = p.p
+    let take_while1 f =
+        { p = Angstrom.take_while1 f
+        ; info = Consume
+            { empty = false
+            ; first = mk_first_test f
+            }
+        ; typ = Parser
+        ; id = Id.get()
+        }
 
-    let parse_string p ?(filename = "none") text =
-        let open Simple in
-        match parse_string ~consume:All (State.init filename >> p.p) text with
-        | Ok x -> Some x
-        | _ -> None
+    let skip f =
+        { p = Angstrom.skip f
+        ; info = Consume
+            { empty = false
+            ; first = mk_first_test f
+            }
+        ; typ = Parser
+        ; id = Id.get()
+        }
 
-    module Expose = struct
-        let make_position = make_position
-    end
+    let skip_while f =
+        { p = Angstrom.skip_while f
+        ; info = Consume
+            { empty = false
+            ; first = mk_first_test f
+            }
+        ; typ = Parser
+        ; id = Id.get()
+        }
+
+    let satisfy f =
+        { p = Angstrom.satisfy f
+        ; info = Consume
+            { empty = false
+            ; first = mk_first_test f
+            }
+        ; typ = Parser
+        ; id = Id.get()
+        }
+
+    let any_char =
+        { p = Angstrom.any_char
+        ; info = Consume
+            { empty = false
+            ; first = Charset.full
+            }
+        ; typ = Parser
+        ; id = Id.get()
+        }
+
+    let peek_char =
+        { p = Angstrom.peek_char
+        ; info = Unknown
+        ; typ = Parser
+        ; id = Id.get()
+        }
 end

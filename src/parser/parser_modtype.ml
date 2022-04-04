@@ -16,6 +16,7 @@ module Make
     open Core
     open Type
     open Modexpr
+    open Pc
     open Comb
 
     module Comb = Comb
@@ -30,8 +31,7 @@ module Make
             let modtype_with = getter.get @@ fun (module M) -> M.modtype_with
 
             let modtype_atom =
-                named "modtype:atom" begin
-                    peek_first
+                choice ~name:"modtype:atom"
                     [
                         with_loc & parens & mapping mty_loc
                         +modtype_with
@@ -48,7 +48,6 @@ module Make
                         with_loc & hlp Mty.ident
                         +loc longident
                     ]
-                end
 
             let modtype = mty_attrs modtype_atom
 
@@ -92,7 +91,7 @@ module Make
             let modtype_with =
                 let type_decl eq =
                     mapping begin fun params manifest cstrs p2 name p1 ->
-                        let loc = make_location p1 p2 in
+                        let loc = loc_mk p1 p2 in
                         Ast_helper.Type.mk ~loc
                             ?docs:None ?text:None ?params ?cstrs ?kind:None ?priv:None ~manifest name
                     end

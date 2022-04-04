@@ -6,13 +6,8 @@ let () =
 
     let parsers =
         [ "original", (fun _ -> (module ParseRes: Pc_syntax.Sigs.PARSE))
-        (*
-        ; "pure", (module Parse)
-        ; "peek", (module ParsePeek)
-        ; "memo", (fun _ -> mk_memoized Pc_syntax.Parser.memo_spec)
-        *)
-        ; "memo+peek", (fun _ -> mk_parse ~peek:true ~memo:true ())
-        ; "memo+peek+tokenize", (fun _ -> mk_parse ~peek:true ~memo:true ~tokenize:true ())
+        ; "pc", (fun _ -> let (module Parse) = mk_parse () in (module Parse))
+        ; "pc+t", (fun _ -> let (module Parse) = mk_parse ~tokenize:true () in (module Parse))
         ]
     in
 
@@ -41,5 +36,5 @@ let () =
 
     Core_bench.Bench.bench (
         test
-        @ [Core_bench.Bench.Test.create ~name:"init" @@ fun _ -> mk_parse ~peek:true ~memo:true ()]
-        @ [Core_bench.Bench.Test.create ~name:"init+t" @@ fun _ -> mk_parse ~peek:true ~memo:true ~tokenize:true ()]);
+        @ [Core_bench.Bench.Test.create ~name:"init" @@ fun _ -> mk_parse ()]
+        @ [Core_bench.Bench.Test.create ~name:"init+t" @@ fun _ -> mk_parse ~tokenize:true ()]);

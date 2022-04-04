@@ -26,25 +26,6 @@ let
             doCheck = true;
             checkInputs = [ super.ounit ];
         };
-
-        ppx_deriving_yojson = super.buildDunePackage rec {
-            pname = "ppx_deriving_yojson";
-            version = "3.6.0";
-
-            useDune2 = true;
-
-            src = pkgs.fetchurl {
-                url = "https://github.com/ocaml-ppx/ppx_deriving_yojson/releases/download/v${version}/ppx_deriving_yojson-v${version}.tbz";
-                sha256 = "sha256:d6f66c6f76b5caa9b2f91ad61a8d8142f4e0582d9c6f39ea42b56491048358bc";
-            };
-
-            checkInputs = [ super.ounit ];
-            buildInputs = [ ];
-
-            propagatedBuildInputs = [ super.yojson super.ppx_deriving super.ppxlib ];
-
-            doCheck = true;
-        };
     });
 in
 
@@ -52,6 +33,6 @@ in
 pkgs.mkShell {
     nativeBuildInputs =
         (with pkgs; [ git perf-tools linuxPackages.perf ncurses ocamlformat gdb ]) ++
-        (with ocamlPackages; [ utop ocaml dune_2 ocaml-lsp core_bench alcotest findlib re ]);
+        (with ocamlPackages; [ utop ocaml dune_2 ocaml-lsp core_bench alcotest findlib ]);
     buildInputs = with ocamlPackages; [ ocamlgraph yojson bigstringaf fix async lwt ocaml-syntax-shims ];
 }

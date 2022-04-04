@@ -3,7 +3,7 @@ open Base
 module type POS = sig
     type s
 
-    include Pc.Sigs.COMB
+    include Pc.COMB
         with type log_elem = s
         and type 'a Simple.t = 'a Angstrom.t
         and type 'a t = 'a Parser.t
@@ -30,8 +30,4 @@ module type POS = sig
     val with_literal : 'a t -> ('a * string) t
 
     val consumed : _ t -> string t
-
-    module Expose : sig
-        val make_position : int -> Lexing.position
-    end
 end

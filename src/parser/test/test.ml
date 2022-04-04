@@ -38,8 +38,9 @@ let structure: Parsetree.structure Alcotest.testable = Alcotest.testable (fun fm
 
 let () =
     let open Alcotest in
-    let (module Parse) = mk_parse ~peek:true ~memo:true ~tokenize:false () in
-    let (module ParseT) = mk_parse ~peek:true ~memo:true ~tokenize:true () in
+    config := "data/configs/test.json";
+    let (module Parse) = mk_parse ~tokenize:false () in
+    let (module ParseT) = mk_parse ~tokenize:true () in
 
     let mk_test_cases (module Parse : Pc_syntax.Sigs.PARSE) map_sig map_str =
         List.map files

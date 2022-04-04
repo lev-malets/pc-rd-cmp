@@ -4,9 +4,11 @@ open Parsetree
 open Ast_helper
 open Asttypes
 
-module Make (BasicBase : Sigs.BASIC_BASE) = struct
+module Make (BasicBase : Sigs.BASIC_BASE): Sigs.PARSER = struct
     module Basic = Parser_basic.Make(BasicBase)
     open Basic
+    open Pc
+    module Comb = Comb
     open Comb
 
     type parsers =
@@ -40,11 +42,11 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                 let extension = named "extension" @@ id_payload_pair percent
 
                 let attrs_ =
-                    memo & named "attrs" &
-                    seq ~sep:ng ~trail attribute
+                    named "attrs" &
+                    seq ~sep:ng ~trail:true attribute
                 let attrs1_ =
                     named "attrs1" @@
-                    seq ~n:1 ~sep:ng ~trail attribute
+                    seq ~n:1 ~sep:ng ~trail:true attribute
 
                 let pat_attrs p =
                     mapping begin fun loc_start attrs x ->
@@ -358,7 +360,7 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
             named "sig" begin
                 seq ~sep:ng
                 (
-                    peek_first
+                    choice ~name:"sig:elem"
                     [
                         with_del & na_hlp Sig.attribute
                         +module_attribute
@@ -495,7 +497,7 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
                             | None -> x attrs
                             | Some loc -> x (Hc.attr "genType" ~loc :: attrs)
                         in
-                        decl @@ make_location p1 p2
+                        decl @@ loc_mk p1 p2
                     end
                     +attrs_ -and' -ng +pos +opt(loc_of(export)-ng) +helper +pos
                 in
@@ -539,10 +541,10 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
         in
 
         let structure =
-            memo & named "str" &
+            named "str" &
             seq ~sep:ng
             (
-                peek_first
+                choice ~name:"str:elem"
                 [
                     with_del & na_hlp Str.attribute
                     +module_attribute
@@ -617,6 +619,9 @@ module Make (BasicBase : Sigs.BASIC_BASE) = struct
         in
         parse_string p ~filename src
 
-    let parse_interface = parse (ng >> parsers.signature << ng)
-    let parse_implementation = parse (ng >> parsers.structure << ng)
+    let signature_parser = ng >> parsers.signature << ng
+    let structure_parser = ng >> parsers.structure << ng
+
+    let parse_interface = parse signature_parser
+    let parse_implementation = parse structure_parser
 end

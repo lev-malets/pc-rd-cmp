@@ -16,6 +16,7 @@ module Make
     open Type
     open Expression
     open Modtype
+    open Pc
     open Comb
 
     module Comb = Comb
@@ -39,19 +40,18 @@ module Make
                     )
 
             let atom =
-                named "modexpr:atom" begin
-                    let unpack_constr =
-                        fold_left_cont_0_1
-                            expression
-                            (
-                                mapping begin fun typ prev ->
-                                    Exp.constraint_ ~loc:(loc_comb prev.pexp_loc typ.ptyp_loc) prev typ
-                                end
-                                -ng -colon -ng +core_type_package
-                            )
-                    in
+                let unpack_constr =
+                    fold_left_cont_0_1
+                        expression
+                        (
+                            mapping begin fun typ prev ->
+                                Exp.constraint_ ~loc:(loc_comb prev.pexp_loc typ.ptyp_loc) prev typ
+                            end
+                            -ng -colon -ng +core_type_package
+                        )
+                in
 
-                    peek_first
+                choice ~name:"modexpr:atom"
                     [
                         with_loc & hlp Mod.unpack
                         -unpack -ng -l_paren -ng +unpack_constr -ng -r_paren
@@ -65,7 +65,6 @@ module Make
                         with_loc & hlp Mod.extension
                         +extension
                     ]
-                end
 
             let apply =
                 named "modexpr:apply" begin

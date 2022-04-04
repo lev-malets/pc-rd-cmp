@@ -1,0 +1,39 @@
+{
+    "memoize": [
+        "expression:in_braces",
+        "expression:sequence",
+        "expression:arrow",
+        "expression:object:set",
+        "expression:p0",
+        "expression:p8",
+        "expression",
+
+        "pattern",
+
+        "typexpr:atom",
+        "typexpr:arrow",
+        "typexpr",
+
+        "attrs",
+        "str",
+
+        "pa:number",
+        "pa:nongrammar",
+
+        "ta:nongrammar"
+    ],
+    "peek": [
+        "expression:atom",
+        "expression:p5:op",
+        "modexpr:atom",
+        "modtype:atom",
+        "pattern:atom",
+        "typexpr:atom:noattrs",
+        "sig:elem",
+        "str:elem",
+        "pa:value_part:0",
+        "pa:char:escaped",
+        "pa:constant",
+        "pt:constant"
+    ]
+}

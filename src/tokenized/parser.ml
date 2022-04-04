@@ -14,28 +14,33 @@ type 'a token =
     ; payload   : Caml.Obj.t option
     }
 
-type ('t, 'l) state =
+type ('t, 'l) state_immutable =
     { file_start     : Lexing.position
     ; file_end       : Lexing.position
     ; tokens         : 't token array
+    ; memo_tables    : (int, (int, Caml.Obj.t) Hashtbl.t) Hashtbl.t
+    ; trace_depth    : int ref
+    ; trace_entries  : Exec_info.entry list ref
+    }
+
+type ('t, 'l) state =
+    { im             : ('t, 'l) state_immutable
     ; pos            : int
     ; log            : 'l list
     ; log_parts      : 'l list list
-    ; memo_tables    : (int, (int, Caml.Obj.t) Hashtbl.t) Hashtbl.t
     }
-
 
 let prev_token_end state =
     if state.pos = 0 then
-        state.file_start
+        state.im.file_start
     else
-        state.tokens.(state.pos - 1).loc_end
+        state.im.tokens.(state.pos - 1).loc_end
 
 let next_token_start state =
-    if state.pos = Array.length state.tokens then
-        state.file_end
+    if state.pos = Array.length state.im.tokens then
+        state.im.file_end
     else
-        state.tokens.(state.pos).loc_start
+        state.im.tokens.(state.pos).loc_start
 
 type ('a, 't, 'l) failure     = ('t, 'l) state -> 'a option
 type ('a, 'r, 't, 'l) success = ('t, 'l) state -> 'a -> 'r option

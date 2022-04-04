@@ -12,9 +12,10 @@ let identifier's_character = function
     | 'A'..'Z' | 'a'..'z' | '0'..'9' | '_' | '\'' -> true
     | _ -> false
 
-module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
+module Make (Tpc : TPC): Pc_syntax.Sigs.PARSER = struct
     module Base = struct
         module Comb = Tpc
+        open Pc
         open Comb
         open Token
 
@@ -151,7 +152,7 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
             >>| Const.string ~quotation_delimiter:"js"
 
         let constant =
-            peek_first
+            choice ~name:"pt:constant"
             [ number
             ; character
             ; string_multiline
@@ -189,7 +190,7 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
             +pos_end +(single_line_comment <|> multi_line_comment)
 
         let ng =
-            memo & named "nongrammar" &
+            named "pt:nongrammar" &
             let p = seq comment >>| Simple.log_many in
             let p1 = run p in
             {p1 with info = p.info}
@@ -235,7 +236,7 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
             let template_part = tkn_payload TemplatePart in
             let template_tail = tkn_payload TemplateTail in
             let mk_const str p1 p2 =
-                Exp.constant ~loc:(make_location p1 p2) ~attrs:[Hc.attr "res.template"] @@
+                Exp.constant ~loc:(loc_mk p1 p2) ~attrs:[Hc.attr "res.template"] @@
                 Const.string ~quotation_delimiter:quote_tag str
             in
 
@@ -288,7 +289,7 @@ module Make (Tpc : TPC): Pc_syntax.Sigs.PARSE = struct
                 mapping begin fun p1 str p2 expr tail ->
                     let e0 = mk_const str p1 p2 in
                     let e1 = Exp.apply
-                        ~loc:(make_location p1 p2)
+                        ~loc:(loc_mk p1 p2)
                         ~attrs:[Hc.attr "res.template"]
                         op
                         [Nolabel, e0; Nolabel, expr]

@@ -1,13 +1,17 @@
 
-# 1 - parser; 2 - file
+# 1 - file; 2 - flags
 
-filename=$2
-dir=tmp/t/src/parser/test/exec.sh/$2
+filename=$1
+dir=tmp/t/src/parser/test/exec.sh/$1
 
 mkdir -p $dir
-dune exec $(dirname $0)/main.exe -- --parser $1 --simplified --input $filename --output $dir/actual 2> $dir/actual.log
+dune exec $(dirname $0)/print_actual.exe -- $2 --input $filename --output $dir/actual
 if [[ "$?" != "0" ]]; then cat $dir/actual.log; exit 1; fi
-dune exec $(dirname $0)/main.exe -- --parser res --simplified --input $filename --output $dir/expected 2> $dir/expected.log
+dune exec $(dirname $0)/print_expected.exe -- $2 --input $filename --output $dir/expected
 
-code --diff $dir/expected $dir/actual
-exit 1
+if diff $dir/expected $dir/actual > /dev/null; then
+    true
+else
+    code --diff $dir/expected $dir/actual
+    exit 1
+fi

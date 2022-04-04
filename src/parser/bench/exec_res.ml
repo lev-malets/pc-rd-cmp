@@ -1,16 +1,12 @@
-
-let input = ref ""
-let anon_fun _ = ()
-
-let speclist =
-    [ "--input", Arg.Set_string input, "" ]
+open Run_common
 
 let () =
     Arg.parse speclist anon_fun "";
 
     let filename = !input in
+    let src = read_file ~filename in
 
     match Filename.extension filename with
-    | ".res" -> let _ = Res_driver.parse_implementation filename in ()
-    | ".resi" -> let _ = Res_driver.parse_interface filename in ()
+    | ".res" -> let _ = ParseRes.parse_implementation ~filename ~src in ()
+    | ".resi" -> let _ = ParseRes.parse_interface ~filename ~src in ()
     | _ -> failwith filename

@@ -1,11 +1,21 @@
 open Parsetree
 open Basic
 
-module type COMB = Pc.Sigs.COMB with type log_elem = LogElement.t
+module type COMB = Pc.COMB with type log_elem = LogElement.t
+module type CONF = Pc.CONF with type Log.elem = LogElement.t
 
 module type PARSE = sig
     val parse_interface : src:string -> filename:string -> signature parse_result option
     val parse_implementation : src:string -> filename:string -> structure parse_result option
+end
+
+module type PARSER = sig
+    include PARSE
+
+    module Comb : COMB
+
+    val signature_parser : signature Comb.t
+    val structure_parser : structure Comb.t
 end
 
 module type CORE = sig

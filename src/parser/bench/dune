@@ -6,28 +6,14 @@
 (executable
  (name exec_res)
  (modules exec_res)
- (libraries syntax))
+ (libraries run_common))
 
 (executable
- (name exec_memo)
- (modules exec_memo)
- (libraries parser_angstrom))
-
-(executable
- (name exec_mpt)
- (modules exec_mpt)
- (libraries parser_tokenized))
-
-(executable
- (name exec_memo_peek)
- (modules exec_memo_peek)
- (libraries parser_angstrom))
+ (name exec_pc)
+ (modules exec_pc)
+ (libraries run_common))
 
 (executable
  (name exec_none)
  (modules exec_none)
- (libraries syntax))
-
-(executable
- (name exec_none2)
- (modules exec_none2))
+ (libraries run_common))

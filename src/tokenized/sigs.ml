@@ -14,7 +14,7 @@ module type TPC = sig
     type tag
     type s
 
-    include Pc.Sigs.COMB with
+    include Pc.COMB with
         type log_elem = s
         and type 'a Simple.t = ('a, tag, s) Parser.simple
         and type 'a t = ('a, tag, s) Parser.t
@@ -25,8 +25,4 @@ module type TPC = sig
     val tkn_tag : tag -> tag t
     val tkn_payload : tag -> 'a t
     val peek : 'a t -> 'a t
-
-    module Id : sig
-        val get : unit -> int
-    end
 end

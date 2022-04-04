@@ -10,6 +10,7 @@ module Make (Base : Sigs.BASIC_BASE): Sigs.BASIC = struct
     module type TYPE = Sigs.TYPE with module Comb = Comb
     module type MODTYPE = Sigs.MODTYPE with module Comb = Comb
 
+    open Pc
     open Comb
 
     let ng_not_empty =
@@ -43,7 +44,7 @@ module Make (Base : Sigs.BASIC_BASE): Sigs.BASIC = struct
         +pos_end -ng +pos
 
     let with_del p =
-        mapping (fun p1 f p2 -> f (make_location p1 p2))
+        mapping (fun p1 f p2 -> f (loc_mk p1 p2))
         +pos +p +del_pos
 
     let sep = ng >> comma >> ng

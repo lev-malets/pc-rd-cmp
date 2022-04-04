@@ -1,6 +1,11 @@
 (executable
- (name main)
- (modules main)
+ (name print_actual)
+ (modules print_actual)
+ (libraries run_common))
+
+(executable
+ (name print_expected)
+ (modules print_expected)
  (libraries run_common))
 
 (executable

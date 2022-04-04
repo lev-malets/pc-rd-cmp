@@ -12,6 +12,7 @@ module Make
 
     open Basic
     open Core
+    open Pc
     open Comb
 
     module Comb = Comb
@@ -55,7 +56,7 @@ module Make
             let constr =
                 named "typexpr:constr" & choice [
                     with_loc & hlp2 Typ.constr
-                    +loc l_longident -ng -lt -ng +(seq ~n:1 core_type ~sep ~trail) -ng -gt
+                    +loc l_longident -ng -lt -ng +(seq ~n:1 core_type ~sep ~trail:true) -ng -gt
                 ;
                     with_loc & mapping (fun a loc -> Typ.constr ~loc a [])
                     +loc l_longident
@@ -63,7 +64,7 @@ module Make
 
             let tuple =
                 with_loc & parens & hlp Typ.tuple
-                +(seq ~n:2 core_type ~sep ~trail)
+                +(seq ~n:2 core_type ~sep ~trail:true)
 
             let unit =
                 with_loc & mapping (fun a loc -> Typ.constr ~loc a [])
@@ -85,13 +86,13 @@ module Make
                     -l_brace -ng -dot -ng -r_brace
                 ;
                     with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
-                    -l_brace -ng +(seq object_field ~sep ~trail) -ng -r_brace
+                    -l_brace -ng +(seq object_field ~sep ~trail:true) -ng -r_brace
                 ;
                     with_loc & mapping (fun a loc -> Typ.object_ ~loc a Open)
-                    -l_brace -ng -dot_dot -ng +(seq object_field ~sep ~trail) -ng -r_brace
+                    -l_brace -ng -dot_dot -ng +(seq object_field ~sep ~trail:true) -ng -r_brace
                 ;
                     with_loc & mapping (fun a loc -> Typ.object_ ~loc a Closed)
-                    -l_brace -ng -dot -ng +(seq object_field ~sep ~trail) -ng -r_brace
+                    -l_brace -ng -dot -ng +(seq object_field ~sep ~trail:true) -ng -r_brace
                 ]
 
             let variant =
@@ -144,8 +145,8 @@ module Make
                 end
 
             let core_type_atom =
-                memo & named "typexpr:atom" &
-                typ_attrs & peek_first
+                named "typexpr:atom" &
+                typ_attrs & choice ~name:"typexpr:atom:noattrs"
                 [ any
                 ; var
                 ; unit
@@ -230,11 +231,11 @@ module Make
                 end
 
             let core_type_fun =
-                memo & named "typexpr:arrow"
+                named "typexpr:arrow"
                 (arrow <|> core_type_atom)
 
             let core_type =
-                memo & named "typexpr" &
+                named "typexpr" &
                 alias core_type_fun
 
             let core_type_poly =
@@ -261,7 +262,7 @@ module Make
                 end
 
             let label_declarations =
-                braces & seq ~n:1 label_declaration ~sep ~trail
+                braces & seq ~n:1 label_declaration ~sep ~trail:true
 
             let constr_args =
                 choice [
@@ -269,7 +270,7 @@ module Make
                     +label_declarations -opt sep
                 ;
                     parens & mapping (fun x -> Pcstr_tuple x)
-                    +seq ~n:1 core_type ~sep ~trail
+                    +seq ~n:1 core_type ~sep ~trail:true
                 ]
 
             let type_kind =
@@ -310,7 +311,7 @@ module Make
                     +variance +(any <|> var)
                 in
 
-                chevrons & seq ~n:1 param ~sep ~trail
+                chevrons & seq ~n:1 param ~sep ~trail:true
 
             let type_decl_constraints =
                 seq ~n:1 ~sep:ng

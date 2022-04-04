@@ -1,3 +1,0 @@
-(executable
- (name main)
- (libraries angstrom_pos core core_bench))

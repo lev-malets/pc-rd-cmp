@@ -13,6 +13,7 @@ module Make
     open Basic
     open Core
     open Type
+    open Pc
     open Comb
 
     module Comb = Comb
@@ -42,13 +43,13 @@ module Make
             let tuple =
                 named "pattern:tuple" begin
                     with_loc & parens & hlp Pat.tuple
-                    +(seq ~n:2 pattern_constrainted ~sep ~trail)
+                    +(seq ~n:2 pattern_constrainted ~sep ~trail:true)
                 end
 
             let array =
                 named "pattern:array" begin
                     with_loc & brackets & hlp Pat.array
-                    +(seq pattern_constrainted ~sep ~trail)
+                    +(seq pattern_constrainted ~sep ~trail:true)
                 end
 
             let record =
@@ -59,7 +60,7 @@ module Make
                         | Longident.Ldot (_, str) -> str
                     in
                     let loc_end = lid.Location.loc.loc_end in
-                    Location.mkloc str @@ make_location {loc_end with pos_cnum = Int.(loc_end.pos_cnum - String.length str)} loc_end
+                    Location.mkloc str @@ loc_mk {loc_end with pos_cnum = Int.(loc_end.pos_cnum - String.length str)} loc_end
                 in
 
                 with_loc & hlp2 Pat.record
@@ -169,8 +170,7 @@ module Make
                 +loc_of(false')
 
             let pattern_atom =
-                named "pattern:atom" begin
-                    peek_first
+                choice ~name:"pattern:atom"
                     [
                         with_loc & mapping (fun loc -> Pat.any ~loc ())
                         -_'
@@ -202,7 +202,6 @@ module Make
                         with_loc & hlp Pat.var
                         +loc(ident)
                     ]
-                end
 
             let pattern_exception =
                 choice [
@@ -243,7 +242,7 @@ module Make
                         -ng -pipe -ng +alias
                     )
 
-            let pattern = memo & named "pattern" or_
+            let pattern = named "pattern" or_
         end: THIS)
 
     let pattern = let (module M) = x in M.pattern

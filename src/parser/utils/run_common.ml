@@ -1,3 +1,5 @@
+open Base
+
 module ParseRes: Pc_syntax.Sigs.PARSE = struct
     let parse_interface ~src ~filename =
         let x = Res_parse_string.parse_interface ~src ~filename in
@@ -8,112 +10,31 @@ module ParseRes: Pc_syntax.Sigs.PARSE = struct
         Some x
 end
 
-let mk_apos ?(peek=false) ?(memo=false) (): (module Parser_angstrom.APOS) =
-    let module APos = Angstrom_pos.Make(Pc_syntax.Basic.LogElement) in
-
-    let (module APos: Parser_angstrom.APOS) =
-        if peek then
-            (module APos)
-        else
-            let module NotPeek = Angstrom_pos.Alt.MakeNotPeek(APos) in
-            (module struct
-                include APos
-                include NotPeek
-            end)
-    in
-
-    let (module APos: Parser_angstrom.APOS) =
-        if memo then
-            (module APos)
-        else
-            let module NotMemoized = Angstrom_pos.Alt.MakeNotMemoized(APos) in
-            (module struct
-                include APos
-                include NotMemoized
-            end)
-    in
-
-    (module APos)
-
-let mk_tpc ?(peek=false) ?(memo=false) (): (module Parser_tokenized.TPC) =
-    let module Tpc = Tokenized.Make(Parser_tokenized.Lexer.Make())(Pc_syntax.Basic.LogElement) in
-
-    let (module Tpc: Parser_tokenized.TPC) =
-        if peek then
-            (module Tpc)
-        else
-            let module NotPeek = Tokenized.Alt.MakeNotPeek(Tpc) in
-            (module struct
-                include Tpc
-                include NotPeek
-            end)
-    in
-
-    let (module Tpc: Parser_tokenized.TPC) =
-        if memo then
-            (module Tpc)
-        else
-            let module NotMemoized = Tokenized.Alt.MakeNotMemoized(Tpc) in
-            (module struct
-                include Tpc
-                include NotMemoized
-            end)
-    in
-
-    (module Tpc)
-
-let mk_parse ?(peek=false) ?(memo=false) ?(tokenize=false) (): (module Pc_syntax.Sigs.PARSE) =
-    if tokenize then
-        let (module Tpc) = mk_tpc ~peek ~memo () in
-        (module Parser_tokenized.Make(Tpc))
-    else
-        let (module APos) = mk_apos ~peek ~memo () in
-        (module Parser_angstrom.Make(APos))
-
-
-let mk_traced ?(peek=false) ?(memo=false) ?(tokenize=false) () =
-    if tokenize then
-        let (module Tpc) = mk_tpc ~peek ~memo () in
-
-        let module Traced = Tokenized.Alt.MakeTraced(Tpc) in
-        let module Tpc =
-            struct
-                include Tpc
-                include Traced
-            end
-        in
-        (module Traced: Pc.Sigs.TRACE)
-        ,
-        (module Tpc: Pc.Sigs.COMB)
-        ,
-        (module Parser_tokenized.Make(Tpc): Pc_syntax.Sigs.PARSE)
-    else
-        let (module APos) = mk_apos ~peek ~memo () in
-
-        let module Traced = Angstrom_pos.Alt.MakeTraced(APos) in
-        let module Apos =
-            struct
-                include APos
-                include Traced
-            end
-        in
-        (module Traced: Pc.Sigs.TRACE)
-        ,
-        (module APos: Pc.Sigs.COMB)
-        ,
-        (module Parser_angstrom.Make(Apos))
-
-let input = ref ""
-let output = ref ""
-let anon_fun _ = ()
-
-let speclist =
-    [ "--input", Arg.Set_string input, ""
-    ; "--output", Arg.Set_string output, ""
-    ]
-
 let read_file ~filename =
     Core_kernel.In_channel.read_all filename
+
+let config = ref ""
+
+let mk_conf (): (module Pc_syntax.Sigs.CONF) =
+    let module Log =
+        struct
+            type elem = Pc_syntax.Basic.LogElement.t
+        end
+    in
+    match !config with
+    | "" ->
+        (module Pc.Utils.MakeConf (Log) (struct let filename = None;; let src = "{}" end))
+    | filename ->
+        (module Pc.Utils.MakeConf (Log) (struct let src = read_file ~filename;; let filename = Some filename end))
+
+let mk_parse ?(tokenize=false) (): (module Pc_syntax.Sigs.PARSER) =
+    let (module Conf) = mk_conf () in
+    if tokenize then
+        let module Tpc = Tokenized.Make(Parser_tokenized.Lexer.Make())(Conf) in
+        (module Parser_tokenized.Make(Tpc))
+    else
+        let module APos = Angstrom_pos.Make(Conf) in
+        (module Parser_angstrom.Make(APos))
 
 let dump_loc_mapping =
     let open Pc_syntax.Parsetree_mapping in
@@ -134,7 +55,7 @@ let dump_loc_mapping =
                         | Ppat_var x            -> Ppat_var (loc x)
                         | Ppat_alias (x, n)     -> Ppat_alias (x, loc n)
                         | Ppat_construct (x, a) -> Ppat_construct (loc x, a)
-                        | Ppat_record (x, f)    -> Ppat_record (List.map (fun (n, x) -> loc n, x) x, f)
+                        | Ppat_record (x, f)    -> Ppat_record (List.map ~f:(fun (n, x) -> loc n, x) x, f)
                         | Ppat_type x           -> Ppat_type (loc x)
                         | Ppat_unpack x         -> Ppat_unpack (loc x)
                         | Ppat_extension (n, x) -> Ppat_extension (loc n, x)
@@ -156,8 +77,8 @@ let dump_loc_mapping =
                         | Pexp_new x               -> Pexp_new (loc x)
                         | Pexp_newtype (l, x)      -> Pexp_newtype (loc l, x)
                         | Pexp_open (f, n, x)      -> Pexp_open (f, loc n, x)
-                        | Pexp_override x          -> Pexp_override (List.map (fun (m, e) -> loc m, e) x)
-                        | Pexp_record (x, e)       -> Pexp_record (List.map (fun (m, e) -> loc m, e) x, e)
+                        | Pexp_override x          -> Pexp_override (List.map ~f:(fun (m, e) -> loc m, e) x)
+                        | Pexp_record (x, e)       -> Pexp_record (List.map ~f:(fun (m, e) -> loc m, e) x, e)
                         | Pexp_send (x, n)         -> Pexp_send (x, loc n)
                         | Pexp_setfield (x, n, y)  -> Pexp_setfield (x, loc n, y)
                         | Pexp_setinstvar (n, x)   -> Pexp_setinstvar (loc n, x)
@@ -173,7 +94,7 @@ let dump_loc_mapping =
                     begin match x.ptyp_desc with
                     | Ptyp_class (n, x)  -> Ptyp_class (loc n, x)
                     | Ptyp_constr (n, x) -> Ptyp_constr (loc n, x)
-                    | Ptyp_poly (n, x)   -> Ptyp_poly (List.map (fun n -> loc n) n, x)
+                    | Ptyp_poly (n, x)   -> Ptyp_poly (List.map ~f:(fun n -> loc n) n, x)
                     | x                  -> x
                     end;
                 }
@@ -262,7 +183,7 @@ let dump_loc_mapping =
             (fun x ->
                 {x with
                     ptype_name = loc x.ptype_name;
-                    ptype_cstrs = List.map (fun (x, y, _) -> x, y, none) x.ptype_cstrs;
+                    ptype_cstrs = List.map ~f:(fun (x, y, _) -> x, y, none) x.ptype_cstrs;
                     ptype_loc = none;
                 }
             );
@@ -273,3 +194,17 @@ let dump_loc_mapping =
         include_description     = (fun x -> {x with pincl_loc = none});
         include_declaration     = (fun x -> {x with pincl_loc = none});
     }
+
+let input = ref ""
+let output = ref ""
+let tokenize = ref false
+let mapping = ref Pc_syntax.Parsetree_mapping.default
+let anon_fun _ = ()
+
+let speclist =
+    [ "--input", Caml.Arg.Set_string input, ""
+    ; "--output", Caml.Arg.Set_string output, ""
+    ; "--tokenize", Caml.Arg.Set tokenize, ""
+    ; "--simplified", Caml.Arg.Unit (fun _ -> mapping := dump_loc_mapping), ""
+    ; "--config", Caml.Arg.Set_string config, ""
+    ]
