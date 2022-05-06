@@ -32,7 +32,7 @@ in
 
 pkgs.mkShell {
     nativeBuildInputs =
-        (with pkgs; [ git perf-tools linuxPackages.perf ncurses ocamlformat gdb ]) ++
+        (with pkgs; [ git perf-tools linuxPackages.perf ncurses ocamlformat gdb valgrind ]) ++
         (with ocamlPackages; [ utop ocaml dune_2 ocaml-lsp core_bench alcotest findlib ]);
-    buildInputs = with ocamlPackages; [ ocamlgraph yojson bigstringaf fix async lwt ocaml-syntax-shims ];
+    buildInputs = with ocamlPackages; [ ocamlgraph yojson bigstringaf fix async lwt ocaml-syntax-shims cmdliner ];
 }

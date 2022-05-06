@@ -1,4 +1,5 @@
 (library
  (name pc_syntax)
  (libraries pc core_kernel syntax fix)
- (preprocess (pps ppx_deriving__eq)))
+ (preprocess
+  (pps ppx_deriving__eq)))

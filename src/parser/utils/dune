@@ -6,4 +6,10 @@
 (library
  (name run_common)
  (modules run_common)
- (libraries core_kernel res_parse_string pc_syntax parser_angstrom parser_tokenized))
+ (libraries
+  core_kernel
+  res_parse_string
+  pc_syntax
+  parser_angstrom
+  parser_tokenized
+  cmdliner))

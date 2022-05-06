@@ -1,6 +1,7 @@
 (library
  (name parser_tokenized)
  (libraries pc_syntax tokenized)
- (preprocess (pps ppx_deriving__eq ppx_deriving__show)))
+ (preprocess
+  (pps ppx_deriving__eq ppx_deriving__show)))
 
 (ocamllex lexer)
