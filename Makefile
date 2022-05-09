@@ -18,6 +18,12 @@ xelatex := xelatex main.tex
 build: deps
 	dune build
 
+clean-top:
+	rm -rf _build
+	rm -rf tmp
+
 .PHONY: build
 
 include make-helper/main.mk
+
+clean: clean-top
