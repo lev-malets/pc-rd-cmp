@@ -6,9 +6,11 @@ module type COMB = Pc.COMB with type log_elem = LogElement.t
 module type CONF = Pc.CONF with type Log.elem = LogElement.t
 
 module type PARSE = sig
-  val parse_interface : src:string -> filename:string -> signature parse_result option
+  val parse_interface :
+    src:string -> filename:string -> signature parse_result option
 
-  val parse_implementation : src:string -> filename:string -> structure parse_result option
+  val parse_implementation :
+    src:string -> filename:string -> structure parse_result option
 end
 
 module type PARSER = sig
@@ -308,7 +310,8 @@ module type BASIC_BASE = sig
 
   val string_raw : string Comb.t
 
-  val template : quote_tag:string -> expression:expression Comb.t -> expression Comb.t
+  val template :
+    quote_tag:string -> expression:expression Comb.t -> expression Comb.t
 
   val string_ident : string Comb.t
 
@@ -374,23 +377,32 @@ module type BASIC = sig
 
   val variant_tag : string Comb.t
 
-  val na_hlp : (?loc:Warnings.loc -> 'a -> 'b) -> ('a -> Location.t -> 'b) Comb.t
+  val na_hlp :
+    (?loc:Warnings.loc -> 'a -> 'b) -> ('a -> Location.t -> 'b) Comb.t
 
-  val hlp : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) -> ('a -> Location.t -> 'b) Comb.t
+  val hlp :
+    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) ->
+    ('a -> Location.t -> 'b) Comb.t
 
-  val hlp2 : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) -> ('a -> 'b -> Location.t -> 'c) Comb.t
+  val hlp2 :
+    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) ->
+    ('a -> 'b -> Location.t -> 'c) Comb.t
 
   val hlp3 :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) -> ('a -> 'b -> 'c -> Location.t -> 'd) Comb.t
+    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) ->
+    ('a -> 'b -> 'c -> Location.t -> 'd) Comb.t
 
   val hlp4 :
     (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) ->
     ('a -> 'b -> 'c -> 'd -> Location.t -> 'e) Comb.t
 
-  val hlp_a : (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) -> (attributes -> 'a -> Location.t -> 'b) Comb.t
+  val hlp_a :
+    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) ->
+    (attributes -> 'a -> Location.t -> 'b) Comb.t
 
   val hlp2_a :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) -> (attributes -> 'a -> 'b -> Location.t -> 'c) Comb.t
+    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) ->
+    (attributes -> 'a -> 'b -> Location.t -> 'c) Comb.t
 
   val hlp3_a :
     (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) ->

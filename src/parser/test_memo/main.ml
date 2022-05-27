@@ -5,8 +5,6 @@ let tokenize = ref false
 
 let anon_fun _ = ()
 
-let speclist = [ ("--tokenize", Arg.Set tokenize, "") ] @ speclist
-
 let () =
   Arg.parse speclist anon_fun "";
 
@@ -48,12 +46,14 @@ let () =
   in
 
   (*Printf.fprintf ch "memo table size: %d\n\n" (Hashtbl.length Measured.table);*)
-  Printf.fprintf ch "%30s | %10s | %10s | %16s | %16s | %16s | %12s\n\n" "name" "call count" "cc per pos" "time"
-    "time per call" "ind time" "ind time (%)";
+  Printf.fprintf ch "%30s | %10s | %10s | %16s | %16s | %16s | %12s\n\n" "name"
+    "call count" "cc per pos" "time" "time per call" "ind time" "ind time (%)";
 
   List.iter
     ~f:(fun (name, stats) ->
-      Printf.fprintf ch "%30s | %10d | %10.4f | %16.1f | %16.2f | %16.1f | %12.4f\n" name stats.Exec_info.call_count
+      Printf.fprintf ch
+        "%30s | %10d | %10.4f | %16.1f | %16.2f | %16.1f | %12.4f\n" name
+        stats.Exec_info.call_count
         (Float.of_int stats.call_count /. Float.of_int stats.Exec_info.pos_count)
         (stats.Exec_info.time.sum *. 1_000_000.)
         Exec_info.FloatStatistics.(mean stats.time *. 1_000_000.)

@@ -1,3 +1,5 @@
 tmp
 _build
+_build_release
 .vscode
+.direnv

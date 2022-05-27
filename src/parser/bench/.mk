@@ -1,14 +1,20 @@
-T := $T/_
+$K/done: $K/core_bench_result $K/perf_result
 
-tested := $(patsubst %,$T/file/%/tested,$(syntax_benchmark_files))
-metrics := $(patsubst $T/file/%/tested,$T/file/%/metrics,$(tested))
+main_exe := _build_release/default/$D/main.exe
 
-$K/done: $T/stats
+$(main_exe): force $(KEYS)/deps/done
+	dune build --build-dir _build_release --release $D/main.exe
 
-exe := $D/main.exe
+$K/core_bench_result: $(main_exe)
+	bash $D/exec_core_bench.sh $T/_cb_result $(main_exe)
+	$(touch)
 
-_build/default/$(exe): force $(KEYS)/deps/done
-	$(log_err dune build $(exe))
+$K/perf_result: $(utils_exec_exe) $D/exec_perf.sh
+	bash $D/exec_perf.sh $T/_perf_result $(utils_exec_exe)
+	$(touch)
+
+$D/core_bench: $K/core_bench_result
+$D/perf: $K/perf_result
 
 $T/stats: $D/avg.sh $(metrics)
 	. $^ > $@.tmp

@@ -8,7 +8,9 @@ let parse ~src ~filename ~parse =
 
   let parsetree = parse engine in
   let invalid, diagnostics =
-    match engine.diagnostics with [] as diagnostics -> (false, diagnostics) | _ as diagnostics -> (true, diagnostics)
+    match engine.diagnostics with
+    | [] as diagnostics -> (false, diagnostics)
+    | _ as diagnostics -> (true, diagnostics)
   in
 
   let parse_result =
@@ -28,6 +30,8 @@ let parse ~src ~filename ~parse =
   parse_result
   [@@raises exit]
 
-let parse_implementation ~src ~filename = parse ~src ~filename ~parse:Res_core.parseImplementation
+let parse_implementation ~src ~filename =
+  parse ~src ~filename ~parse:Res_core.parseImplementation
 
-let parse_interface ~src ~filename = parse ~src ~filename ~parse:Res_core.parseSpecification
+let parse_interface ~src ~filename =
+  parse ~src ~filename ~parse:Res_core.parseSpecification

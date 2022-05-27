@@ -5,7 +5,7 @@ let b = import ./basic.nix p; in
 pkgs.mkShell {
   nativeBuildInputs =
     (with pkgs; [ git perf-tools linuxPackages.perf ncurses ocamlformat gdb valgrind act ]) ++
-    (with b.ocamlPackages; [ ocaml-lsp ]) ++
+    (with b.ocamlPackages; [ ocaml-lsp utop ]) ++
     b.tools;
   buildInputs = b.libs;
 }

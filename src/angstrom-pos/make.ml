@@ -35,7 +35,15 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
         {
           run =
             (fun input pos more _fail succ ->
-              let default_position = Lexing.{ pos_fname = file_name; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 } in
+              let default_position =
+                Lexing.
+                  {
+                    pos_fname = file_name;
+                    pos_lnum = 1;
+                    pos_bol = 0;
+                    pos_cnum = 0;
+                  }
+              in
               state :=
                 Some
                   {
@@ -80,7 +88,11 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
     module Simple = struct
       include Angstrom
 
-      let fail = { Angstrom.Expose.Parser.run = (fun input pos more fail _succ -> fail input pos more [] "") }
+      let fail =
+        {
+          Angstrom.Expose.Parser.run =
+            (fun input pos more fail _succ -> fail input pos more [] "");
+        }
 
       let ( >> ) = ( *> )
 
@@ -95,7 +107,11 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
                 p.run input pos more fail succ);
           }
 
-      let exec f = { Angstrom.Expose.Parser.run = (fun input pos more _fail succ -> succ input pos more (f ())) }
+      let exec f =
+        {
+          Angstrom.Expose.Parser.run =
+            (fun input pos more _fail succ -> succ input pos more (f ()));
+        }
 
       let ( <|> ) p q =
         {
@@ -123,7 +139,8 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
         {
           Angstrom.Expose.Parser.run =
             (fun input pos more _fail succ ->
-              State.map (fun s -> { s with log; log_parts = s.log :: s.log_parts });
+              State.map (fun s ->
+                  { s with log; log_parts = s.log :: s.log_parts });
               succ input pos more ());
         }
     end
@@ -151,7 +168,8 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
               match p2.info with
               | Unknown -> Unknown
               | Empty -> p1
-              | Consume p2 -> Consume { p2 with first = Charset.union first p2.first }
+              | Consume p2 ->
+                  Consume { p2 with first = Charset.union first p2.first }
             else p1
       in
 
@@ -161,7 +179,10 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       let open Simple in
       match (p1.typ, p2.typ) with
       | Return _, _ -> p2
-      | _, Return v -> mk_parser_cont p1 p2 ~p:(p1.p >>| fun _ -> v) ~typ:(Value { v; p = p1.p })
+      | _, Return v ->
+          mk_parser_cont p1 p2
+            ~p:(p1.p >>| fun _ -> v)
+            ~typ:(Value { v; p = p1.p })
       | _, Value { v; _ } ->
           let p = p1.p >> p2.p in
           mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
@@ -180,7 +201,10 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       let open Simple in
       match (p1.typ, p2.typ) with
       | _, Return _ -> p1
-      | Return v, _ -> mk_parser_cont p1 p2 ~p:(p2.p >>| fun _ -> v) ~typ:(Value { v; p = p2.p })
+      | Return v, _ ->
+          mk_parser_cont p1 p2
+            ~p:(p2.p >>| fun _ -> v)
+            ~typ:(Value { v; p = p2.p })
       | Value { v; _ }, _ ->
           let p = p1.p << p2.p in
           mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
@@ -205,7 +229,12 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
           | Empty, Empty -> Empty
           | Empty, Consume p2 -> Consume { p2 with empty = true }
           | Consume p1, Empty -> Consume { p1 with empty = true }
-          | Consume p1, Consume p2 -> Consume { empty = p1.empty || p2.empty; first = Charset.union p1.first p2.first });
+          | Consume p1, Consume p2 ->
+              Consume
+                {
+                  empty = p1.empty || p2.empty;
+                  first = Charset.union p1.first p2.first;
+                });
         typ = Parser;
         id = Id.get ();
       }
@@ -219,9 +248,14 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       | Value { v = f; p } ->
           let a = p >> pv.p in
           mk_parser_cont pf pv ~p:(lift f a) ~typ:(Lift { f; a })
-      | Lift { f; a } -> mk_parser_cont pf pv ~p:(lift2 f a pv.p) ~typ:(Lift2 { f; a; b = pv.p })
-      | Lift2 { f; a; b } -> mk_parser_cont pf pv ~p:(lift3 f a b pv.p) ~typ:(Lift3 { f; a; b; c = pv.p })
-      | Lift3 { f; a; b; c } -> mk_parser_cont pf pv ~p:(lift4 f a b c pv.p) ~typ:Parser
+      | Lift { f; a } ->
+          mk_parser_cont pf pv ~p:(lift2 f a pv.p)
+            ~typ:(Lift2 { f; a; b = pv.p })
+      | Lift2 { f; a; b } ->
+          mk_parser_cont pf pv ~p:(lift3 f a b pv.p)
+            ~typ:(Lift3 { f; a; b; c = pv.p })
+      | Lift3 { f; a; b; c } ->
+          mk_parser_cont pf pv ~p:(lift4 f a b c pv.p) ~typ:Parser
       | _ -> mk_parser_cont pf pv ~p:(pf.p <*> pv.p) ~typ:Parser
 
     let ( >>$ ) pp v =
@@ -229,14 +263,20 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       { pp with p; typ = Value { v; p }; id = Id.get () }
 
     let run p =
-      let info = match p.info with Consume { empty = false; _ } as x -> x | _ -> Unknown in
+      let info =
+        match p.info with
+        | Consume { empty = false; _ } as x -> x
+        | _ -> Unknown
+      in
 
       {
         p =
           {
             run =
               (fun input pos more fail succ ->
-                let succ' input' pos' more' v = v.Angstrom.Expose.Parser.run input' pos' more' fail succ in
+                let succ' input' pos' more' v =
+                  v.Angstrom.Expose.Parser.run input' pos' more' fail succ
+                in
                 p.p.run input pos more fail succ');
           };
         info;
@@ -244,7 +284,8 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
         id = Id.get ();
       }
 
-    let ( >>| ) p f = { p with p = Simple.(p.p >>| f); typ = Parser; id = Id.get () }
+    let ( >>| ) p f =
+      { p with p = Simple.(p.p >>| f); typ = Parser; id = Id.get () }
 
     let make_position pos =
       let open State in
@@ -256,7 +297,14 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
 
     let fix f =
       let rec p = lazy (f r)
-      and r = { p = { run = (fun i -> (Lazy.force p).p.run i) }; info = Unknown; typ = Parser; id = Id.get () } in
+      and r =
+        {
+          p = { run = (fun i -> (Lazy.force p).p.run i) };
+          info = Unknown;
+          typ = Parser;
+          id = Id.get ();
+        }
+      in
       Lazy.force p
 
     let fix_poly f =
@@ -265,20 +313,33 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
         {
           get =
             (fun get ->
-              { p = { run = (fun i -> (get @@ Lazy.force res).p.run i) }; info = Unknown; typ = Parser; id = Id.get () });
+              {
+                p = { run = (fun i -> (get @@ Lazy.force res).p.run i) };
+                info = Unknown;
+                typ = Parser;
+                id = Id.get ();
+              });
         }
       in
       Lazy.force res
 
-    let return x = { p = Simple.(return x); info = Empty; typ = Return x; id = Id.get () }
+    let return x =
+      { p = Simple.(return x); info = Empty; typ = Return x; id = Id.get () }
 
     let fail = { p = Simple.fail; info = Unknown; typ = Parser; id = Id.fail }
 
-    let pos = { p = { run = (fun i p m _ s -> s i p m (make_position p)) }; info = Empty; typ = Parser; id = Id.get () }
+    let pos =
+      {
+        p = { run = (fun i p m _ s -> s i p m (make_position p)) };
+        info = Empty;
+        typ = Parser;
+        id = Id.get ();
+      }
 
     let pos_end = pos
 
-    let exec f = { p = Simple.exec f; info = Empty; typ = Parser; id = Id.get () }
+    let exec f =
+      { p = Simple.exec f; info = Empty; typ = Parser; id = Id.get () }
 
     let failed p =
       {
@@ -306,7 +367,11 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
     let opt p =
       {
         p = Simple.(p.p >>| (fun x -> Some x) <|> return None);
-        info = (match p.info with Unknown -> Unknown | Empty -> Empty | Consume p -> Consume { p with empty = true });
+        info =
+          (match p.info with
+          | Unknown -> Unknown
+          | Empty -> Empty
+          | Consume p -> Consume { p with empty = true });
         typ = Parser;
         id = Id.get ();
       }
@@ -334,17 +399,26 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
         | Empty, Consume p2 -> Consume { p2 with empty = n < 2 }
         | Consume { empty = true; _ }, Empty -> failwith "Endless sequence"
         | Consume p1, Empty -> Consume { p1 with empty = n = 0 }
-        | Consume { empty = true; _ }, Consume { empty = true; _ } -> failwith "Endless sequence"
+        | Consume { empty = true; _ }, Consume { empty = true; _ } ->
+            failwith "Endless sequence"
         | Consume p1, Consume p2 ->
-            if p1.empty then Consume { empty = p1.empty && n = 1; first = Charset.union p1.first p2.first }
+            if p1.empty then
+              Consume
+                {
+                  empty = p1.empty && n = 1;
+                  first = Charset.union p1.first p2.first;
+                }
             else Consume { p1 with empty = n = 0 }
       in
 
       {
         p =
           (let open Simple in
-          let list = map2 p.p tail ~f:(fun first tail -> first :: tail) <|> return [] in
-          list >>= fun list -> if List.length list < n then fail else return list);
+          let list =
+            map2 p.p tail ~f:(fun first tail -> first :: tail) <|> return []
+          in
+          list >>= fun list ->
+          if List.length list < n then fail else return list);
         info;
         typ = Parser;
         id = Id.get ();
@@ -388,7 +462,12 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
 
     let trace_entries =
       {
-        p = { run = (fun input pos more _fail succ -> succ input pos more !State.trace_entries) };
+        p =
+          {
+            run =
+              (fun input pos more _fail succ ->
+                succ input pos more !State.trace_entries);
+          };
         info = Empty;
         typ = Parser;
         id = Id.trace_entries;
@@ -401,7 +480,8 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       | Parser -> { p = simple; id = Id.get (); typ = Parser; info = p.info }
       | _ -> failwith "check usage"
 
-    let not_empty p = match p.info with Consume { empty = false; _ } -> true | _ -> false
+    let not_empty p =
+      match p.info with Consume { empty = false; _ } -> true | _ -> false
 
     let peek_first expected =
       let arr = Array.create ~len:256 Simple.fail in
@@ -410,13 +490,18 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       let rec loop = function
         | [] -> ()
         | p :: xs ->
-            let p_first = match p.info with Consume { empty = false; first } -> first | _ -> failwith "" in
+            let p_first =
+              match p.info with
+              | Consume { empty = false; first } -> first
+              | _ -> failwith ""
+            in
 
             first := Charset.union !first p_first;
 
             loop xs;
 
-            p_first |> Charset.iter_code (fun c -> arr.(c) <- Simple.(p.p <|> arr.(c)))
+            p_first
+            |> Charset.iter_code (fun c -> arr.(c) <- Simple.(p.p <|> arr.(c)))
       in
       loop expected;
 
@@ -438,20 +523,26 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
               (fun input pos more fail succ ->
                 let s = State.get () in
 
-                let table = Hashtbl.find_or_add s.memo_tables id ~default:(fun _ -> Hashtbl.create (module Int)) in
+                let table =
+                  Hashtbl.find_or_add s.memo_tables id ~default:(fun _ ->
+                      Hashtbl.create (module Int))
+                in
 
                 match Hashtbl.find table pos with
                 | Some t -> (
                     let x, log, line = Obj.obj t in
-                    State.set { s with line; log; log_parts = s.log :: s.log_parts };
+                    State.set
+                      { s with line; log; log_parts = s.log :: s.log_parts };
 
                     match x with
                     | Ok (input', pos', more', v) -> succ input' pos' more' v
-                    | Error (input', pos', more', marks', msg') -> fail input' pos' more' marks' msg')
+                    | Error (input', pos', more', marks', msg') ->
+                        fail input' pos' more' marks' msg')
                 | None ->
                     let set_data x =
                       let s = State.get () in
-                      Hashtbl.add_exn table ~key:pos ~data:(Obj.repr (x, s.log, s.line))
+                      Hashtbl.add_exn table ~key:pos
+                        ~data:(Obj.repr (x, s.log, s.line))
                     in
 
                     let succ' input' pos' more' v =
@@ -463,7 +554,8 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
                       fail input' pos' more' marks' msg'
                     in
 
-                    State.set { s with log = []; log_parts = s.log :: s.log_parts };
+                    State.set
+                      { s with log = []; log_parts = s.log :: s.log_parts };
                     p.p.run input pos more fail' succ');
           };
       }
@@ -490,7 +582,18 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
                   let exit_pos = make_position pos in
                   let exit_time = Sys.time () in
 
-                  let entry = Exec_info.{ id; enter_time; enter_pos; exit_time; exit_pos; succeded; depth = d } in
+                  let entry =
+                    Exec_info.
+                      {
+                        id;
+                        enter_time;
+                        enter_pos;
+                        exit_time;
+                        exit_pos;
+                        succeded;
+                        depth = d;
+                      }
+                  in
 
                   entries := entry :: !entries
                 in
@@ -519,7 +622,10 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
 
                 let init = List.fold_left ~init ~f s.log in
 
-                let res = List.fold_left s.log_parts ~init ~f:(fun init -> List.fold_left ~init ~f) in
+                let res =
+                  List.fold_left s.log_parts ~init ~f:(fun init ->
+                      List.fold_left ~init ~f)
+                in
 
                 succ i p m res);
           };
@@ -532,11 +638,19 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
 
     let simple p = p.p
 
-    let eof = { p = Angstrom.end_of_input; id = Id.get (); info = Unknown; typ = Parser }
+    let eof =
+      {
+        p = Angstrom.end_of_input;
+        id = Id.get ();
+        info = Unknown;
+        typ = Parser;
+      }
 
     let parse_string p ?(filename = "none") text =
       let open Simple in
-      match parse_string ~consume:All (State.init filename >> p.p) text with Ok x -> Some x | _ -> None
+      match parse_string ~consume:All (State.init filename >> p.p) text with
+      | Ok x -> Some x
+      | _ -> None
 
     let parse_string_with_trace p ?(filename = "none") text =
       let p = t2 <*> opt (p << eof) <*> trace_entries in
@@ -551,20 +665,31 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
 
   let char c =
     let p = Angstrom.char c in
-    { p; info = Consume { empty = false; first = Charset.singleton c }; typ = Value { v = c; p }; id = Id.get () }
+    {
+      p;
+      info = Consume { empty = false; first = Charset.singleton c };
+      typ = Value { v = c; p };
+      id = Id.get ();
+    }
 
   let string s =
     if String.(s = "") then return ""
     else
       let p = Angstrom.string s in
-      { p; info = Consume { empty = false; first = Charset.singleton s.[0] }; typ = Value { v = s; p }; id = Id.get () }
+      {
+        p;
+        info = Consume { empty = false; first = Charset.singleton s.[0] };
+        typ = Value { v = s; p };
+        id = Id.get ();
+      }
 
   let advance_line =
     let p =
       {
         Angstrom.Expose.Parser.run =
           (fun i p m _ s ->
-            State.map (fun s -> { s with line = { no = Int.(s.line.no + 1); start = p } });
+            State.map (fun s ->
+                { s with line = { no = Int.(s.line.no + 1); start = p } });
             s i p m ());
       }
     in
@@ -583,7 +708,9 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
           let char = Input.unsafe_get_char input in
 
           let succ lines start pos1 =
-            if lines <> 0 then State.map (fun s -> { s with line = { no = s.line.no + lines; start } });
+            if lines <> 0 then
+              State.map (fun s ->
+                  { s with line = { no = s.line.no + lines; start } });
             succ input pos1 more ()
           in
           let rec loop lines start pos =
@@ -608,7 +735,9 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
   let whitespace =
     {
       p = whitespace;
-      info = Consume { empty = true; first = Charset.of_list [ ' '; '\n'; '\t'; '\r' ] };
+      info =
+        Consume
+          { empty = true; first = Charset.of_list [ ' '; '\n'; '\t'; '\r' ] };
       typ = Value { v = (); p = whitespace };
       id = Id.get ();
     }
@@ -627,19 +756,34 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       id = Id.get ();
     }
 
-  let consumed p = { p with p = Angstrom.consumed p.p; typ = Parser; id = Id.get () }
+  let consumed p =
+    { p with p = Angstrom.consumed p.p; typ = Parser; id = Id.get () }
 
   let s =
     Fix.Memoize.String.memoize @@ fun x ->
     named
       ("\'" ^ x ^ "\'")
-      (match String.length x with 0 -> return () | 1 -> char x.[0] >>$ () | _ -> string x >>$ ())
+      (match String.length x with
+      | 0 -> return ()
+      | 1 -> char x.[0] >>$ ()
+      | _ -> string x >>$ ())
 
   let advance i =
-    if i = 0 then { p = Angstrom.(advance 0); info = Empty; typ = Return (); id = Id.get () }
+    if i = 0 then
+      {
+        p = Angstrom.(advance 0);
+        info = Empty;
+        typ = Return ();
+        id = Id.get ();
+      }
     else
       let p = Angstrom.(advance i) in
-      { p; info = Consume { empty = false; first = Charset.full }; typ = Value { v = (); p }; id = Id.get () }
+      {
+        p;
+        info = Consume { empty = false; first = Charset.full };
+        typ = Value { v = (); p };
+        id = Id.get ();
+      }
 
   let mk_first_test f =
     let rec loop set = function
@@ -668,7 +812,12 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
     }
 
   let skip f =
-    { p = Angstrom.skip f; info = Consume { empty = false; first = mk_first_test f }; typ = Parser; id = Id.get () }
+    {
+      p = Angstrom.skip f;
+      info = Consume { empty = false; first = mk_first_test f };
+      typ = Parser;
+      id = Id.get ();
+    }
 
   let skip_while f =
     {
@@ -679,10 +828,21 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
     }
 
   let satisfy f =
-    { p = Angstrom.satisfy f; info = Consume { empty = false; first = mk_first_test f }; typ = Parser; id = Id.get () }
+    {
+      p = Angstrom.satisfy f;
+      info = Consume { empty = false; first = mk_first_test f };
+      typ = Parser;
+      id = Id.get ();
+    }
 
   let any_char =
-    { p = Angstrom.any_char; info = Consume { empty = false; first = Charset.full }; typ = Parser; id = Id.get () }
+    {
+      p = Angstrom.any_char;
+      info = Consume { empty = false; first = Charset.full };
+      typ = Parser;
+      id = Id.get ();
+    }
 
-  let peek_char = { p = Angstrom.peek_char; info = Unknown; typ = Parser; id = Id.get () }
+  let peek_char =
+    { p = Angstrom.peek_char; info = Unknown; typ = Parser; id = Id.get () }
 end

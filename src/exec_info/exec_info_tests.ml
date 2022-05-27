@@ -53,9 +53,13 @@ let%test "single: stats table has one entry" = Hashtbl.length Stats.single = 1
 let%test "single stats" =
   let stats = Hashtbl.find_exn Stats.single 0 in
 
-  stats.pos_count = 1 && Float.(stats.time.sum = 1.) && stats.time.count = 1 && Float.(stats.time_individual.sum = 1.)
+  stats.pos_count = 1
+  && Float.(stats.time.sum = 1.)
+  && stats.time.count = 1
+  && Float.(stats.time_individual.sum = 1.)
 
-let%test "complex: stats table has two entries" = Hashtbl.length Stats.complex = 2
+let%test "complex: stats table has two entries" =
+  Hashtbl.length Stats.complex = 2
 
 let%test_unit "complex stats (id = 0)" =
   let stats = Hashtbl.find_exn Stats.complex 0 in

@@ -3,9 +3,14 @@ open Parsetree
 open Ast_helper
 module Lexer = Lexer
 
-module type TPC = Tokenized.Sigs.TPC with type tag = Token.t and type s = Pc_syntax.Basic.LogElement.t
+module type TPC =
+  Tokenized.Sigs.TPC
+    with type tag = Token.t
+     and type s = Pc_syntax.Basic.LogElement.t
 
-let identifier's_character = function 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '\'' -> true | _ -> false
+let identifier's_character = function
+  | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '\'' -> true
+  | _ -> false
 
 module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
   module Base = struct
@@ -98,7 +103,8 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
 
     let asterisk = named "tkn:asterisk" & tkn_ Asterisk
 
-    let asterisk_asterisk = named "tkn:asterisk_asterisk" & tkn_ AsteriskAsterisk
+    let asterisk_asterisk =
+      named "tkn:asterisk_asterisk" & tkn_ AsteriskAsterisk
 
     let asterisk_dot = named "tkn:asterisk_dot" & tkn_ AsteriskDot
 
@@ -192,27 +198,40 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
 
     let tilda = named "tkn:tilda" & tkn_ Tilda
 
-    let integer = named "tkn:integer" & tkn_payload Integer >>| fun { value; suffix } -> (value, suffix)
+    let integer =
+      named "tkn:integer"
+      & tkn_payload Integer >>| fun { value; suffix } -> (value, suffix)
 
     let number =
       named "tkn:number"
       & choice
           [
-            (tkn_payload Integer >>| fun { value; suffix } -> Pconst_integer (value, suffix));
-            (tkn_payload Float >>| fun { value; suffix } -> Pconst_float (value, suffix));
+            ( tkn_payload Integer >>| fun { value; suffix } ->
+              Pconst_integer (value, suffix) );
+            ( tkn_payload Float >>| fun { value; suffix } ->
+              Pconst_float (value, suffix) );
           ]
 
-    let character = named "tkn:character" & tkn_payload Character >>| fun c -> Pconst_char c
+    let character =
+      named "tkn:character" & tkn_payload Character >>| fun c -> Pconst_char c
 
-    let string_raw = named "tkn:string" & tkn_payload String >>| fun { value; raw = _ } -> value
+    let string_raw =
+      named "tkn:string"
+      & tkn_payload String >>| fun { value; raw = _ } -> value
 
     let string_multiline =
-      choice [ (tkn_payload String >>| fun { raw; value = _ } -> raw); tkn_payload MultilineString ]
+      choice
+        [
+          (tkn_payload String >>| fun { raw; value = _ } -> raw);
+          tkn_payload MultilineString;
+        ]
       >>| Const.string ~quotation_delimiter:"js"
 
-    let template_no_template = tkn_payload TemplateTail >>| Const.string ~quotation_delimiter:"js"
+    let template_no_template =
+      tkn_payload TemplateTail >>| Const.string ~quotation_delimiter:"js"
 
-    let constant = choice ~name:"pt:constant" [ number; character; string_multiline ]
+    let constant =
+      choice ~name:"pt:constant" [ number; character; string_multiline ]
 
     let l_ident =
       named "l_ident"
@@ -238,11 +257,13 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
 
     let single_line_comment =
       named "tkn:comment:s"
-      & loc (tkn_payload Comment) >>| fun { txt; loc } -> Res_comment.makeSingleLineComment ~loc txt
+      & loc (tkn_payload Comment) >>| fun { txt; loc } ->
+        Res_comment.makeSingleLineComment ~loc txt
 
     let multi_line_comment =
       named "tkn:comment:m"
-      & loc (tkn_payload MultilineComment) >>| fun { txt; loc } -> Res_comment.makeMultiLineComment ~loc txt
+      & loc (tkn_payload MultilineComment) >>| fun { txt; loc } ->
+        Res_comment.makeMultiLineComment ~loc txt
 
     let comment =
       mapping (fun pt_pos x ->
@@ -270,7 +291,9 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
           & mapping (fun p1 p2 ->
                 let open Simple in
                 let open Lexing in
-                match p1.pos_lnum = p2.pos_lnum with true -> fail | false -> return p1)
+                match p1.pos_lnum = p2.pos_lnum with
+                | true -> fail
+                | false -> return p1)
             + pos_end - ng + pos;
         ]
 
@@ -285,7 +308,9 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
           & mapping (fun p1 p2 ->
                 let open Simple in
                 let open Lexing in
-                match p1.pos_lnum = p2.pos_lnum with true -> fail | false -> return ())
+                match p1.pos_lnum = p2.pos_lnum with
+                | true -> fail
+                | false -> return ())
             + pos_end - ng + pos;
         ]
 
@@ -309,19 +334,25 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
             mapping (fun p1 str p2 prev ->
                 let str = mk_const str p1 p2 in
 
-                Exp.apply ~loc:{ prev.pexp_loc with loc_end = p2 } ~attrs:[ Hc.attr "res.template" ] op
+                Exp.apply
+                  ~loc:{ prev.pexp_loc with loc_end = p2 }
+                  ~attrs:[ Hc.attr "res.template" ] op
                   [ (Nolabel, prev); (Nolabel, str) ])
             + pos + template_tail + pos_end;
             mapping (fun p1 str p2 expr tail prev ->
                 let str = mk_const str p1 p2 in
                 let e1 =
-                  Exp.apply ~loc:{ prev.pexp_loc with loc_end = p2 } ~attrs:[ Hc.attr "res.template" ] op
+                  Exp.apply
+                    ~loc:{ prev.pexp_loc with loc_end = p2 }
+                    ~attrs:[ Hc.attr "res.template" ] op
                     [ (Nolabel, prev); (Nolabel, str) ]
                 in
                 let e2 =
                   Exp.apply
-                    ~loc:{ prev.pexp_loc with loc_end = prev.pexp_loc.loc_start }
-                    op [ (Nolabel, e1); (Nolabel, expr) ]
+                    ~loc:
+                      { prev.pexp_loc with loc_end = prev.pexp_loc.loc_start }
+                    op
+                    [ (Nolabel, e1); (Nolabel, expr) ]
                 in
 
                 tail e2)
@@ -331,17 +362,21 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
 
       choice
         [
-          mapping (fun p1 str p2 -> mk_const str p1 p2) + pos + template_tail + pos_end;
+          mapping (fun p1 str p2 -> mk_const str p1 p2)
+          + pos + template_tail + pos_end;
           mapping (fun p1 str p2 expr tail ->
               let e0 = mk_const str p1 p2 in
               let e1 =
-                Exp.apply ~loc:(loc_mk p1 p2) ~attrs:[ Hc.attr "res.template" ] op [ (Nolabel, e0); (Nolabel, expr) ]
+                Exp.apply ~loc:(loc_mk p1 p2) ~attrs:[ Hc.attr "res.template" ]
+                  op
+                  [ (Nolabel, e0); (Nolabel, expr) ]
               in
               tail e1)
           + pos + template_part + pos_end - ng + expression - ng + tail;
         ]
 
-    let string_ident : string Comb.t = named "tkn:string_ident" & tkn_payload StringIdent
+    let string_ident : string Comb.t =
+      named "tkn:string_ident" & tkn_payload StringIdent
   end
 
   include Pc_syntax.Parser.Make (Base)

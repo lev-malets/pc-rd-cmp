@@ -11,13 +11,17 @@ module Opt = struct
   let set x = function Some _ -> Some x | None -> None
 end
 
-let mkloc ?loc a = match loc with None -> Location.mknoloc a | Some loc -> Location.mkloc a loc
+let mkloc ?loc a =
+  match loc with None -> Location.mknoloc a | Some loc -> Location.mkloc a loc
 
 module Hc = struct
   let attr ?loc s = (mkloc ?loc s, PStr [])
 
   let lid =
-    let rec loop acc = function [] -> acc | x :: xs -> loop (Longident.Ldot (acc, x)) xs in
+    let rec loop acc = function
+      | [] -> acc
+      | x :: xs -> loop (Longident.Ldot (acc, x)) xs
+    in
 
     function [] -> failwith "" | x :: xs -> loop (Longident.Lident x) xs
 
@@ -25,7 +29,10 @@ module Hc = struct
     let lid = lid xs in
     Ast_helper.Exp.ident ?loc ?attrs (mkloc ?loc lid)
 
-  let unit_expr loc = Ast_helper.Exp.construct ~loc (Location.mkloc (Longident.Lident "()") loc) None
+  let unit_expr loc =
+    Ast_helper.Exp.construct ~loc
+      (Location.mkloc (Longident.Lident "()") loc)
+      None
 end
 
 let make_list_helper ~constr ~tuple ~get_loc seq ext loc =
@@ -35,7 +42,9 @@ let make_list_helper ~constr ~tuple ~get_loc seq ext loc =
   let rec loop f = function
     | [] -> ( match ext with Some ext -> ext | None -> f nil_loc nil None)
     | x :: xs ->
-        let tail_exp = loop (fun loc -> constr ?loc:(Some loc) ?attrs:None) xs in
+        let tail_exp =
+          loop (fun loc -> constr ?loc:(Some loc) ?attrs:None) xs
+        in
         let loc = { loc with loc_start = (get_loc x).Location.loc_start } in
         let arg = tuple ?loc:(Some loc) ?attrs:None [ x; tail_exp ] in
         f loc (Location.mkloc (Longident.Lident "::") loc) (Some arg)
@@ -45,25 +54,31 @@ let make_list_helper ~constr ~tuple ~get_loc seq ext loc =
 
 let pat_loc p loc = { p with ppat_loc = loc }
 
-let pat_add_attr ?loc n x = { x with ppat_attributes = Hc.attr ?loc n :: x.ppat_attributes }
+let pat_add_attr ?loc n x =
+  { x with ppat_attributes = Hc.attr ?loc n :: x.ppat_attributes }
 
 let exp_loc p loc = { p with pexp_loc = loc }
 
-let exp_add_attr ?loc n x = { x with pexp_attributes = Hc.attr ?loc n :: x.pexp_attributes }
+let exp_add_attr ?loc n x =
+  { x with pexp_attributes = Hc.attr ?loc n :: x.pexp_attributes }
 
 let mod_loc p loc = { p with pmod_loc = loc }
 
-let mod_add_attr ?loc n x = { x with pmod_attributes = Hc.attr ?loc n :: x.pmod_attributes }
+let mod_add_attr ?loc n x =
+  { x with pmod_attributes = Hc.attr ?loc n :: x.pmod_attributes }
 
 let mty_loc p loc = { p with pmty_loc = loc }
 
-let mty_add_attr ?loc n x = { x with pmty_attributes = Hc.attr ?loc n :: x.pmty_attributes }
+let mty_add_attr ?loc n x =
+  { x with pmty_attributes = Hc.attr ?loc n :: x.pmty_attributes }
 
 let typ_loc p loc = { p with ptyp_loc = loc }
 
-let typ_add_attr ?loc n x = { x with ptyp_attributes = Hc.attr ?loc n :: x.ptyp_attributes }
+let typ_add_attr ?loc n x =
+  { x with ptyp_attributes = Hc.attr ?loc n :: x.ptyp_attributes }
 
-let tdecl_add_attr ?loc n x = { x with ptype_attributes = Hc.attr ?loc n :: x.ptype_attributes }
+let tdecl_add_attr ?loc n x =
+  { x with ptype_attributes = Hc.attr ?loc n :: x.ptype_attributes }
 
 let str2lid x =
   let open Location in

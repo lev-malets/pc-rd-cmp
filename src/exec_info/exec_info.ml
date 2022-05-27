@@ -24,14 +24,23 @@ module PosKey = struct
 end
 
 module FloatStatistics = struct
-  type t = { sum : float; min : float; max : float; count : int } [@@deriving sexp, ord]
+  type t = { sum : float; min : float; max : float; count : int }
+  [@@deriving sexp, ord]
 
   let equal x y =
-    Float.equal x.sum y.sum && Float.equal x.min y.min && Float.equal x.max y.max && Int.equal x.count y.count
+    Float.equal x.sum y.sum && Float.equal x.min y.min
+    && Float.equal x.max y.max && Int.equal x.count y.count
 
-  let empty = { sum = 0.; min = Float.max_value; max = Float.min_value; count = 0 }
+  let empty =
+    { sum = 0.; min = Float.max_value; max = Float.min_value; count = 0 }
 
-  let add x t = { sum = t.sum +. x; min = Float.min x t.min; max = Float.max x t.max; count = t.count + 1 }
+  let add x t =
+    {
+      sum = t.sum +. x;
+      min = Float.min x t.min;
+      max = Float.max x t.max;
+      count = t.count + 1;
+    }
 
   let mean t = t.sum /. Float.of_int t.count
 end
@@ -58,7 +67,9 @@ module Collect = struct
                 let x, xs, time_sub =
                   if x.depth = depth then (x, xs, 0.)
                   else
-                    let Hlp.{ entries; time = time_sub } = helper (depth + 1) entries in
+                    let Hlp.{ entries; time = time_sub } =
+                      helper (depth + 1) entries
+                    in
 
                     match entries with
                     | [] -> failwith ""
@@ -82,7 +93,8 @@ module Collect = struct
 
                 Hashtbl.change stats.positions x.enter_pos ~f:(fun _ -> Some ());
                 stats.time <- FloatStatistics.add x_time stats.time;
-                stats.time_individual <- FloatStatistics.add x_time_individual stats.time_individual;
+                stats.time_individual <-
+                  FloatStatistics.add x_time_individual stats.time_individual;
 
                 loop xs (time +. x_time)
         in
@@ -94,7 +106,12 @@ module Collect = struct
       assert (List.is_empty hlp.entries)
 end
 
-type stats = { call_count : int; pos_count : int; time : FloatStatistics.t; time_individual : FloatStatistics.t }
+type stats = {
+  call_count : int;
+  pos_count : int;
+  time : FloatStatistics.t;
+  time_individual : FloatStatistics.t;
+}
 [@@deriving sexp, ord]
 
 let to_stats t =
@@ -118,4 +135,7 @@ let gt (p1 : Lexing.position) (p2 : Lexing.position) =
     if c2 > 0 then true else false
 
 let last_pos =
-  List.fold_left ~f:(fun acc entry -> if gt acc entry.enter_pos then acc else entry.enter_pos) ~init:Lexing.dummy_pos
+  List.fold_left
+    ~f:(fun acc entry ->
+      if gt acc entry.enter_pos then acc else entry.enter_pos)
+    ~init:Lexing.dummy_pos

@@ -3,7 +3,11 @@ open Base
 module type POS = sig
   type s
 
-  include Pc.COMB with type log_elem = s and type 'a Simple.t = 'a Angstrom.t and type 'a t = 'a Parser.t
+  include
+    Pc.COMB
+      with type log_elem = s
+       and type 'a Simple.t = 'a Angstrom.t
+       and type 'a t = 'a Parser.t
 
   module Id : sig
     val get : unit -> int

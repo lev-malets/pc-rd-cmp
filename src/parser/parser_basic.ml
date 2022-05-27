@@ -24,7 +24,9 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
     & mapping (fun p1 p2 ->
           let open Simple in
           let open Lexing in
-          match p1.pos_cnum = p2.pos_cnum with true -> fail | false -> return ())
+          match p1.pos_cnum = p2.pos_cnum with
+          | true -> fail
+          | false -> return ())
       + pos_end - ng + pos
 
   let ng_no_new_line =
@@ -32,7 +34,9 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
     & mapping (fun p1 p2 ->
           let open Simple in
           let open Lexing in
-          match p1.pos_lnum = p2.pos_lnum with true -> return () | false -> fail)
+          match p1.pos_lnum = p2.pos_lnum with
+          | true -> return ()
+          | false -> fail)
       + pos_end - ng + pos
 
   let ng_new_line =
@@ -40,7 +44,9 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
     & mapping (fun p1 p2 ->
           let open Simple in
           let open Lexing in
-          match p1.pos_lnum = p2.pos_lnum with true -> fail | false -> return ())
+          match p1.pos_lnum = p2.pos_lnum with
+          | true -> fail
+          | false -> return ())
       + pos_end - ng + pos
 
   let with_del p = mapping (fun p1 f p2 -> f (loc_mk p1 p2)) + pos + p + del_pos
@@ -58,7 +64,8 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
     named "l_longident"
     & choice
         [
-          mapping (fun a b -> Longident.Ldot (a, b)) + u_longident - ng - dot - ng + l_ident;
+          mapping (fun a b -> Longident.Ldot (a, b))
+          + u_longident - ng - dot - ng + l_ident;
           (l_ident >>| fun s -> Longident.Lident s);
         ]
 
@@ -66,7 +73,8 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
     named "longident"
     & choice
         [
-          mapping (fun a b -> match b with None -> a | Some b -> Longident.Ldot (a, b))
+          mapping (fun a b ->
+              match b with None -> a | Some b -> Longident.Ldot (a, b))
           + u_longident
           + opt (ng >> dot >> ng >> l_ident);
           (l_ident >>| fun s -> Longident.Lident s);
@@ -85,7 +93,8 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
       (ng >> dot >> ng >> ident)
     >>| Buffer.contents
 
-  let variant_tag = hash >> ng >> choice [ ident; string_raw; (integer >>| fun (x, _) -> x) ]
+  let variant_tag =
+    hash >> ng >> choice [ ident; string_raw; (integer >>| fun (x, _) -> x) ]
 
   let parens p = l_paren >> ng >> p << ng << r_paren
 
@@ -95,26 +104,36 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
 
   let chevrons p = lt >> ng >> p << ng << gt
 
-  let na_hlp (f : ?loc:Warnings.loc -> 'a -> 'b) = return @@ fun a loc -> f ~loc a
+  let na_hlp (f : ?loc:Warnings.loc -> 'a -> 'b) =
+    return @@ fun a loc -> f ~loc a
 
-  let hlp (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) = return @@ fun a loc -> f ~loc a
+  let hlp (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) =
+    return @@ fun a loc -> f ~loc a
 
-  let hlp2 (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) = return @@ fun a b loc -> f ~loc a b
+  let hlp2 (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) =
+    return @@ fun a b loc -> f ~loc a b
 
-  let hlp3 (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) =
+  let hlp3 (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd)
+      =
     return @@ fun a b c loc -> f ~loc a b c
 
-  let hlp4 (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) =
+  let hlp4
+      (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e)
+      =
     return @@ fun a b c d loc -> f ~loc a b c d
 
-  let hlp_a (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) = return @@ fun attrs a loc -> f ~loc ~attrs a
+  let hlp_a (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) =
+    return @@ fun attrs a loc -> f ~loc ~attrs a
 
   let hlp2_a (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) =
     return @@ fun attrs a b loc -> f ~attrs ~loc a b
 
-  let hlp3_a (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) =
+  let hlp3_a
+      (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) =
     return @@ fun attrs a b c loc -> f ~attrs ~loc a b c
 
-  let hlp4_a (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) =
+  let hlp4_a
+      (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e)
+      =
     return @@ fun attrs a b c d loc -> f ~attrs ~loc a b c d
 end

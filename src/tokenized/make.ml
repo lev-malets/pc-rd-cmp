@@ -146,14 +146,16 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         }
 
       let fix f =
-        let rec p = lazy (f r) and r = { run = (fun i -> (Lazy.force p).run i) } in
+        let rec p = lazy (f r)
+        and r = { run = (fun i -> (Lazy.force p).run i) } in
         Lazy.force p
 
       let return x = { run = (fun state _fail succ -> succ state x) }
 
       let fail = { run = (fun state fail _succ -> fail state) }
 
-      let many p = fix @@ fun many_p -> lift2 (fun x xs -> x :: xs) p many_p <|> return []
+      let many p =
+        fix @@ fun many_p -> lift2 (fun x xs -> x :: xs) p many_p <|> return []
 
       let log x =
         {
@@ -167,7 +169,9 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         {
           run =
             (fun state _fail succ ->
-              let state = { state with log; log_parts = state.log :: state.log_parts } in
+              let state =
+                { state with log; log_parts = state.log :: state.log_parts }
+              in
               succ state ());
         }
     end
@@ -186,7 +190,8 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
               match p2.info with
               | Unknown -> Unknown
               | Empty -> p1
-              | Consume p2 -> Consume { p2 with first = Tset.union first p2.first }
+              | Consume p2 ->
+                  Consume { p2 with first = Tset.union first p2.first }
             else p1
       in
 
@@ -195,7 +200,10 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
     let ( >> ) (p1 : 'a t) p2 =
       match (p1.typ, p2.typ) with
       | Return _, _ -> p2
-      | _, Return v -> mk_parser_cont p1 p2 ~p:Simple.(p1.p >>| fun _ -> v) ~typ:(Value { v; p = p1.p })
+      | _, Return v ->
+          mk_parser_cont p1 p2
+            ~p:Simple.(p1.p >>| fun _ -> v)
+            ~typ:(Value { v; p = p1.p })
       | _, Value { v; _ } ->
           let p = Simple.(p1.p >> p2.p) in
           mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
@@ -207,13 +215,18 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
           mk_parser_cont p1 p2 ~p:Simple.(lift2 f a b) ~typ:(Lift2 { f; a; b })
       | _, Lift3 { f; a; b; c } ->
           let a = Simple.(p1.p >> a) in
-          mk_parser_cont p1 p2 ~p:Simple.(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
+          mk_parser_cont p1 p2
+            ~p:Simple.(lift3 f a b c)
+            ~typ:(Lift3 { f; a; b; c })
       | _ -> mk_parser_cont p1 p2 ~p:Simple.(p1.p >> p2.p) ~typ:Parser
 
     let ( << ) p1 p2 =
       match (p1.typ, p2.typ) with
       | _, Return _ -> p1
-      | Return v, _ -> mk_parser_cont p1 p2 ~p:Simple.(p2.p >>| fun _ -> v) ~typ:(Value { v; p = p2.p })
+      | Return v, _ ->
+          mk_parser_cont p1 p2
+            ~p:Simple.(p2.p >>| fun _ -> v)
+            ~typ:(Value { v; p = p2.p })
       | Value { v; _ }, _ ->
           let p = Simple.(p1.p << p2.p) in
           mk_parser_cont p1 p2 ~p ~typ:(Value { v; p })
@@ -225,7 +238,9 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
           mk_parser_cont p1 p2 ~p:Simple.(lift2 f a b) ~typ:(Lift2 { f; a; b })
       | Lift3 { f; a; b; c }, _ ->
           let c = Simple.( << ) c p2.p in
-          mk_parser_cont p1 p2 ~p:Simple.(lift3 f a b c) ~typ:(Lift3 { f; a; b; c })
+          mk_parser_cont p1 p2
+            ~p:Simple.(lift3 f a b c)
+            ~typ:(Lift3 { f; a; b; c })
       | _ -> mk_parser_cont p1 p2 ~p:Simple.(p1.p << p2.p) ~typ:Parser
 
     let ( <|> ) p1 p2 =
@@ -238,7 +253,12 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
           | Empty, Empty -> Empty
           | Empty, Consume p2 -> Consume { p2 with empty = true }
           | Consume p1, Empty -> Consume { p1 with empty = true }
-          | Consume p1, Consume p2 -> Consume { empty = p1.empty || p2.empty; first = Tset.union p1.first p2.first });
+          | Consume p1, Consume p2 ->
+              Consume
+                {
+                  empty = p1.empty || p2.empty;
+                  first = Tset.union p1.first p2.first;
+                });
         typ = Parser;
         id = Id.get ();
       }
@@ -251,20 +271,35 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
       | Value { v = f; p } ->
           let a = Simple.(p >> pv.p) in
           mk_parser_cont pf pv ~p:Simple.(lift f a) ~typ:(Lift { f; a })
-      | Lift { f; a } -> mk_parser_cont pf pv ~p:Simple.(lift2 f a pv.p) ~typ:(Lift2 { f; a; b = pv.p })
-      | Lift2 { f; a; b } -> mk_parser_cont pf pv ~p:Simple.(lift3 f a b pv.p) ~typ:(Lift3 { f; a; b; c = pv.p })
-      | Lift3 { f; a; b; c } -> mk_parser_cont pf pv ~p:Simple.(lift4 f a b c pv.p) ~typ:Parser
+      | Lift { f; a } ->
+          mk_parser_cont pf pv
+            ~p:Simple.(lift2 f a pv.p)
+            ~typ:(Lift2 { f; a; b = pv.p })
+      | Lift2 { f; a; b } ->
+          mk_parser_cont pf pv
+            ~p:Simple.(lift3 f a b pv.p)
+            ~typ:(Lift3 { f; a; b; c = pv.p })
+      | Lift3 { f; a; b; c } ->
+          mk_parser_cont pf pv ~p:Simple.(lift4 f a b c pv.p) ~typ:Parser
       | _ -> mk_parser_cont pf pv ~p:Simple.(pf.p <*> pv.p) ~typ:Parser
 
     let ( >>$ ) pp v =
       let p = Simple.(pp.p >>$ v) in
       { pp with p; typ = Value { v; p }; id = Id.get () }
 
-    let ( >>| ) p f = { p with p = Simple.(p.p >>| f); typ = Parser; id = Id.get () }
+    let ( >>| ) p f =
+      { p with p = Simple.(p.p >>| f); typ = Parser; id = Id.get () }
 
     let fix f =
       let rec p = lazy (f r)
-      and r = { p = { run = (fun i -> (Lazy.force p).p.run i) }; info = Unknown; typ = Parser; id = Id.get () } in
+      and r =
+        {
+          p = { run = (fun i -> (Lazy.force p).p.run i) };
+          info = Unknown;
+          typ = Parser;
+          id = Id.get ();
+        }
+      in
       Lazy.force p
 
     let fix_poly f =
@@ -273,12 +308,18 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         {
           get =
             (fun get ->
-              { p = { run = (fun i -> (get @@ Lazy.force res).p.run i) }; info = Unknown; typ = Parser; id = Id.get () });
+              {
+                p = { run = (fun i -> (get @@ Lazy.force res).p.run i) };
+                info = Unknown;
+                typ = Parser;
+                id = Id.get ();
+              });
         }
       in
       Lazy.force res
 
-    let return x = { p = Simple.(return x); info = Empty; typ = Return x; id = Id.get () }
+    let return x =
+      { p = Simple.(return x); info = Empty; typ = Return x; id = Id.get () }
 
     let fail = { p = Simple.fail; info = Unknown; typ = Parser; id = Id.fail }
 
@@ -291,7 +332,10 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
 
     let pos : Lexing.position t =
       {
-        p = { run = (fun state _fail succ -> succ state (next_token_start state)) };
+        p =
+          {
+            run = (fun state _fail succ -> succ state (next_token_start state));
+          };
         info = Empty;
         typ = Parser;
         id = Id.get ();
@@ -299,13 +343,15 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
 
     let pos_end : Lexing.position t =
       {
-        p = { run = (fun state _fail succ -> succ state (prev_token_end state)) };
+        p =
+          { run = (fun state _fail succ -> succ state (prev_token_end state)) };
         info = Empty;
         typ = Parser;
         id = Id.get ();
       }
 
-    let exec f = { p = Simple.exec f; info = Empty; typ = Parser; id = Id.get () }
+    let exec f =
+      { p = Simple.exec f; info = Empty; typ = Parser; id = Id.get () }
 
     let failed p =
       {
@@ -326,7 +372,11 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
     let opt p =
       {
         p = Simple.(p.p >>| (fun x -> Some x) <|> return None);
-        info = (match p.info with Unknown -> Unknown | Empty -> Empty | Consume p -> Consume { p with empty = true });
+        info =
+          (match p.info with
+          | Unknown -> Unknown
+          | Empty -> Empty
+          | Consume p -> Consume { p with empty = true });
         typ = Parser;
         id = Id.get ();
       }
@@ -354,17 +404,26 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         | Empty, Consume p2 -> Consume { p2 with empty = n < 2 }
         | Consume { empty = true; _ }, Empty -> failwith "Endless sequence"
         | Consume p1, Empty -> Consume { p1 with empty = n = 0 }
-        | Consume { empty = true; _ }, Consume { empty = true; _ } -> failwith "Endless sequence"
+        | Consume { empty = true; _ }, Consume { empty = true; _ } ->
+            failwith "Endless sequence"
         | Consume p1, Consume p2 ->
-            if p1.empty then Consume { empty = p1.empty && n = 1; first = Tset.union p1.first p2.first }
+            if p1.empty then
+              Consume
+                {
+                  empty = p1.empty && n = 1;
+                  first = Tset.union p1.first p2.first;
+                }
             else Consume { p1 with empty = n = 0 }
       in
 
       {
         p =
           (let open Simple in
-          let list = lift2 (fun first tail -> first :: tail) p.p tail <|> return [] in
-          list >>= fun list -> if List.length list < n then fail else return list);
+          let list =
+            lift2 (fun first tail -> first :: tail) p.p tail <|> return []
+          in
+          list >>= fun list ->
+          if List.length list < n then fail else return list);
         info;
         typ = Parser;
         id = Id.get ();
@@ -372,21 +431,42 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
 
     let t2 =
       let f a b = (a, b) in
-      { p = { run = (fun state _fail succ -> succ state f) }; info = Empty; typ = Return f; id = Id.t2 }
+      {
+        p = { run = (fun state _fail succ -> succ state f) };
+        info = Empty;
+        typ = Return f;
+        id = Id.t2;
+      }
 
     let t3 =
       let f a b c = (a, b, c) in
-      { p = { run = (fun state _fail succ -> succ state f) }; info = Empty; typ = Return f; id = Id.t3 }
+      {
+        p = { run = (fun state _fail succ -> succ state f) };
+        info = Empty;
+        typ = Return f;
+        id = Id.t3;
+      }
 
     let t4 =
       let f a b c d = (a, b, c, d) in
-      { p = { run = (fun state _fail succ -> succ state f) }; info = Empty; typ = Return f; id = Id.t4 }
+      {
+        p = { run = (fun state _fail succ -> succ state f) };
+        info = Empty;
+        typ = Return f;
+        id = Id.t4;
+      }
 
     let cons =
       let f x xs = x :: xs in
-      { p = { run = (fun state _fail succ -> succ state f) }; info = Empty; typ = Return f; id = Id.cons }
+      {
+        p = { run = (fun state _fail succ -> succ state f) };
+        info = Empty;
+        typ = Return f;
+        id = Id.cons;
+      }
 
-    let not_empty p = match p.info with Consume { empty = false; _ } -> true | _ -> false
+    let not_empty p =
+      match p.info with Consume { empty = false; _ } -> true | _ -> false
 
     let peek_first expected =
       let arr = Array.create ~len:256 Simple.fail in
@@ -405,7 +485,8 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
 
             loop xs;
 
-            p_first |> Tset.iter_code (fun c -> arr.(c) <- Simple.(p.p <|> arr.(c)))
+            p_first
+            |> Tset.iter_code (fun c -> arr.(c) <- Simple.(p.p <|> arr.(c)))
       in
       loop expected;
 
@@ -435,18 +516,24 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
             run =
               (fun state fail succ ->
                 let table =
-                  Hashtbl.find_or_add state.im.memo_tables id ~default:(fun _ -> Hashtbl.create (module Int))
+                  Hashtbl.find_or_add state.im.memo_tables id ~default:(fun _ ->
+                      Hashtbl.create (module Int))
                 in
                 let key = state.pos in
 
                 match Hashtbl.find table key with
                 | Some t -> (
                     let t, state' = Caml.Obj.obj t in
-                    let state = { state' with log_parts = state.log :: state.log_parts } in
+                    let state =
+                      { state' with log_parts = state.log :: state.log_parts }
+                    in
 
                     match t with Some v -> succ state v | None -> fail state)
                 | None ->
-                    let set_data state x = Hashtbl.add_exn table ~key ~data:(Caml.Obj.repr (x, state)) in
+                    let set_data state x =
+                      Hashtbl.add_exn table ~key
+                        ~data:(Caml.Obj.repr (x, state))
+                    in
 
                     let succ state v =
                       set_data state @@ Some v;
@@ -457,7 +544,13 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
                       fail state
                     in
 
-                    let state = { state with log = []; log_parts = state.log :: state.log_parts } in
+                    let state =
+                      {
+                        state with
+                        log = [];
+                        log_parts = state.log :: state.log_parts;
+                      }
+                    in
 
                     p.p.run state fail succ);
           };
@@ -486,7 +579,18 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
                     let exit_pos = Parser.next_token_start state in
                     let exit_time = Caml.Sys.time () in
 
-                    let entry = Exec_info.{ id; enter_time; enter_pos; exit_time; exit_pos; succeded; depth = d } in
+                    let entry =
+                      Exec_info.
+                        {
+                          id;
+                          enter_time;
+                          enter_pos;
+                          exit_time;
+                          exit_pos;
+                          succeded;
+                          depth = d;
+                        }
+                    in
 
                     (* begin match Hashtbl.find Pos.id2name p.id with
                        | Some name ->
@@ -524,7 +628,10 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
               (fun state _ succ ->
                 let init = List.fold_left ~init ~f state.log in
 
-                let res = List.fold_left state.log_parts ~init ~f:(fun init -> List.fold_left ~init ~f) in
+                let res =
+                  List.fold_left state.log_parts ~init ~f:(fun init ->
+                      List.fold_left ~init ~f)
+                in
 
                 succ state res);
           };
@@ -575,13 +682,17 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         fail succ
 
     let parse_string p ?filename text =
-      let succ state v = if state.pos = Array.length state.im.tokens then Some v else None in
+      let succ state v =
+        if state.pos = Array.length state.im.tokens then Some v else None
+      in
       let fail _state = None in
       parse_helper fail succ p ?filename text
 
     let parse_string_with_trace p ?filename text =
       let succ state v =
-        let x = if state.pos = Array.length state.im.tokens then Some v else None in
+        let x =
+          if state.pos = Array.length state.im.tokens then Some v else None
+        in
         Some (x, List.rev !(state.im.trace_entries))
       in
       let fail state = Some (None, List.rev !(state.im.trace_entries)) in
@@ -594,7 +705,11 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
     let simple p = p.p
 
     let run p =
-      let info = match p.info with Consume { empty = false; _ } as x -> x | _ -> Unknown in
+      let info =
+        match p.info with
+        | Consume { empty = false; _ } as x -> x
+        | _ -> Unknown
+      in
 
       {
         p =
@@ -621,7 +736,10 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
     let eof =
       let p =
         {
-          run = (fun state fail succ -> if state.pos = Array.length state.im.tokens then succ state () else fail state);
+          run =
+            (fun state fail succ ->
+              if state.pos = Array.length state.im.tokens then succ state ()
+              else fail state);
         }
       in
       { p; info = Empty; typ = Value { v = (); p }; id = Id.eof }
@@ -639,22 +757,35 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
             else
               let t = state.im.tokens.(state.pos) in
               if Tokenizer.Tag.equal t.tag tag then
-                match f t with Some x -> succ { state with pos = Int.succ state.pos } x | None -> fail state
+                match f t with
+                | Some x -> succ { state with pos = Int.succ state.pos } x
+                | None -> fail state
               else fail state);
       }
     in
 
-    { p; info = Consume { empty = false; first = Tset.singleton (tag2int tag) }; typ = Parser; id = Id.get () }
+    {
+      p;
+      info = Consume { empty = false; first = Tset.singleton (tag2int tag) };
+      typ = Parser;
+      id = Id.get ();
+    }
 
   let tkn tag =
-    tkn_helper tag ~f:(fun t -> match t.payload with Some payload -> Some (t.tag, Caml.Obj.obj payload) | _ -> None)
+    tkn_helper tag ~f:(fun t ->
+        match t.payload with
+        | Some payload -> Some (t.tag, Caml.Obj.obj payload)
+        | _ -> None)
 
   let tkn_ tag = tkn_helper tag ~f:(fun _ -> Some ())
 
   let tkn_tag tag = tkn_helper tag ~f:(fun _ -> Some tag)
 
   let tkn_payload tag =
-    tkn_helper tag ~f:(fun t -> match t.payload with Some payload -> Some (Caml.Obj.obj payload) | _ -> None)
+    tkn_helper tag ~f:(fun t ->
+        match t.payload with
+        | Some payload -> Some (Caml.Obj.obj payload)
+        | _ -> None)
 
   let peek p =
     {

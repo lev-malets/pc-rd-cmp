@@ -99,7 +99,8 @@ module type COMB_COMMON = sig
 
   val id : _ t -> int
 
-  val parse_string_with_trace : 'a t -> ?filename:string -> string -> 'a option * Exec_info.entry list
+  val parse_string_with_trace :
+    'a t -> ?filename:string -> string -> 'a option * Exec_info.entry list
 end
 
 module type COMB_BASE = sig

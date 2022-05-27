@@ -32,36 +32,55 @@ struct
       let modexpr_constrainted =
         named "modexpr:constrainted"
         @@ fold_left_cont_0_1 modexpr
-             (mapping (fun typ prev -> Mod.constraint_ ~loc:(loc_comb prev.pmod_loc typ.pmty_loc) prev typ)
+             (mapping (fun typ prev ->
+                  Mod.constraint_
+                    ~loc:(loc_comb prev.pmod_loc typ.pmty_loc)
+                    prev typ)
              - ng - colon - ng + modtype)
 
       let atom =
         let unpack_constr =
           fold_left_cont_0_1 expression
-            (mapping (fun typ prev -> Exp.constraint_ ~loc:(loc_comb prev.pexp_loc typ.ptyp_loc) prev typ)
+            (mapping (fun typ prev ->
+                 Exp.constraint_
+                   ~loc:(loc_comb prev.pexp_loc typ.ptyp_loc)
+                   prev typ)
             - ng - colon - ng + core_type_package)
         in
 
         choice ~name:"modexpr:atom"
           [
-            with_loc & (hlp Mod.unpack - unpack - ng - l_paren - ng + unpack_constr - ng - r_paren);
+            with_loc
+            & hlp Mod.unpack - unpack - ng - l_paren - ng + unpack_constr - ng
+              - r_paren;
             with_loc & (hlp Mod.ident + loc u_longident);
-            with_loc & parens & (mapping mod_loc + mod_attrs modexpr_constrainted);
+            with_loc & parens
+            & (mapping mod_loc + mod_attrs modexpr_constrainted);
             with_loc & (hlp Mod.extension + extension);
           ]
 
       let apply =
         named "modexpr:apply"
-          (let genarg = with_loc & (mapping (fun loc -> Mod.structure ~loc []) - l_paren - ng - r_paren) in
+          (let genarg =
+             with_loc
+             & mapping (fun loc -> Mod.structure ~loc [])
+               - l_paren - ng - r_paren
+           in
 
            let arg = genarg <|> modexpr_constrainted in
 
            let args =
              fold_left_cont_0_n
-               (mapping (fun arg prev -> Mod.apply ~loc:(loc_comb prev.pmod_loc arg.pmod_loc) prev arg) + arg)
+               (mapping (fun arg prev ->
+                    Mod.apply
+                      ~loc:(loc_comb prev.pmod_loc arg.pmod_loc)
+                      prev arg)
+               + arg)
                (mapping (fun arg cont prev ->
                     let prev = cont prev in
-                    Mod.apply ~loc:(loc_comb prev.pmod_loc arg.pmod_loc) prev arg)
+                    Mod.apply
+                      ~loc:(loc_comb prev.pmod_loc arg.pmod_loc)
+                      prev arg)
                - ng - comma - ng + arg)
            in
 
@@ -69,7 +88,10 @@ struct
              choice
                [
                  l_paren >> args << opt sep << ng << r_paren;
-                 mapping (fun loc_end prev -> Mod.apply ~loc:{ prev.pmod_loc with loc_end } prev (Mod.structure []))
+                 mapping (fun loc_end prev ->
+                     Mod.apply
+                       ~loc:{ prev.pmod_loc with loc_end }
+                       prev (Mod.structure []))
                  - l_paren - ng - r_paren + pos;
                ]
            in
@@ -89,12 +111,20 @@ struct
 
            let arg_loop =
              fix @@ fun arg_loop ->
-             let tail = choice [ opt comma >> ng >> r_paren >> ng >> tail; comma >> ng >> arg_loop ] in
+             let tail =
+               choice
+                 [
+                   opt comma >> ng >> r_paren >> ng >> tail;
+                   comma >> ng >> arg_loop;
+                 ]
+             in
 
              choice
                [
                  mod_attrs & with_loc
-                 & (hlp3 Mod.functor_ + loc u_ident + opt (ng >> colon >> ng >> modtype) - ng + tail);
+                 & hlp3 Mod.functor_ + loc u_ident
+                   + opt (ng >> colon >> ng >> modtype)
+                   - ng + tail;
                  mod_attrs & with_loc
                  & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
                    + loc (l_paren >> ng >> r_paren >>$ "*")
@@ -112,7 +142,9 @@ struct
              ])
 
       let structure =
-        named "modexpr:structure" (with_loc & (hlp Mod.structure - l_brace - ng + structure - ng - r_brace))
+        named "modexpr:structure"
+          (with_loc
+          & (hlp Mod.structure - l_brace - ng + structure - ng - r_brace))
 
       let modexpr = named "modexpr" (functor_ <|> apply <|> structure)
     end)

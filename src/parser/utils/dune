@@ -13,3 +13,9 @@
   parser_angstrom
   parser_tokenized
   cmdliner))
+
+(executable
+ (name exec)
+ (modules exec)
+ (libraries run_common)
+ (modes byte exe))

@@ -29,8 +29,16 @@ rec {
   });
 
   libs = with ocamlPackages; [
-    yojson bigstringaf fix async lwt ocaml-syntax-shims
-    cmdliner core_bench core_kernel alcotest
+    yojson
+    bigstringaf
+    fix
+    async
+    lwt
+    ocaml-syntax-shims
+    cmdliner
+    core_bench
+    core_kernel
+    alcotest
   ];
   tools =
     (with ocamlPackages; [ ocaml dune_2 findlib ])

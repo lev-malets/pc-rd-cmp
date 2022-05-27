@@ -1,25 +1,13 @@
-open Base
+open Core_kernel
 
-module ParseRes : Pc_syntax.Sigs.PARSE = struct
-  let parse_interface ~src ~filename =
-    let x = Res_parse_string.parse_interface ~src ~filename in
-    Some x
+let read_file ~filename = In_channel.read_all filename
 
-  let parse_implementation ~src ~filename =
-    let x = Res_parse_string.parse_implementation ~src ~filename in
-    Some x
-end
-
-let read_file ~filename = Core_kernel.In_channel.read_all filename
-
-let config = ref ""
-
-let mk_conf () : (module Pc_syntax.Sigs.CONF) =
+let mk_conf file : (module Pc_syntax.Sigs.CONF) =
   let module Log = struct
     type elem = Pc_syntax.Basic.LogElement.t
   end in
-  match !config with
-  | "" ->
+  match file with
+  | None ->
       (module Pc.Utils.MakeConf
                 (Log)
                 (struct
@@ -27,7 +15,7 @@ let mk_conf () : (module Pc_syntax.Sigs.CONF) =
 
                   let src = "{}"
                 end))
-  | filename ->
+  | Some filename ->
       (module Pc.Utils.MakeConf
                 (Log)
                 (struct
@@ -36,8 +24,8 @@ let mk_conf () : (module Pc_syntax.Sigs.CONF) =
                   let filename = Some filename
                 end))
 
-let mk_parse ?(tokenize = false) () : (module Pc_syntax.Sigs.PARSER) =
-  let (module Conf) = mk_conf () in
+let mk_parse ?(tokenize = false) file : (module Pc_syntax.Sigs.PARSER) =
+  let (module Conf) = mk_conf file in
   if tokenize then
     let module Tpc = Tokenized.Make (Parser_tokenized.Lexer.Make ()) (Conf) in
     (module Parser_tokenized.Make (Tpc))
@@ -65,7 +53,8 @@ let dump_loc_mapping =
             | Ppat_var x -> Ppat_var (loc x)
             | Ppat_alias (x, n) -> Ppat_alias (x, loc n)
             | Ppat_construct (x, a) -> Ppat_construct (loc x, a)
-            | Ppat_record (x, f) -> Ppat_record (List.map ~f:(fun (n, x) -> (loc n, x)) x, f)
+            | Ppat_record (x, f) ->
+                Ppat_record (List.map ~f:(fun (n, x) -> (loc n, x)) x, f)
             | Ppat_type x -> Ppat_type (loc x)
             | Ppat_unpack x -> Ppat_unpack (loc x)
             | Ppat_extension (n, x) -> Ppat_extension (loc n, x)
@@ -86,8 +75,10 @@ let dump_loc_mapping =
             | Pexp_new x -> Pexp_new (loc x)
             | Pexp_newtype (l, x) -> Pexp_newtype (loc l, x)
             | Pexp_open (f, n, x) -> Pexp_open (f, loc n, x)
-            | Pexp_override x -> Pexp_override (List.map ~f:(fun (m, e) -> (loc m, e)) x)
-            | Pexp_record (x, e) -> Pexp_record (List.map ~f:(fun (m, e) -> (loc m, e)) x, e)
+            | Pexp_override x ->
+                Pexp_override (List.map ~f:(fun (m, e) -> (loc m, e)) x)
+            | Pexp_record (x, e) ->
+                Pexp_record (List.map ~f:(fun (m, e) -> (loc m, e)) x, e)
             | Pexp_send (x, n) -> Pexp_send (x, loc n)
             | Pexp_setfield (x, n, y) -> Pexp_setfield (x, loc n, y)
             | Pexp_setinstvar (n, x) -> Pexp_setinstvar (loc n, x)
@@ -146,7 +137,9 @@ let dump_loc_mapping =
           pcf_loc = none;
           pcf_desc =
             (match x.pcf_desc with
-            | Pcf_inherit (f, x, n) -> Pcf_inherit (f, x, match n with Some x -> Some (loc x) | None -> None)
+            | Pcf_inherit (f, x, n) ->
+                Pcf_inherit
+                  (f, x, match n with Some x -> Some (loc x) | None -> None)
             | Pcf_method (n, f, x) -> Pcf_method (loc n, f, x)
             | Pcf_val (n, f, x) -> Pcf_val (loc n, f, x)
             | x -> x);
@@ -175,45 +168,179 @@ let dump_loc_mapping =
         });
     attribute = (fun (n, x) -> (loc n, x));
     extension = (fun (n, x) -> (loc n, x));
-    class_description = (fun x -> { x with pci_name = loc x.pci_name; pci_loc = none });
-    class_type_declaration = (fun x -> { x with pci_name = loc x.pci_name; pci_loc = none });
-    extension_constructor = (fun x -> { x with pext_name = loc x.pext_name; pext_loc = none });
-    module_binding = (fun x -> { x with pmb_name = loc x.pmb_name; pmb_loc = none });
-    module_type_declaration = (fun x -> { x with pmtd_name = loc x.pmtd_name; pmtd_loc = none });
-    module_declaration = (fun x -> { x with pmd_name = loc x.pmd_name; pmd_loc = none });
-    open_description = (fun x -> { x with popen_lid = loc x.popen_lid; popen_loc = none });
+    class_description =
+      (fun x -> { x with pci_name = loc x.pci_name; pci_loc = none });
+    class_type_declaration =
+      (fun x -> { x with pci_name = loc x.pci_name; pci_loc = none });
+    extension_constructor =
+      (fun x -> { x with pext_name = loc x.pext_name; pext_loc = none });
+    module_binding =
+      (fun x -> { x with pmb_name = loc x.pmb_name; pmb_loc = none });
+    module_type_declaration =
+      (fun x -> { x with pmtd_name = loc x.pmtd_name; pmtd_loc = none });
+    module_declaration =
+      (fun x -> { x with pmd_name = loc x.pmd_name; pmd_loc = none });
+    open_description =
+      (fun x -> { x with popen_lid = loc x.popen_lid; popen_loc = none });
     type_extension = (fun x -> { x with ptyext_path = loc x.ptyext_path });
     type_declaration =
       (fun x ->
         {
           x with
           ptype_name = loc x.ptype_name;
-          ptype_cstrs = List.map ~f:(fun (x, y, _) -> (x, y, none)) x.ptype_cstrs;
+          ptype_cstrs =
+            List.map ~f:(fun (x, y, _) -> (x, y, none)) x.ptype_cstrs;
           ptype_loc = none;
         });
-    value_description = (fun x -> { x with pval_name = loc x.pval_name; pval_loc = none });
-    constructor_declaration = (fun x -> { x with pcd_name = loc x.pcd_name; pcd_loc = none });
+    value_description =
+      (fun x -> { x with pval_name = loc x.pval_name; pval_loc = none });
+    constructor_declaration =
+      (fun x -> { x with pcd_name = loc x.pcd_name; pcd_loc = none });
     value_binding = (fun x -> { x with pvb_loc = none });
     label_declaration = (fun x -> { x with pld_loc = none });
     include_description = (fun x -> { x with pincl_loc = none });
     include_declaration = (fun x -> { x with pincl_loc = none });
   }
 
-let input = ref ""
+type pv_pc = Angstrom | Tokenized
 
-let output = ref ""
+type parser_variant = Pc of pv_pc | Rescript | Dummy
 
-let tokenize = ref false
+type exec_stage = ParserInit | Parse | ResultPrint
 
-let mapping = ref Pc_syntax.Parsetree_mapping.default
+module Parser = struct
+  module Rescript : Pc_syntax.Sigs.PARSE = struct
+    let parse_interface ~src ~filename =
+      let x = Res_parse_string.parse_interface ~src ~filename in
+      Some x
 
-let anon_fun _ = ()
+    let parse_implementation ~src ~filename =
+      let x = Res_parse_string.parse_implementation ~src ~filename in
+      Some x
+  end
 
-let speclist =
-  [
-    ("--input", Caml.Arg.Set_string input, "");
-    ("--output", Caml.Arg.Set_string output, "");
-    ("--tokenize", Caml.Arg.Set tokenize, "");
-    ("--simplified", Caml.Arg.Unit (fun _ -> mapping := dump_loc_mapping), "");
-    ("--config", Caml.Arg.Set_string config, "");
-  ]
+  module Dummy : Pc_syntax.Sigs.PARSE = struct
+    let parse_interface ~src ~filename =
+      let open Res_driver in
+      Some
+        {
+          filename;
+          source = src;
+          parsetree = [];
+          diagnostics = [];
+          invalid = false;
+          comments = [];
+        }
+
+    let parse_implementation ~src ~filename =
+      let open Res_driver in
+      Some
+        {
+          filename;
+          source = src;
+          parsetree = [];
+          diagnostics = [];
+          invalid = false;
+          comments = [];
+        }
+  end
+
+  let pc parser config =
+    match parser with
+    | Angstrom -> mk_parse config
+    | Tokenized -> mk_parse ~tokenize:true config
+
+  let rescipt : (module Pc_syntax.Sigs.PARSE) = (module Rescript)
+
+  let dummy : (module Pc_syntax.Sigs.PARSE) = (module Dummy)
+
+  let of_variant parser config : (module Pc_syntax.Sigs.PARSE) =
+    match parser with
+    | Pc x ->
+        let (module M) = pc x config in
+        (module M)
+    | Rescript -> rescipt
+    | Dummy -> dummy
+end
+
+type input = { filename : string; src : string }
+
+type output = { channel : Out_channel.t; close : unit -> unit }
+
+let mk_input input =
+  match input with
+  | None ->
+      let filename =
+        if Caml.Sys.file_exists "/dev/stdin" then "/dev/stdin" else "__stdin__"
+      in
+      { filename; src = Core_kernel.In_channel.(input_all stdin) }
+  | Some filename -> { filename; src = read_file ~filename }
+
+let mk_output output =
+  match output with
+  | None ->
+      {
+        channel = Out_channel.stdout;
+        close = (fun () -> Out_channel.flush stdout);
+      }
+  | Some filename ->
+      let och = Out_channel.create filename in
+      { channel = och; close = (fun () -> Out_channel.close och) }
+
+module Args = struct
+  open Cmdliner
+
+  let config =
+    let doc = "Config file" in
+    Arg.(value & opt (some string) None & info ~doc ~docv:"FILE" [ "config" ])
+
+  let input =
+    let doc = "Input file" in
+    Arg.(value & opt (some string) None & info ~doc ~docv:"FILE" [ "input" ])
+
+  let output =
+    let doc = "Output file" in
+    Arg.(value & opt (some string) None & info ~doc ~docv:"FILE" [ "output" ])
+
+  let parser_variants_pc = [ ("angstrom", Angstrom); ("tokenized", Tokenized) ]
+
+  let parser_variants =
+    [
+      ("rescript", Rescript);
+      ("angstrom", Pc Angstrom);
+      ("tokenized", Pc Tokenized);
+      ("dummy", Dummy);
+    ]
+
+  let parser_pc =
+    let doc = "Parser" in
+    Arg.(
+      value
+      & opt (enum parser_variants_pc) Tokenized
+      & info ~doc ~docv:"PC-PARSER" [ "parser" ])
+
+  let parser =
+    let doc = "Parser" in
+    Arg.(
+      value
+      & opt (enum parser_variants) Rescript
+      & info ~doc ~docv:"PARSER" [ "parser" ])
+
+  let ignore_loc =
+    let doc = "If set, location will be ignored" in
+    Arg.(value & flag & info ~doc [ "ignore-loc" ])
+
+  let last_stage =
+    let doc = "Last stage for execution" in
+    Arg.(
+      value
+      & opt
+          (enum
+             [
+               ("parser-init", ParserInit);
+               ("parse", Parse);
+               ("result-print", ResultPrint);
+             ])
+          ResultPrint
+      & info ~doc ~docv:"STAGE" [ "last-stage" ])
+end

@@ -23,7 +23,12 @@ let search_files dirs =
   List.rev @@ loop dirs []
 
 let files =
-  search_files [ "data/res"; "tmp/t/deps/syntax/tests/parsing/grammar"; "tmp/t/deps/syntax/benchmarks/data" ]
+  search_files
+    [
+      "data/res";
+      "tmp/t/deps/syntax/tests/parsing/grammar";
+      "tmp/t/deps/syntax/benchmarks/data";
+    ]
   |> List.map ~f:(fun (n, f) -> (n, f, Stdio.In_channel.read_all n))
 
 let signature : Parsetree.signature Alcotest.testable =
@@ -34,9 +39,9 @@ let structure : Parsetree.structure Alcotest.testable =
 
 let () =
   let open Alcotest in
-  config := "data/configs/test.json";
-  let (module Parse) = mk_parse ~tokenize:false () in
-  let (module ParseT) = mk_parse ~tokenize:true () in
+  let config = Some "data/configs/test.json" in
+  let (module Parse) = mk_parse ~tokenize:false config in
+  let (module ParseT) = mk_parse ~tokenize:true config in
 
   let mk_test_cases (module Parse : Pc_syntax.Sigs.PARSE) map_sig map_str =
     List.map files ~f:(fun (n, is_sig, s) ->
@@ -44,16 +49,22 @@ let () =
           let open Res_driver in
           if is_sig then fun () ->
             let expected =
-              ParseRes.parse_interface ~filename:n ~src:s |> Option.map ~f:(fun x -> map_sig x.parsetree)
+              Parser.Rescript.parse_interface ~filename:n ~src:s
+              |> Option.map ~f:(fun x -> map_sig x.parsetree)
             in
-            let actual = Parse.parse_interface ~filename:n ~src:s |> Option.map ~f:(fun x -> map_sig x.parsetree) in
+            let actual =
+              Parse.parse_interface ~filename:n ~src:s
+              |> Option.map ~f:(fun x -> map_sig x.parsetree)
+            in
             check' (option signature) ~msg:n ~expected ~actual
           else fun () ->
             let expected =
-              ParseRes.parse_implementation ~filename:n ~src:s |> Option.map ~f:(fun x -> map_str x.parsetree)
+              Parser.Rescript.parse_implementation ~filename:n ~src:s
+              |> Option.map ~f:(fun x -> map_str x.parsetree)
             in
             let actual =
-              Parse.parse_implementation ~filename:n ~src:s |> Option.map ~f:(fun x -> map_str x.parsetree)
+              Parse.parse_implementation ~filename:n ~src:s
+              |> Option.map ~f:(fun x -> map_str x.parsetree)
             in
             Alcotest.check' (option structure) ~msg:n ~expected ~actual
         in
@@ -66,12 +77,18 @@ let () =
       ( "parse:noloc",
         mk_test_cases
           (module Parse)
-          (fun x -> Pc_syntax.Parsetree_mapping.signature Run_common.dump_loc_mapping x)
-          (fun x -> Pc_syntax.Parsetree_mapping.structure Run_common.dump_loc_mapping x) );
+          (fun x ->
+            Pc_syntax.Parsetree_mapping.signature Run_common.dump_loc_mapping x)
+          (fun x ->
+            Pc_syntax.Parsetree_mapping.structure Run_common.dump_loc_mapping x)
+      );
       ("parse:tokenize", mk_test_cases (module ParseT) (fun x -> x) (fun x -> x));
       ( "parse:tokenize:noloc",
         mk_test_cases
           (module ParseT)
-          (fun x -> Pc_syntax.Parsetree_mapping.signature Run_common.dump_loc_mapping x)
-          (fun x -> Pc_syntax.Parsetree_mapping.structure Run_common.dump_loc_mapping x) );
+          (fun x ->
+            Pc_syntax.Parsetree_mapping.signature Run_common.dump_loc_mapping x)
+          (fun x ->
+            Pc_syntax.Parsetree_mapping.structure Run_common.dump_loc_mapping x)
+      );
     ]

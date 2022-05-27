@@ -15,5 +15,7 @@ echo Change repo files ownership
 docker exec $CONTAINER_CP chown -R 0:0 /repo
 echo Remove cp container
 docker rm -f $CONTAINER_CP
-echo Start test container
+echo Run test container
 docker run --rm --tmpfs /tmp -v $VOLUME:/repo $NAME
+echo Delete volume
+docker volume rm $VOLUME

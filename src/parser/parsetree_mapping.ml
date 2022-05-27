@@ -89,7 +89,8 @@ and structure_item f x =
 
 and class_description f x = f.class_description @@ class_infos class_type f x
 
-and class_type_declaration f x = f.class_type_declaration @@ class_infos class_type f x
+and class_type_declaration f x =
+  f.class_type_declaration @@ class_infos class_type f x
 
 and attribute f x = f.attribute @@ id__payload f x
 
@@ -106,16 +107,32 @@ and id__payload f (s, p) =
 and attributes f l = list attribute f l
 
 and module_binding f x =
-  f.module_binding { x with pmb_expr = module_expr f x.pmb_expr; pmb_attributes = attributes f x.pmb_attributes }
+  f.module_binding
+    {
+      x with
+      pmb_expr = module_expr f x.pmb_expr;
+      pmb_attributes = attributes f x.pmb_attributes;
+    }
 
 and module_type_declaration f x =
   f.module_type_declaration
-    { x with pmtd_type = opt module_type f x.pmtd_type; pmtd_attributes = attributes f x.pmtd_attributes }
+    {
+      x with
+      pmtd_type = opt module_type f x.pmtd_type;
+      pmtd_attributes = attributes f x.pmtd_attributes;
+    }
 
 and module_declaration f x =
-  f.module_declaration { x with pmd_type = module_type f x.pmd_type; pmd_attributes = attributes f x.pmd_attributes }
+  f.module_declaration
+    {
+      x with
+      pmd_type = module_type f x.pmd_type;
+      pmd_attributes = attributes f x.pmd_attributes;
+    }
 
-and open_description f x = f.open_description { x with popen_attributes = attributes f x.popen_attributes }
+and open_description f x =
+  f.open_description
+    { x with popen_attributes = attributes f x.popen_attributes }
 
 and type_extension f x =
   f.type_extension
@@ -128,7 +145,12 @@ and type_extension f x =
     }
 
 and value_description f x =
-  f.value_description { x with pval_type = core_type f x.pval_type; pval_attributes = attributes f x.pval_attributes }
+  f.value_description
+    {
+      x with
+      pval_type = core_type f x.pval_type;
+      pval_attributes = attributes f x.pval_attributes;
+    }
 
 and class_declaration f x = class_infos class_expr f x
 
@@ -175,24 +197,39 @@ and expression f x =
       pexp_attributes = attributes f x.pexp_attributes;
       pexp_desc =
         (match x.pexp_desc with
-        | Pexp_apply (e, l) -> Pexp_apply (expression f e, list (t2 id expression) f l)
+        | Pexp_apply (e, l) ->
+            Pexp_apply (expression f e, list (t2 id expression) f l)
         | Pexp_array l -> Pexp_array (list expression f l)
         | Pexp_assert e -> Pexp_assert (expression f e)
-        | Pexp_coerce (e, t1, t2) -> Pexp_coerce (expression f e, opt core_type f t1, core_type f t2)
+        | Pexp_coerce (e, t1, t2) ->
+            Pexp_coerce (expression f e, opt core_type f t1, core_type f t2)
         | Pexp_constant x -> Pexp_constant x
-        | Pexp_constraint (e, t) -> Pexp_constraint (expression f e, core_type f t)
+        | Pexp_constraint (e, t) ->
+            Pexp_constraint (expression f e, core_type f t)
         | Pexp_construct (lid, e) -> Pexp_construct (lid, opt expression f e)
         | Pexp_extension e -> Pexp_extension (extension f e)
         | Pexp_field (e, lid) -> Pexp_field (expression f e, lid)
-        | Pexp_for (p, e1, e2, fl, e3) -> Pexp_for (pattern f p, expression f e1, expression f e2, fl, expression f e3)
-        | Pexp_fun (l, e1, p, e2) -> Pexp_fun (l, opt expression f e1, pattern f p, expression f e2)
+        | Pexp_for (p, e1, e2, fl, e3) ->
+            Pexp_for
+              ( pattern f p,
+                expression f e1,
+                expression f e2,
+                fl,
+                expression f e3 )
+        | Pexp_fun (l, e1, p, e2) ->
+            Pexp_fun (l, opt expression f e1, pattern f p, expression f e2)
         | Pexp_function l -> Pexp_function (list case f l)
         | Pexp_ident lid -> Pexp_ident lid
-        | Pexp_ifthenelse (e1, e2, e3) -> Pexp_ifthenelse (expression f e1, expression f e2, opt expression f e3)
+        | Pexp_ifthenelse (e1, e2, e3) ->
+            Pexp_ifthenelse
+              (expression f e1, expression f e2, opt expression f e3)
         | Pexp_lazy e -> Pexp_lazy (expression f e)
-        | Pexp_let (fl, vb, e) -> Pexp_let (fl, list value_binding f vb, expression f e)
-        | Pexp_letexception (ec, e) -> Pexp_letexception (extension_constructor f ec, expression f e)
-        | Pexp_letmodule (s, m, e) -> Pexp_letmodule (s, module_expr f m, expression f e)
+        | Pexp_let (fl, vb, e) ->
+            Pexp_let (fl, list value_binding f vb, expression f e)
+        | Pexp_letexception (ec, e) ->
+            Pexp_letexception (extension_constructor f ec, expression f e)
+        | Pexp_letmodule (s, m, e) ->
+            Pexp_letmodule (s, module_expr f m, expression f e)
         | Pexp_match (e, l) -> Pexp_match (expression f e, list case f l)
         | Pexp_new lid -> Pexp_new lid
         | Pexp_newtype (s, e) -> Pexp_newtype (s, expression f e)
@@ -201,10 +238,13 @@ and expression f x =
         | Pexp_override l -> Pexp_override (list (t2 id expression) f l)
         | Pexp_pack m -> Pexp_pack (module_expr f m)
         | Pexp_poly (e, l) -> Pexp_poly (expression f e, opt core_type f l)
-        | Pexp_record (l, e) -> Pexp_record (list (t2 id expression) f l, opt expression f e)
+        | Pexp_record (l, e) ->
+            Pexp_record (list (t2 id expression) f l, opt expression f e)
         | Pexp_send (e, s) -> Pexp_send (expression f e, s)
-        | Pexp_sequence (e1, e2) -> Pexp_sequence (expression f e1, expression f e2)
-        | Pexp_setfield (e1, lid, e2) -> Pexp_setfield (expression f e1, lid, expression f e2)
+        | Pexp_sequence (e1, e2) ->
+            Pexp_sequence (expression f e1, expression f e2)
+        | Pexp_setfield (e1, lid, e2) ->
+            Pexp_setfield (expression f e1, lid, expression f e2)
         | Pexp_setinstvar (s, e) -> Pexp_setinstvar (s, expression f e)
         | Pexp_try (e, l) -> Pexp_try (expression f e, list case f l)
         | Pexp_tuple e -> Pexp_tuple (list expression f e)
@@ -222,7 +262,8 @@ and core_type f x =
         (match x.ptyp_desc with
         | Ptyp_any -> Ptyp_any
         | Ptyp_alias (c, s) -> Ptyp_alias (core_type f c, s)
-        | Ptyp_arrow (l, t1, t2) -> Ptyp_arrow (l, core_type f t1, core_type f t2)
+        | Ptyp_arrow (l, t1, t2) ->
+            Ptyp_arrow (l, core_type f t1, core_type f t2)
         | Ptyp_class (lid, l) -> Ptyp_class (lid, list core_type f l)
         | Ptyp_constr (lid, l) -> Ptyp_constr (lid, list core_type f l)
         | Ptyp_extension x -> Ptyp_extension (extension f x)
@@ -245,7 +286,11 @@ and row_field f = function
   | Rinherit x -> Rinherit (core_type f x)
 
 and class_stucture f x =
-  f.class_structure { pcstr_self = pattern f x.pcstr_self; pcstr_fields = list class_field f x.pcstr_fields }
+  f.class_structure
+    {
+      pcstr_self = pattern f x.pcstr_self;
+      pcstr_fields = list class_field f x.pcstr_fields;
+    }
 
 and module_expr f x =
   f.module_expr
@@ -255,9 +300,11 @@ and module_expr f x =
       pmod_desc =
         (match x.pmod_desc with
         | Pmod_apply (m1, m2) -> Pmod_apply (module_expr f m1, module_expr f m2)
-        | Pmod_constraint (m, t) -> Pmod_constraint (module_expr f m, module_type f t)
+        | Pmod_constraint (m, t) ->
+            Pmod_constraint (module_expr f m, module_type f t)
         | Pmod_extension x -> Pmod_extension (extension f x)
-        | Pmod_functor (s, t, m) -> Pmod_functor (s, opt module_type f t, module_expr f m)
+        | Pmod_functor (s, t, m) ->
+            Pmod_functor (s, opt module_type f t, module_expr f m)
         | Pmod_ident x -> Pmod_ident x
         | Pmod_structure x -> Pmod_structure (structure f x)
         | Pmod_unpack x -> Pmod_unpack (expression f x));
@@ -272,11 +319,13 @@ and module_type f x =
         (match x.pmty_desc with
         | Pmty_alias x -> Pmty_alias x
         | Pmty_extension x -> Pmty_extension (extension f x)
-        | Pmty_functor (s, o, x) -> Pmty_functor (s, opt module_type f o, module_type f x)
+        | Pmty_functor (s, o, x) ->
+            Pmty_functor (s, opt module_type f o, module_type f x)
         | Pmty_ident x -> Pmty_ident x
         | Pmty_signature x -> Pmty_signature (signature f x)
         | Pmty_typeof x -> Pmty_typeof (module_expr f x)
-        | Pmty_with (x, l) -> Pmty_with (module_type f x, list with_constraint f l));
+        | Pmty_with (x, l) ->
+            Pmty_with (module_type f x, list with_constraint f l));
     }
 
 and with_constraint f = function
@@ -310,10 +359,17 @@ and constructor_declaration f x =
       pcd_attributes = attributes f x.pcd_attributes;
     }
 
-and class_structure f x = { pcstr_self = pattern f x.pcstr_self; pcstr_fields = list class_field f x.pcstr_fields }
+and class_structure f x =
+  {
+    pcstr_self = pattern f x.pcstr_self;
+    pcstr_fields = list class_field f x.pcstr_fields;
+  }
 
 and class_signature f x =
-  { pcsig_self = core_type f x.pcsig_self; pcsig_fields = list class_type_field f x.pcsig_fields }
+  {
+    pcsig_self = core_type f x.pcsig_self;
+    pcsig_fields = list class_type_field f x.pcsig_fields;
+  }
 
 and class_type f x =
   f.class_type
@@ -322,7 +378,8 @@ and class_type f x =
       pcty_attributes = attributes f x.pcty_attributes;
       pcty_desc =
         (match x.pcty_desc with
-        | Pcty_arrow (l, t1, t2) -> Pcty_arrow (l, core_type f t1, class_type f t2)
+        | Pcty_arrow (l, t1, t2) ->
+            Pcty_arrow (l, core_type f t1, class_type f t2)
         | Pcty_constr (lid, l) -> Pcty_constr (lid, list core_type f l)
         | Pcty_extension x -> Pcty_extension (extension f x)
         | Pcty_open (fl, lid, t) -> Pcty_open (fl, lid, class_type f t)
@@ -337,7 +394,8 @@ and class_type_field f x =
       pctf_desc =
         (match x.pctf_desc with
         | Pctf_attribute x -> Pctf_attribute (attribute f x)
-        | Pctf_constraint (t1, t2) -> Pctf_constraint (core_type f t1, core_type f t2)
+        | Pctf_constraint (t1, t2) ->
+            Pctf_constraint (core_type f t1, core_type f t2)
         | Pctf_extension x -> Pctf_extension (extension f x)
         | Pctf_inherit x -> Pctf_inherit (class_type f x)
         | Pctf_method (s, f1, f2, t) -> Pctf_method (s, f1, f2, core_type f t)
@@ -351,12 +409,16 @@ and class_expr f x =
       pcl_attributes = attributes f x.pcl_attributes;
       pcl_desc =
         (match x.pcl_desc with
-        | Pcl_apply (x, l) -> Pcl_apply (class_expr f x, list (t2 id expression) f l)
+        | Pcl_apply (x, l) ->
+            Pcl_apply (class_expr f x, list (t2 id expression) f l)
         | Pcl_constr (lid, l) -> Pcl_constr (lid, list core_type f l)
-        | Pcl_constraint (x, t) -> Pcl_constraint (class_expr f x, class_type f t)
+        | Pcl_constraint (x, t) ->
+            Pcl_constraint (class_expr f x, class_type f t)
         | Pcl_extension x -> Pcl_extension (extension f x)
-        | Pcl_fun (l, e, p, x) -> Pcl_fun (l, opt expression f e, pattern f p, class_expr f x)
-        | Pcl_let (fl, l, x) -> Pcl_let (fl, list value_binding f l, class_expr f x)
+        | Pcl_fun (l, e, p, x) ->
+            Pcl_fun (l, opt expression f e, pattern f p, class_expr f x)
+        | Pcl_let (fl, l, x) ->
+            Pcl_let (fl, list value_binding f l, class_expr f x)
         | Pcl_open (fl, lid, x) -> Pcl_open (fl, lid, class_expr f x)
         | Pcl_structure x -> Pcl_structure (class_structure f x));
     }
@@ -369,7 +431,8 @@ and class_field f x =
       pcf_desc =
         (match x.pcf_desc with
         | Pcf_attribute x -> Pcf_attribute (attribute f x)
-        | Pcf_constraint (t1, t2) -> Pcf_constraint (core_type f t1, core_type f t2)
+        | Pcf_constraint (t1, t2) ->
+            Pcf_constraint (core_type f t1, core_type f t2)
         | Pcf_extension x -> Pcf_extension (extension f x)
         | Pcf_inherit (fl, c, s) -> Pcf_inherit (fl, class_expr f c, s)
         | Pcf_initializer x -> Pcf_initializer (expression f x)
@@ -392,10 +455,15 @@ and value_binding f x =
 
 and extension_constructor f x =
   f.extension_constructor
-    { x with pext_kind = extension_constructor_kind f x.pext_kind; pext_attributes = attributes f x.pext_attributes }
+    {
+      x with
+      pext_kind = extension_constructor_kind f x.pext_kind;
+      pext_attributes = attributes f x.pext_attributes;
+    }
 
 and extension_constructor_kind f = function
-  | Pext_decl (ca, ct) -> Pext_decl (constructor_arguments f ca, opt core_type f ct)
+  | Pext_decl (ca, ct) ->
+      Pext_decl (constructor_arguments f ca, opt core_type f ct)
   | Pext_rebind lid -> Pext_rebind lid
 
 and constructor_arguments f = function
@@ -403,24 +471,52 @@ and constructor_arguments f = function
   | Pcstr_record l -> Pcstr_record (list label_declaration f l)
 
 and label_declaration f x =
-  f.label_declaration { x with pld_type = core_type f x.pld_type; pld_attributes = attributes f x.pld_attributes }
+  f.label_declaration
+    {
+      x with
+      pld_type = core_type f x.pld_type;
+      pld_attributes = attributes f x.pld_attributes;
+    }
 
-and case f x = { pc_lhs = pattern f x.pc_lhs; pc_guard = opt expression f x.pc_guard; pc_rhs = expression f x.pc_rhs }
+and case f x =
+  {
+    pc_lhs = pattern f x.pc_lhs;
+    pc_guard = opt expression f x.pc_guard;
+    pc_rhs = expression f x.pc_rhs;
+  }
 
-and include_description f x = f.include_description @@ include_infos module_type f x
+and include_description f x =
+  f.include_description @@ include_infos module_type f x
 
-and include_declaration f x = f.include_declaration @@ include_infos module_expr f x
+and include_declaration f x =
+  f.include_declaration @@ include_infos module_expr f x
 
-and include_infos : 'a. (t -> 'a -> 'a) -> t -> 'a include_infos -> 'a include_infos =
- fun e f x -> { x with pincl_mod = e f x.pincl_mod; pincl_attributes = attributes f x.pincl_attributes }
+and include_infos :
+      'a. (t -> 'a -> 'a) -> t -> 'a include_infos -> 'a include_infos =
+ fun e f x ->
+  {
+    x with
+    pincl_mod = e f x.pincl_mod;
+    pincl_attributes = attributes f x.pincl_attributes;
+  }
 
-and opt : 'a. (t -> 'a -> 'a) -> t -> 'a option -> 'a option = fun f m x -> Option.map ~f:(f m) x
+and opt : 'a. (t -> 'a -> 'a) -> t -> 'a option -> 'a option =
+ fun f m x -> Option.map ~f:(f m) x
 
-and list : 'a. (t -> 'a -> 'a) -> t -> 'a list -> 'a list = fun f m x -> List.map ~f:(f m) x
+and list : 'a. (t -> 'a -> 'a) -> t -> 'a list -> 'a list =
+ fun f m x -> List.map ~f:(f m) x
 
-and t2 : 'a 'b. (t -> 'a -> 'a) -> (t -> 'b -> 'b) -> t -> 'a * 'b -> 'a * 'b = fun f1 f2 m (a, b) -> (f1 m a, f2 m b)
+and t2 : 'a 'b. (t -> 'a -> 'a) -> (t -> 'b -> 'b) -> t -> 'a * 'b -> 'a * 'b =
+ fun f1 f2 m (a, b) -> (f1 m a, f2 m b)
 
-and t3 : 'a 'b 'c. (t -> 'a -> 'a) -> (t -> 'b -> 'b) -> (t -> 'c -> 'c) -> t -> 'a * 'b * 'c -> 'a * 'b * 'c =
+and t3 :
+      'a 'b 'c.
+      (t -> 'a -> 'a) ->
+      (t -> 'b -> 'b) ->
+      (t -> 'c -> 'c) ->
+      t ->
+      'a * 'b * 'c ->
+      'a * 'b * 'c =
  fun f1 f2 f3 m (a, b, c) -> (f1 m a, f2 m b, f3 m c)
 
 and id : 'a. t -> 'a -> 'a = fun _ x -> x

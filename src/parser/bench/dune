@@ -2,18 +2,3 @@
  (name main)
  (modules main)
  (libraries run_common core_kernel core_bench))
-
-(executable
- (name exec_res)
- (modules exec_res)
- (libraries run_common))
-
-(executable
- (name exec_pc)
- (modules exec_pc)
- (libraries run_common))
-
-(executable
- (name exec_none)
- (modules exec_none)
- (libraries run_common))
