@@ -193,9 +193,12 @@ module Make (BasicBase : Sigs.BASIC_BASE) : Sigs.PARSER = struct
         + attrs_
         + opt (loc_of @@ export << ng)
         - type' - ng
-        + (rec' >> ng >>$ Recursive
-          <|> (nonrec' >> ng >>$ Nonrecursive)
-          <|> return Nonrecursive)
+        + choice
+            [
+              rec' >> ng >>$ Recursive;
+              nonrec' >> ng >>$ Nonrecursive;
+              return Nonrecursive;
+            ]
         + type_declaration
       in
 

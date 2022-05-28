@@ -41,9 +41,6 @@ open Cmdliner
 
 let cmd =
   let open Args in
-  let doc = "" in
-  let man = [ `S Manpage.s_description ] in
-  ( Term.(const run $ input $ output $ ignore_loc),
-    Term.info "rm" ~version:"%%VERSION%%" ~doc ~man )
+  (Term.(const run $ input $ output $ ignore_loc), Term.info "print_expected")
 
 let () = Term.exit @@ Term.eval cmd

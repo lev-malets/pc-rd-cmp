@@ -61,24 +61,22 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
         (ng >> dot >> ng >> u_ident)
 
   let l_longident =
-    named "l_longident"
-    & choice
-        [
-          mapping (fun a b -> Longident.Ldot (a, b))
-          + u_longident - ng - dot - ng + l_ident;
-          (l_ident >>| fun s -> Longident.Lident s);
-        ]
+    choice ~name:"l_longident"
+      [
+        mapping (fun a b -> Longident.Ldot (a, b))
+        + u_longident - ng - dot - ng + l_ident;
+        (l_ident >>| fun s -> Longident.Lident s);
+      ]
 
   let longident =
-    named "longident"
-    & choice
-        [
-          mapping (fun a b ->
-              match b with None -> a | Some b -> Longident.Ldot (a, b))
-          + u_longident
-          + opt (ng >> dot >> ng >> l_ident);
-          (l_ident >>| fun s -> Longident.Lident s);
-        ]
+    choice ~name:"longident"
+      [
+        mapping (fun a b ->
+            match b with None -> a | Some b -> Longident.Ldot (a, b))
+        + u_longident
+        + opt (ng >> dot >> ng >> l_ident);
+        (l_ident >>| fun s -> Longident.Lident s);
+      ]
 
   let attribute_id =
     fold_left_0_n
@@ -94,7 +92,9 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
     >>| Buffer.contents
 
   let variant_tag =
-    hash >> ng >> choice [ ident; string_raw; (integer >>| fun (x, _) -> x) ]
+    hash >> ng
+    >> choice ~name:"variant_tag:tag"
+         [ ident; string_raw; (integer >>| fun (x, _) -> x) ]
 
   let parens p = l_paren >> ng >> p << ng << r_paren
 

@@ -27,13 +27,12 @@ struct
       let pattern = getter.get @@ fun (module M : THIS) -> M.pattern
 
       let pattern_constrainted =
-        named "pattern:constraint"
-        & choice
-            [
-              with_loc
-              & (hlp2 Pat.constraint_ + pattern - ng - colon - ng + core_type);
-              pattern;
-            ]
+        let constrainted =
+          with_loc
+          & (hlp2 Pat.constraint_ + pattern - ng - colon - ng + core_type)
+        in
+
+        named "pattern:constraint" & choice [ constrainted; pattern ]
 
       let pattern_poly_constrainted =
         named "pattern:constraint:poly"
@@ -84,7 +83,7 @@ struct
                          Pat.var ~loc:str.loc str ))
               + loc l_longident
               + opt (ng >> colon >> ng >> pattern_constrainted))
-          + choice
+          + choice ~name:"pattern:record:closed"
               [
                 opt sep >> ng >> r_brace >>$ Closed;
                 sep >> _' >> opt sep >> ng >> r_brace >>$ Open;
@@ -95,26 +94,30 @@ struct
           ~get_loc:(fun x -> x.ppat_loc)
 
       let list =
-        named "pattern:list"
-        & choice
-            [
-              with_loc & (mapping (list_helper [] None) - list - ng - r_brace);
-              list >> ng >> ellipsis >> ng >> pattern_constrainted << opt sep
-              << ng << r_brace;
-              with_loc
-              & mapping list_helper - list - ng
-                + seq ~n:1 pattern_constrainted ~sep
-                + choice
-                    [
-                      sep >> ng >> ellipsis >> ng >> pattern_constrainted
-                      >>| Base.Option.some;
-                      return None;
-                    ]
-                - opt sep - ng - r_brace;
-            ]
+        let empty_list =
+          with_loc & (mapping (list_helper [] None) - list - ng - r_brace)
+        in
+        let flatten =
+          list >> ng >> ellipsis >> ng >> pattern_constrainted << opt sep << ng
+          << r_brace
+        in
+        let ordinary =
+          with_loc
+          & mapping list_helper - list - ng
+            + seq ~n:1 pattern_constrainted ~sep
+            + choice
+                [
+                  sep >> ng >> ellipsis >> ng >> pattern_constrainted
+                  >>| Base.Option.some;
+                  return None;
+                ]
+            - opt sep - ng - r_brace
+        in
+
+        choice ~name:"pattern:list" [ empty_list; flatten; ordinary ]
 
       let constructor_arguments =
-        choice
+        choice ~name:"pattern:constructor_arguments"
           [
             tuple;
             l_paren >> ng >> pattern_constrainted << opt sep << ng << r_paren;
@@ -137,22 +140,21 @@ struct
         with_loc & (hlp Pat.type_ - hash - ng - ellipsis - ng + loc l_longident)
 
       let unpack =
-        named "pattern:unpack"
-        & choice
-            [
-              with_loc
-              & mapping (fun m t loc ->
-                    let m = Pat.unpack m in
-                    Pat.constraint_ ~loc m t)
-                - module' - ng - l_paren - ng + loc u_ident - ng - colon - ng
-                + core_type_package - ng - r_paren;
-              with_loc
-              & hlp Pat.unpack - module' - ng - l_paren - ng + loc u_ident - ng
-                - r_paren;
-            ]
+        choice ~name:"pattern:unpack"
+          [
+            with_loc
+            & mapping (fun m t loc ->
+                  let m = Pat.unpack m in
+                  Pat.constraint_ ~loc m t)
+              - module' - ng - l_paren - ng + loc u_ident - ng - colon - ng
+              + core_type_package - ng - r_paren;
+            with_loc
+            & hlp Pat.unpack - module' - ng - l_paren - ng + loc u_ident - ng
+              - r_paren;
+          ]
 
       let signed_number =
-        choice
+        choice ~name:"pattern:signed_nubmer"
           [
             mapping (function [@warning "-8"]
               | Pconst_integer (str, suf) -> Pconst_integer ("-" ^ str, suf)
@@ -162,7 +164,9 @@ struct
           ]
 
       let number_range =
-        let number = signed_number <|> number in
+        let number =
+          choice ~name:"pattern:number_range:nubmer" [ signed_number; number ]
+        in
 
         with_loc & (hlp2 Pat.interval + number - ng - dot_dot - ng + number)
 
@@ -202,7 +206,7 @@ struct
             & (mapping pat_loc + pat_attrs pattern_constrainted);
             array;
             record;
-            with_loc & (hlp Pat.constant + (signed_number <|> constant));
+            with_loc & (hlp Pat.constant + choice [ signed_number; constant ]);
             js_string;
             list;
             construct;

@@ -205,7 +205,7 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
       let float = int >> dot >> skip_digits in
 
       match exp with
-      | None -> float >>$ true <|> (int >>$ false)
+      | None -> choice [ float >>$ true; int >>$ false ]
       | Some exp ->
           let exp = skip exp >> opt exp_sign >> skip digit >> skip_digits in
           choice
@@ -246,7 +246,7 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
                value_part_8;
              ]
       in
-      nondec <|> value_part_10
+      choice [ nondec; value_part_10 ]
 
     let suffix_part =
       opt @@ satisfy (function 'g' .. 'z' | 'G' .. 'Z' -> true | _ -> false)
@@ -268,9 +268,12 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
       satisfy (function '0' .. '9' -> true | _ -> false) >>| code 0 '0'
 
     let hexadecimal_code =
-      decimal_code
-      <|> (satisfy (function 'a' .. 'f' -> true | _ -> false) >>| code 10 'a')
-      <|> (satisfy (function 'A' .. 'F' -> true | _ -> false) >>| code 10 'A')
+      choice
+        [
+          decimal_code;
+          satisfy (function 'a' .. 'f' -> true | _ -> false) >>| code 10 'a';
+          satisfy (function 'A' .. 'F' -> true | _ -> false) >>| code 10 'A';
+        ]
 
     let escaped =
       let hex_cc =
@@ -310,10 +313,13 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
     let p =
       named "const:char"
         (s "\'"
-        >> (s "\\" >> escaped
-           <|> satisfy (function
+        >> choice
+             [
+               s "\\" >> escaped;
+               satisfy (function
                  | '\\' | '\'' | '\n' | '\t' | '\b' | '\r' -> false
-                 | _ -> true))
+                 | _ -> true);
+             ]
         << s "\'")
 
     let character = p >>| Const.char
@@ -351,10 +357,13 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
                [
                  s q >>$ [];
                  cons
-                 + (new_line
-                   <|> (s ("\\" ^ q) >>$ "\\" ^ q)
-                   <|> (s "\\\\" >>$ "\\\\")
-                   <|> (s "\\" >>$ "\\"))
+                 + choice
+                     [
+                       new_line;
+                       s ("\\" ^ q) >>$ "\\" ^ q;
+                       s "\\\\" >>$ "\\\\";
+                       s "\\" >>$ "\\";
+                     ]
                  + loop;
                ]
       in
@@ -379,7 +388,7 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
 
     let u_ident = named "u_ident" @@ c_ident upper
 
-    let ident = named "ident" & l_ident <|> u_ident
+    let ident = named "ident" & choice [ l_ident; u_ident ]
 
     let type_var = s "\'" >> ident
 
@@ -416,7 +425,8 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
       Res_comment.makeMultiLineComment ~loc txt
 
     let comment =
-      single_line_comment <|> multi_line_comment >>| fun x pos comments ->
+      choice [ single_line_comment; multi_line_comment ]
+      >>| fun x pos comments ->
       Pc_syntax.Basic.LogElement.Comment
         (Res_comment.setPrevTokEndPos x pos;
          x)

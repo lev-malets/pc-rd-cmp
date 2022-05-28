@@ -67,7 +67,7 @@ struct
                - l_paren - ng - r_paren
            in
 
-           let arg = genarg <|> modexpr_constrainted in
+           let arg = choice [ genarg; modexpr_constrainted ] in
 
            let args =
              fold_left_cont_0_n
@@ -85,7 +85,7 @@ struct
            in
 
            let args =
-             choice
+             choice ~name:"modexpr:apply:args"
                [
                  l_paren >> args << opt sep << ng << r_paren;
                  mapping (fun loc_end prev ->
@@ -99,54 +99,53 @@ struct
            mod_attrs & fold_left_cont_0_n atom args)
 
       let functor_ =
-        named "modexpr:functor"
-          (let tail =
-             choice
-               [
-                 mapping (fun mt me -> Mod.constraint_ ~loc:me.pmod_loc me mt)
-                 - colon - ng + modtype - ng - arrow - ng + modexpr;
-                 arrow >> ng >> modexpr;
-               ]
-           in
+        let tail =
+          choice ~name:"modexpr:functor:tail"
+            [
+              mapping (fun mt me -> Mod.constraint_ ~loc:me.pmod_loc me mt)
+              - colon - ng + modtype - ng - arrow - ng + modexpr;
+              arrow >> ng >> modexpr;
+            ]
+        in
 
-           let arg_loop =
-             fix @@ fun arg_loop ->
-             let tail =
-               choice
-                 [
-                   opt comma >> ng >> r_paren >> ng >> tail;
-                   comma >> ng >> arg_loop;
-                 ]
-             in
+        let arg_loop =
+          fix @@ fun arg_loop ->
+          let tail =
+            choice ~name:"modexpr:functor:arg_loop:tail"
+              [
+                opt comma >> ng >> r_paren >> ng >> tail;
+                comma >> ng >> arg_loop;
+              ]
+          in
 
-             choice
-               [
-                 mod_attrs & with_loc
-                 & hlp3 Mod.functor_ + loc u_ident
-                   + opt (ng >> colon >> ng >> modtype)
-                   - ng + tail;
-                 mod_attrs & with_loc
-                 & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
-                   + loc (l_paren >> ng >> r_paren >>$ "*")
-                   - ng + tail;
-               ]
-           in
+          choice ~name:"modexpr:functor:arg_loop"
+            [
+              mod_attrs & with_loc
+              & hlp3 Mod.functor_ + loc u_ident
+                + opt (ng >> colon >> ng >> modtype)
+                - ng + tail;
+              mod_attrs & with_loc
+              & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
+                + loc (l_paren >> ng >> r_paren >>$ "*")
+                - ng + tail;
+            ]
+        in
 
-           choice
-             [
-               mod_attrs & with_loc
-               & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
-                 + loc (l_paren >> ng >> r_paren >>$ "*")
-                 - ng + tail;
-               mod_attrs & l_paren >> ng >> arg_loop;
-             ])
+        choice ~name:"modexpr:functor"
+          [
+            mod_attrs & with_loc
+            & mapping (fun a b loc -> Mod.functor_ ~loc a None b)
+              + loc (l_paren >> ng >> r_paren >>$ "*")
+              - ng + tail;
+            mod_attrs & l_paren >> ng >> arg_loop;
+          ]
 
       let structure =
         named "modexpr:structure"
           (with_loc
           & (hlp Mod.structure - l_brace - ng + structure - ng - r_brace))
 
-      let modexpr = named "modexpr" (functor_ <|> apply <|> structure)
+      let modexpr = choice ~name:"modexpr" [ functor_; apply; structure ]
     end)
 
   let modexpr =

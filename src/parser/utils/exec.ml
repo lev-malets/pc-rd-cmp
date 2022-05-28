@@ -44,9 +44,7 @@ let run config input output parser ignore_loc last_stage =
 
 let cmd =
   let open Args in
-  let doc = "" in
-  let man = [ `S Manpage.s_description ] in
   ( Term.(const run $ config $ input $ output $ parser $ ignore_loc $ last_stage),
-    Term.info "exec" ~doc ~man )
+    Term.info "exec" )
 
 let () = Term.exit @@ Term.eval cmd

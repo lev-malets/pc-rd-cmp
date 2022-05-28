@@ -695,7 +695,9 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
     in
     { p; info = Empty; typ = Value { v = (); p }; id = Id.get () }
 
-  let new_line = string "\n" << advance_line <|> (string "\r\n" << advance_line)
+  let new_line =
+    choice ~name:"angstrom:newline"
+      [ string "\n" << advance_line; string "\r\n" << advance_line ]
 
   let whitespace =
     {

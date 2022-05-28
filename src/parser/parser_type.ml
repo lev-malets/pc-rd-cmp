@@ -216,7 +216,8 @@ module Make (Basic : BASIC) (Core : CORE with module Comb = Basic.Comb) = struct
               named "typexpr:arrow:onearg" (with_args aliased_atom arrow_tail);
             ]
 
-      let core_type_fun = named "typexpr:arrow" (arrow <|> core_type_atom)
+      let core_type_fun =
+        named "typexpr:arrow" @@ choice [ arrow; core_type_atom ]
 
       let core_type = named "typexpr" & alias core_type_fun
 
@@ -274,7 +275,7 @@ module Make (Basic : BASIC) (Core : CORE with module Comb = Basic.Comb) = struct
                      Type.constructor ~loc ~attrs ?info:None ?args:(Some args)
                        ?res name)
                  + attrs_ + loc u_ident
-                 + (ng >> constr_args <|> return @@ Pcstr_tuple [])
+                 + choice [ ng >> constr_args; return @@ Pcstr_tuple [] ]
                  + opt (ng >> colon >> ng >> core_type_atom)
              in
 
@@ -286,7 +287,7 @@ module Make (Basic : BASIC) (Core : CORE with module Comb = Basic.Comb) = struct
 
         let open' = dot_dot >>$ Ptype_open in
 
-        named "type_kind" (variant <|> record <|> open')
+        named "type_kind" @@ choice [ variant; record; open' ]
 
       let type_decl_params =
         let variance =
@@ -298,7 +299,9 @@ module Make (Basic : BASIC) (Core : CORE with module Comb = Basic.Comb) = struct
             ]
         in
 
-        let param = mapping (fun v t -> (t, v)) + variance + (any <|> var) in
+        let param =
+          mapping (fun v t -> (t, v)) + variance + choice [ any; var ]
+        in
 
         chevrons & seq ~n:1 param ~sep ~trail:true
 

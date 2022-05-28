@@ -39,8 +39,6 @@ module type COMB_COMMON = sig
 
   val ( << ) : 'a t -> _ t -> 'a t
 
-  val ( <|> ) : 'a t -> 'a t -> 'a t
-
   val ( <*> ) : ('a -> 'b) t -> 'a t -> 'b t
 
   val ( >>$ ) : _ t -> 'a -> 'a t
@@ -105,6 +103,8 @@ end
 
 module type COMB_BASE = sig
   include COMB_COMMON
+
+  val ( <|> ) : 'a t -> 'a t -> 'a t
 end
 
 module type COMB = sig

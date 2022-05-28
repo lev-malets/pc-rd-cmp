@@ -251,7 +251,7 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
 
     let u_ident = named "u_ident" & tkn_payload UIdent
 
-    let ident = named "ident" & l_ident <|> u_ident
+    let ident = named "ident" & choice [ l_ident; u_ident ]
 
     let type_var = named "tkn:string:type_var" & tkn_payload TypeVar
 
@@ -271,7 +271,7 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
             (Res_comment.setPrevTokEndPos x pt_pos;
              x))
       + pos_end
-      + (single_line_comment <|> multi_line_comment)
+      + choice [ single_line_comment; multi_line_comment ]
 
     let ng =
       named "pt:nongrammar"

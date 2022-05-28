@@ -159,7 +159,9 @@ module Make
         let p =
           if Utils.check_string Conf.peek name then peek_first ps
           else
-            let check x = if not_empty x then x else failwith "check usage" in
+            let check x =
+              if not_empty x then x else failwith "check usage: empty"
+            in
             let rec loop = function
               | [] -> failwith "check usage"
               | [ x ] -> check x
