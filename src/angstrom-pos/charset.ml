@@ -175,3 +175,7 @@ let iter_code f t =
       loop1 (shift_right_logical w 1) (i + 1))
   in
   loop1 t.w1 0
+
+let size t =
+  Base.Int64.popcount t.w1 + Base.Int64.popcount t.w2 + Base.Int64.popcount t.w3
+  + Base.Int64.popcount t.w4

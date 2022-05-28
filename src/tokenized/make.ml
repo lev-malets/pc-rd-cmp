@@ -476,6 +476,12 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
     let not_empty p =
       match p.info with Consume { empty = false; _ } -> true | _ -> false
 
+    let first_size p =
+      match p.info with
+      | Unknown -> None
+      | Empty -> None
+      | Consume { first; _ } -> Some (Tset.size first)
+
     let peek_first expected =
       let arr = Array.create ~len:256 Simple.fail in
       let first = ref Tset.empty in

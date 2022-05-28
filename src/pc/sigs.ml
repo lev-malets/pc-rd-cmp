@@ -103,6 +103,8 @@ module type COMB_BASE = sig
   include COMB_COMMON
 
   val ( <|> ) : 'a t -> 'a t -> 'a t
+
+  val first_size : 'a t -> int option
 end
 
 module type COMB = sig

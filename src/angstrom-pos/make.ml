@@ -491,6 +491,12 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
     let not_empty p =
       match p.info with Consume { empty = false; _ } -> true | _ -> false
 
+    let first_size p =
+      match p.info with
+      | Unknown -> None
+      | Empty -> None
+      | Consume { first; _ } -> Some (Charset.size first)
+
     let peek_first expected =
       let arr = Array.create ~len:256 Simple.fail in
       let first = ref Charset.empty in

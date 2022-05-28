@@ -170,14 +170,14 @@ end
 
 module Make
     (Basic : COMB_BASE)
-    (Conf : CONF with type Log.elem = Basic.log_elem) :
+    (Config : CONF with type Log.elem = Basic.log_elem) :
   COMB
     with type 'a t = 'a Basic.t
      and type 'a Simple.t = 'a Basic.Simple.t
      and type log_elem = Basic.log_elem = struct
   include Basic
 
-  let config = Conf.config
+  let config = Config.config
 
   let ( + ) = ( <*> )
 
@@ -268,27 +268,65 @@ module Make
   let name_of p = name_of_id @@ id p
 
   let choice ?name ps =
-    match name with
-    | None ->
-        let rec loop = function
-          | [] -> failwith "check usage"
-          | [ x ] -> x
-          | x :: xs -> x <|> loop xs
-        in
-        loop ps
-    | Some name ->
-        let p =
-          if Utils.check_string__pair config.peek.filter name then peek_first ps
-          else
-            let check x =
-              if not_empty x then x else failwith "check usage: empty"
-            in
-            let rec loop = function
-              | [] -> failwith "check usage"
-              | [ x ] -> check x
-              | x :: xs -> check x <|> loop xs
-            in
-            loop ps
-        in
-        named name p
+    let open Base in
+    let auto_peek_border =
+      let open Conf.Peek.Auto in
+      match config.peek.auto with
+      | Disable -> None
+      | Enable { min_variants } -> Some min_variants
+    in
+
+    let rec loop = function
+      | [] -> failwith "check usage"
+      | [ x ] -> (x, if not_empty x then Some 1 else None)
+      | x :: xs -> (
+          let tail, variants = loop xs in
+          let tail_size = first_size tail in
+          let p = x <|> tail in
+          let p_size = first_size p in
+          match (tail_size, p_size, variants, not_empty x) with
+          | Some ts, Some ps, Some vs, true ->
+              if ps > ts then (p, Some (Int.succ vs)) else (p, Some vs)
+          | _ -> (p, None))
+    in
+    let alteration, variants = loop ps in
+
+    if Option.is_some name && Option.is_none variants then
+      failwith "choice: named empty";
+
+    let variant_cond =
+      let cond = Option.map2 ~f:( >= ) variants auto_peek_border in
+      Option.value ~default:false cond
+    in
+    let accept_cond =
+      name
+      |> Option.map ~f:(fun name ->
+             Utils.check_string config.peek.filter.accept name)
+      |> Option.value ~default:false
+    in
+    let decline_cond =
+      name
+      |> Option.map ~f:(fun name ->
+             Utils.check_string config.peek.filter.decline name)
+      |> Option.value ~default:false
+    in
+
+    if
+      Base.(
+        config.debug && accept_cond && (not decline_cond) && not variant_cond)
+    then
+      Caml.Printf.eprintf "choice: forced peek for %s\n"
+        (Option.value ~default:"__unnamed__" name);
+    if Base.(config.debug && decline_cond && variant_cond) then
+      Caml.Printf.eprintf "choice: forced alteration for %s\n"
+        (Option.value ~default:"__unnamed__" name);
+
+    let p =
+      if (accept_cond || variant_cond) && not decline_cond then peek_first ps
+      else alteration
+    in
+
+    let p = match name with Some name -> named name p | None -> p in
+
+    p
 end

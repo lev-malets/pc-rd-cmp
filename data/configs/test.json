@@ -21,21 +21,8 @@
         ]
     },
     "peek": {
-        "filter": {
-            "include": [
-                "expression:atom",
-                "expression:p5:op",
-                "modexpr:atom",
-                "modtype:atom",
-                "pattern:atom",
-                "typexpr:atom:noattrs",
-                "sig:elem",
-                "str:elem",
-                "pa:value_part:0",
-                "pa:char:escaped",
-                "pa:constant",
-                "pt:constant"
-            ]
+        "auto": {
+            "min-variants": 1
         }
     }
 }
