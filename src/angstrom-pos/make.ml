@@ -147,7 +147,7 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
 
     include Parser
 
-    type 'b getter = { get : 'a. ('b -> 'a t) -> 'a t }
+    type 'b getter = { get : 'a 'c. ?info:'c t -> ('b -> 'a t) -> 'a t }
 
     let print_info p =
       Caml.print_endline
@@ -295,30 +295,36 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       let open Lexing in
       { info.default_position with pos_lnum; pos_bol; pos_cnum }
 
-    let fix f =
-      let rec p = lazy (f r)
-      and r =
-        {
-          p = { run = (fun i -> (Lazy.force p).p.run i) };
-          info = Unknown;
-          typ = Parser;
-          id = Id.get ();
-        }
-      in
-      Lazy.force p
-
-    let fix_poly f =
+    let fix_gen f =
       let rec res = lazy (f getter)
       and getter =
         {
           get =
-            (fun get ->
-              {
-                p = { run = (fun i -> (get @@ Lazy.force res).p.run i) };
-                info = Unknown;
-                typ = Parser;
-                id = Id.get ();
-              });
+            (fun ?info get ->
+              match info with
+              | None ->
+                  {
+                    p = { run = (fun i -> (get @@ Lazy.force res).p.run i) };
+                    info = Unknown;
+                    typ = Parser;
+                    id = Id.get ();
+                  }
+              | Some info ->
+                  {
+                    p =
+                      (if Conf.debug then
+                       {
+                         run =
+                           (fun i ->
+                             let p = get @@ Lazy.force res in
+                             assert (p.info = info.info);
+                             p.p.run i);
+                       }
+                      else { run = (fun i -> (get @@ Lazy.force res).p.run i) });
+                    info = info.info;
+                    typ = Parser;
+                    id = Id.get ();
+                  });
         }
       in
       Lazy.force res

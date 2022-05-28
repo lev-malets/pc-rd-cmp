@@ -19,7 +19,7 @@ module Make (BasicBase : Sigs.BASIC_BASE) : Sigs.PARSER = struct
   }
 
   let parsers =
-    fix_poly @@ fun getter ->
+    fix_gen @@ fun getter ->
     let payload = getter.get @@ fun x -> x.payload in
 
     let id_payload_pair start =

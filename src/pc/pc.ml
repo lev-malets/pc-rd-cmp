@@ -19,33 +19,58 @@ module Utils = struct
 
   let empty_regexp = mk_regexp []
 
-  module MakeConf
-      (Log : CONF_LOG) (Params : sig
-        val filename : string option
+  module type MK_CONF = functor (Log : CONF_LOG) -> CONF with module Log = Log
 
-        val src : string
-      end) : CONF with module Log = Log = struct
-    open Yojson.Safe
-    open Util
-    module Log = Log
+  let mk_conf ?filename ~src : ((module MK_CONF), string) Result.t =
+    let open Yojson.Safe in
+    let open Util in
+    let open Result in
+    let json = from_string ?fname:filename src in
 
-    let json = from_string ?fname:Params.filename Params.src
+    let debug =
+      match member "debug" json with
+      | `Null -> Ok false
+      | `Bool x -> Ok x
+      | x ->
+          let buf = Buffer.create 16 in
+          let formatter = Caml.Format.formatter_of_buffer buf in
+          Yojson.Safe.pp formatter x;
+          Error
+            (Printf.sprintf "unexpected value for 'debug': %s"
+               (Buffer.contents buf))
+    in
 
-    let memoize =
-      match member "memoize" json with
-      | `Null -> empty_regexp
-      | x -> to_list x |> List.map ~f:to_string |> mk_regexp
+    let list_of_strings key obj =
+      match member key obj with
+      | `Null -> Ok empty_regexp
+      | `List x ->
+          x
+          |> List.map ~f:(function
+               | `String s -> Ok s
+               | _ -> Error "expected array of strings")
+          |> Result.all >>| mk_regexp
+      | _ -> Error "expected array of strings"
+    in
 
-    let trace =
-      match member "trace" json with
-      | `Null -> empty_regexp
-      | x -> to_list x |> List.map ~f:to_string |> mk_regexp
+    debug >>= fun debug ->
+    list_of_strings "memoize" json >>= fun memoize ->
+    list_of_strings "trace" json >>= fun trace ->
+    list_of_strings "peek" json >>= fun peek ->
+    Ok
+      (module functor
+                (Log : CONF_LOG)
+                ->
+                struct
+                  module Log = Log
 
-    let peek =
-      match member "peek" json with
-      | `Null -> empty_regexp
-      | x -> to_list x |> List.map ~f:to_string |> mk_regexp
-  end
+                  let debug = debug
+
+                  let memoize = memoize
+
+                  let trace = trace
+
+                  let peek = peek
+                end : MK_CONF)
 
   let check_string regexp str =
     Str.string_match regexp str 0 && Str.match_end () = String.length str
@@ -63,6 +88,8 @@ module Make
   let ( + ) = ( <*> )
 
   let ( - ) = ( << )
+
+  let fix ?info f = fix_gen (fun get -> f @@ get.get ?info (fun x -> x))
 
   let mapping = return
 

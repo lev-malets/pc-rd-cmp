@@ -2,33 +2,27 @@ open Core_kernel
 
 let read_file ~filename = In_channel.read_all filename
 
-let mk_conf file : (module Pc_syntax.Sigs.CONF) =
+let mk_conf file : ((module Pc_syntax.Sigs.CONF), string) Result.t =
   let module Log = struct
     type elem = Pc_syntax.Basic.LogElement.t
   end in
   match file with
   | None ->
-      (module Pc.Utils.MakeConf
-                (Log)
-                (struct
-                  let filename = None
-
-                  let src = "{}"
-                end))
+      Result.map
+        ~f:(fun (module F : Pc.Utils.MK_CONF) : (module Pc_syntax.Sigs.CONF) ->
+          (module F (Log)))
+      @@ Pc.Utils.mk_conf ?filename:None ~src:"{}"
   | Some filename ->
-      (module Pc.Utils.MakeConf
-                (Log)
-                (struct
-                  let src = read_file ~filename
-
-                  let filename = Some filename
-                end))
+      Result.map
+        ~f:(fun (module F : Pc.Utils.MK_CONF) : (module Pc_syntax.Sigs.CONF) ->
+          (module F (Log)))
+      @@ Pc.Utils.mk_conf ~filename ~src:(read_file ~filename)
 
 let mk_parse ?(tokenize = false) file : (module Pc_syntax.Sigs.PARSER) =
-  let (module Conf) = mk_conf file in
+  let (module Conf) = Result.ok_or_failwith @@ mk_conf file in
   if tokenize then
     let module Tpc = Tokenized.Make (Parser_tokenized.Lexer.Make ()) (Conf) in
-    (module Parser_tokenized.Make (Tpc))
+    (module Parser_tokenized.Make (Tpc) : Pc_syntax.Sigs.PARSER)
   else
     let module APos = Angstrom_pos.Make (Conf) in
     (module Parser_angstrom.Make (APos))

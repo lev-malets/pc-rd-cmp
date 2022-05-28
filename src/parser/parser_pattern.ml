@@ -20,7 +20,7 @@ struct
   module type THIS = PATTERN with module Comb = Basic.Comb
 
   let x =
-    fix_poly @@ fun getter : (module THIS) ->
+    fix_gen @@ fun getter : (module THIS) ->
     (module struct
       module Comb = Comb
 

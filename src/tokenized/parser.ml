@@ -71,6 +71,7 @@ type (_, 't, 'l) typ =
       -> ('d, 't, 'l) typ
 
 type info = Unknown | Empty | Consume of { empty : bool; first : Tset.t }
+[@@deriving eq]
 
 type ('a, 't, 'l) t = {
   p : ('a, 't, 'l) simple;

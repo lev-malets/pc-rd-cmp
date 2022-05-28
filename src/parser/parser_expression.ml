@@ -26,7 +26,7 @@ struct
   }
 
   let x =
-    fix_poly @@ fun getter : (module EXPRESSION) ->
+    fix_gen @@ fun getter : (module EXPRESSION) ->
     (module struct
       module Comb = Comb
 
@@ -202,7 +202,7 @@ struct
 
         let with_many_args =
           let loop =
-            fix_poly @@ fun getter ->
+            fix_gen @@ fun getter ->
             let args_loop = getter.get @@ fun x -> x.args_loop in
             let types_loop = getter.get @@ fun x -> x.types_loop in
 
@@ -332,7 +332,7 @@ struct
       type if_parsers = { else_part : expression t; ifthenelse : expression t }
 
       let { ifthenelse; _ } =
-        fix_poly @@ fun x ->
+        fix_gen @@ fun x ->
         let else_part = x.get (fun x -> x.else_part) in
         let ifthenelse =
           named "expression:if"

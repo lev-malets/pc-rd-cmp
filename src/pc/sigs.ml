@@ -31,7 +31,7 @@ module type COMB_COMMON = sig
 
   type 'a t
 
-  type 'b getter = { get : 'a. ('b -> 'a t) -> 'a t }
+  type 'b getter = { get : 'a 'c. ?info:'c t -> ('b -> 'a t) -> 'a t }
 
   val simple : 'a t -> 'a Simple.t
 
@@ -47,9 +47,7 @@ module type COMB_COMMON = sig
 
   val parse_string : 'a t -> ?filename:string -> string -> 'a option
 
-  val fix : ('a t -> 'a t) -> 'a t
-
-  val fix_poly : ('x getter -> 'x) -> 'x
+  val fix_gen : ('x getter -> 'x) -> 'x
 
   val return : 'a -> 'a t
 
@@ -114,6 +112,8 @@ module type COMB = sig
 
   val ( - ) : 'a t -> _ t -> 'a t
 
+  val fix : ?info:_ t -> ('a t -> 'a t) -> 'a t
+
   val mapping : ('a -> 'b) -> ('a -> 'b) t
 
   val fold_left_0_n : f:('a -> 'b -> 'a) -> 'a t -> 'b t -> 'a t
@@ -155,6 +155,8 @@ end
 
 module type CONF = sig
   module Log : CONF_LOG
+
+  val debug : bool
 
   val memoize : Str.regexp
 

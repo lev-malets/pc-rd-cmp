@@ -1,4 +1,5 @@
 {
+    "debug": true,
     "memoize": [
         "expression:in_braces",
         "expression:sequence",
