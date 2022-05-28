@@ -153,14 +153,33 @@ module type CONF_LOG = sig
   type elem
 end
 
+type regexp_pair = { accept : Str.regexp; decline : Str.regexp }
+
+module Conf = struct
+  module Peek = struct
+    module Auto = struct
+      type t = Disable | Enable of { min_variants : int }
+
+      let default_min_variants = 3
+
+      let default = Disable
+
+      let default_enable = Enable { min_variants = default_min_variants }
+    end
+
+    type t = { filter : regexp_pair; auto : Auto.t }
+  end
+
+  type t = {
+    debug : bool;
+    memoize : regexp_pair;
+    trace : regexp_pair;
+    peek : Peek.t;
+  }
+end
+
 module type CONF = sig
   module Log : CONF_LOG
 
-  val debug : bool
-
-  val memoize : Str.regexp
-
-  val trace : Str.regexp
-
-  val peek : Str.regexp
+  val config : Conf.t
 end

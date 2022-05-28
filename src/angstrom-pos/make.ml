@@ -3,6 +3,8 @@ open Core_kernel
 module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
   type s = Conf.Log.elem
 
+  let config = Conf.config
+
   module State = struct
     module Line = struct
       type t = { no : int; start : int }
@@ -312,7 +314,7 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
               | Some info ->
                   {
                     p =
-                      (if Conf.debug then
+                      (if config.debug then
                        {
                          run =
                            (fun i ->

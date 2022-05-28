@@ -19,7 +19,14 @@ module Utils = struct
 
   let empty_regexp = mk_regexp []
 
+  let empty_regexp_pair = { accept = empty_regexp; decline = empty_regexp }
+
   module type MK_CONF = functor (Log : CONF_LOG) -> CONF with module Log = Log
+
+  type _ parse_triplet =
+    | Triplet :
+        (string * (Yojson.Safe.t -> ('a, string) Result.t) * 'a Ref.t)
+        -> unit parse_triplet
 
   let mk_conf ?filename ~src : ((module MK_CONF), string) Result.t =
     let open Yojson.Safe in
@@ -27,53 +34,138 @@ module Utils = struct
     let open Result in
     let json = from_string ?fname:filename src in
 
-    let debug =
-      match member "debug" json with
+    let error_prefix s = Result.map_error ~f:(fun x -> s ^ " > " ^ x) in
+
+    let to_bool x =
+      match x with
       | `Null -> Ok false
       | `Bool x -> Ok x
-      | x ->
-          let buf = Buffer.create 16 in
-          let formatter = Caml.Format.formatter_of_buffer buf in
-          Yojson.Safe.pp formatter x;
-          Error
-            (Printf.sprintf "unexpected value for 'debug': %s"
-               (Buffer.contents buf))
+      | _ -> Error "expected boolean"
     in
 
-    let list_of_strings key obj =
-      match member key obj with
+    let list_to_regexp x =
+      x
+      |> List.map ~f:(function
+           | `String s -> Ok s
+           | _ -> Error "expected array of strings")
+      |> Result.all >>| mk_regexp
+    in
+
+    let to_regexp x =
+      match x with
       | `Null -> Ok empty_regexp
-      | `List x ->
-          x
-          |> List.map ~f:(function
-               | `String s -> Ok s
-               | _ -> Error "expected array of strings")
-          |> Result.all >>| mk_regexp
+      | `List x -> list_to_regexp x
       | _ -> Error "expected array of strings"
     in
 
-    debug >>= fun debug ->
-    list_of_strings "memoize" json >>= fun memoize ->
-    list_of_strings "trace" json >>= fun trace ->
-    list_of_strings "peek" json >>= fun peek ->
-    Ok
-      (module functor
-                (Log : CONF_LOG)
-                ->
-                struct
-                  module Log = Log
+    let regexp_pair ?(accept = empty_regexp) ?(decline = empty_regexp) () =
+      { accept; decline }
+    in
 
-                  let debug = debug
+    let parse_fields fields =
+      let helper =
+        List.fold
+          ~init:(fun s _ -> Error (Printf.sprintf "unexpected key '%s'" s))
+          ~f:(fun acc (Triplet (name, mapper, ref)) s x ->
+            if String.equal s name then
+              error_prefix name (mapper x) >>| ( := ) ref
+            else acc s x)
+          fields
+      in
+      fun pairs -> List.map ~f:(fun (s, x) -> helper s x) pairs |> Result.all
+    in
 
-                  let memoize = memoize
+    let to_regexp_pair x =
+      match x with
+      | `Null -> Ok (regexp_pair ())
+      | `Assoc pairs ->
+          let accept = ref empty_regexp in
+          let decline = ref empty_regexp in
+          parse_fields
+            [
+              Triplet ("include", to_regexp, accept);
+              Triplet ("exclude", to_regexp, decline);
+            ]
+            pairs
+          >>| fun _ -> { accept = !accept; decline = !decline }
+      | _ -> Error "expected filter"
+    in
 
-                  let trace = trace
+    let to_peek_auto_conf x =
+      match x with
+      | `Null -> Ok Conf.Peek.Auto.Disable
+      | `Assoc pairs ->
+          let min_variants = ref Conf.Peek.Auto.default_min_variants in
+          let to_int x =
+            match x with `Int i -> Ok i | _ -> Error "expected integer"
+          in
 
-                  let peek = peek
-                end : MK_CONF)
+          parse_fields [ Triplet ("min-variants", to_int, min_variants) ] pairs
+          >>| fun _ -> Conf.Peek.Auto.Enable { min_variants = !min_variants }
+      | _ -> Error "expected auto peek conf"
+    in
+
+    let to_peek_conf x =
+      match x with
+      | `Null ->
+          Ok
+            Conf.Peek.
+              { filter = empty_regexp_pair; auto = Conf.Peek.Auto.default }
+      | `Assoc pairs ->
+          let filter = ref empty_regexp_pair in
+          let auto = ref Conf.Peek.Auto.default in
+          parse_fields
+            [
+              Triplet ("filter", to_regexp_pair, filter);
+              Triplet ("auto", to_peek_auto_conf, auto);
+            ]
+            pairs
+          >>| fun _ -> Conf.Peek.{ filter = !filter; auto = !auto }
+      | _ -> Error "expected peek conf"
+    in
+
+    let config =
+      match json with
+      | `Assoc pairs ->
+          let debug = ref false in
+          let memoize = ref empty_regexp_pair in
+          let trace = ref empty_regexp_pair in
+          let peek =
+            ref
+              Conf.Peek.
+                { filter = empty_regexp_pair; auto = Conf.Peek.Auto.default }
+          in
+
+          parse_fields
+            [
+              Triplet ("memoize", to_regexp_pair, memoize);
+              Triplet ("trace", to_regexp_pair, trace);
+              Triplet ("peek", to_peek_conf, peek);
+              Triplet ("debug", to_bool, debug);
+            ]
+            pairs
+          >>| fun _ ->
+          Conf.
+            { memoize = !memoize; trace = !trace; peek = !peek; debug = !debug }
+      | _ -> Error "expected object"
+    in
+
+    error_prefix (Option.value ~default:"__config__" filename) config
+    >>| fun config : (module MK_CONF) ->
+    (module functor
+              (Log : CONF_LOG)
+              ->
+              struct
+                module Log = Log
+
+                let config = config
+              end)
 
   let check_string regexp str =
     Str.string_match regexp str 0 && Str.match_end () = String.length str
+
+  let check_string__pair pair str =
+    check_string pair.accept str && not (check_string pair.decline str)
 end
 
 module Make
@@ -84,6 +176,8 @@ module Make
      and type 'a Simple.t = 'a Basic.Simple.t
      and type log_elem = Basic.log_elem = struct
   include Basic
+
+  let config = Conf.config
 
   let ( + ) = ( <*> )
 
@@ -141,8 +235,8 @@ module Make
   let named (name : string) (p : 'a t) =
     let p =
       match
-        ( Utils.check_string Conf.memoize name,
-          Utils.check_string Conf.trace name )
+        ( Utils.check_string__pair config.memoize name,
+          Utils.check_string__pair config.trace name )
       with
       | false, false -> touch p
       | true, false ->
@@ -184,7 +278,7 @@ module Make
         loop ps
     | Some name ->
         let p =
-          if Utils.check_string Conf.peek name then peek_first ps
+          if Utils.check_string__pair config.peek.filter name then peek_first ps
           else
             let check x =
               if not_empty x then x else failwith "check usage: empty"

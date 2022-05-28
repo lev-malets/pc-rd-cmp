@@ -2,6 +2,8 @@ open Base
 
 module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
   Sigs.TPC with type s = Conf.Log.elem and type tag = Tokenizer.Tag.t = struct
+  let config = Conf.config
+
   module Id = struct
     let next = ref 0
 
@@ -307,7 +309,7 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
               | Some info ->
                   {
                     p =
-                      (if Conf.debug then
+                      (if config.debug then
                        {
                          run =
                            (fun i ->
