@@ -1,4 +1,3 @@
-
 DIR=tmp/t/src/parser/test_memo/_
 
 mkdir -p $DIR/$1

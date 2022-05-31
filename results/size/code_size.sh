@@ -11,13 +11,13 @@
 sum=0
 
 for f in $@; do
-#     sloc $f |
-#         sed 's/:\s*/:/' |
-#         awk -F ':' '
-#             BEGIN {line='\"$f\"'}
-#             NR > 3 && NR < 13 {line = line "," $2}
-#             END {print line}
-#         '
+    #     sloc $f |
+    #         sed 's/:\s*/:/' |
+    #         awk -F ':' '
+    #             BEGIN {line='\"$f\"'}
+    #             NR > 3 && NR < 13 {line = line "," $2}
+    #             END {print line}
+    #         '
     sum=$(expr $sum + $(sloc $f | awk -F ':' 'NR == 5 {print $2}'))
 done
 
