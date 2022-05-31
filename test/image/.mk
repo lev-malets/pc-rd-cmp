@@ -1,12 +1,10 @@
 $K/name: force
 	mkdir -p $K
-	@ nix-instantiate --eval $D/name.nix \
-		| sed 's/"//g' \
-		> $@.tmp
-	@ test -f $@ && diff $@.tmp $@ > /dev/null || mv $@.tmp $@
+	nix build .#test-image-name -o $T/image-name
+	test -f $@ && diff $T/image-name $@ > /dev/null || cat $T/image-name > $@
 
 $K/builded: $K/name
-	nix-build -o $T/image $D/default.nix
+	nix build .#test-image -o $T/image
 	touch $@
 
 $K/loaded: $K/builded

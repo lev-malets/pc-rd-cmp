@@ -43,5 +43,12 @@ rec {
   tools =
     (with ocamlPackages; [ ocaml dune_2 findlib ])
     ++
-    (with pkgs; [ ocamlformat ]);
+    (with pkgs; [
+      sqlite
+      shfmt
+      ocamlformat
+      nodePackages.sql-formatter
+      treefmt
+      nixpkgs-fmt
+    ]);
 }

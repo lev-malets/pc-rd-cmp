@@ -1,6 +1,4 @@
-let p = import ../../nix/pkgs.nix; in
-let pkgs = p.pkgs; in
-let b = import ../../nix/basic.nix p; in
+{ pkgs, basic, ... }:
 
 let
   user = "user";
@@ -8,7 +6,7 @@ let
   gid = 100;
   envVarsSetup = with pkgs; [
     (
-      runCommand "env-vars-OCAMLPATH" { buildInputs = b.libs ++ b.tools; } ''
+      runCommand "env-vars-OCAMLPATH" { buildInputs = basic.libs ++ basic.tools; } ''
         mkdir -p $out/envars
         echo $OCAMLPATH > $out/envars/OCAMLPATH
       ''
@@ -32,7 +30,7 @@ pkgs.dockerTools.buildLayeredImage {
       gnused
       gnupatch
     ])
-    ++ b.libs ++ b.tools
+    ++ basic.libs ++ basic.tools
     ++ envVarsSetup;
   config = {
     Cmd =
