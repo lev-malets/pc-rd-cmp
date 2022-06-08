@@ -104,7 +104,9 @@ module type COMB_BASE = sig
 
   val ( <|> ) : 'a t -> 'a t -> 'a t
 
-  val first_size : 'a t -> int option
+  val first_size : _ t -> int option
+  val first_size_max : int
+  val first_iter : f:(int -> unit) -> _ t -> unit
 end
 
 module type COMB = sig

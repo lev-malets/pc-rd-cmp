@@ -21,7 +21,7 @@
     },
     "peek": {
         "auto": {
-            "min-variants": 1
+            "min-variants": 2
         }
     }
 }

@@ -267,7 +267,7 @@ module Make
 
   let name_of p = name_of_id @@ id p
 
-  let choice ?name ps =
+  let choice ?name (ps : 'a t list) =
     let open Base in
     let auto_peek_border =
       let open Conf.Peek.Auto in
@@ -278,18 +278,36 @@ module Make
 
     let rec loop = function
       | [] -> failwith "check usage"
-      | [ x ] -> (x, if not_empty x then Some 1 else None)
+      | [ x ] ->
+          ( x,
+            if not_empty x then Some (0, Array.create ~len:first_size_max 0)
+            else None )
       | x :: xs -> (
           let tail, variants = loop xs in
-          let tail_size = first_size tail in
           let p = x <|> tail in
-          let p_size = first_size p in
-          match (tail_size, p_size, variants, not_empty x) with
-          | Some ts, Some ps, Some vs, true ->
-              if ps > ts then (p, Some (Int.succ vs)) else (p, Some vs)
+          match (variants, not_empty x) with
+          | Some (last_set, sets), true ->
+              let set_map = Hashtbl.create (module Int) in
+              let new_last = ref last_set in
+              first_iter x ~f:(fun i ->
+                  let old_set = sets.(i) in
+                  let new_set =
+                    Hashtbl.find_or_add set_map old_set ~default:(fun () ->
+                        let x = !new_last + 1 in
+                        new_last := x;
+                        x)
+                  in
+                  sets.(i) <- new_set);
+              (p, Some (!new_last, sets))
           | _ -> (p, None))
     in
     let alteration, variants = loop ps in
+    let variants =
+      Option.map variants ~f:(fun (_, arr) ->
+          let set = Hash_set.create (module Int) in
+          Array.iter arr ~f:(Hash_set.add set);
+          Hash_set.length set)
+    in
 
     if Option.is_some name && Option.is_none variants then
       failwith "choice: named empty";
