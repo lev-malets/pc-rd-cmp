@@ -42,6 +42,14 @@ module FloatStatistics = struct
       count = t.count + 1;
     }
 
+  let append x t =
+    {
+      sum = t.sum +. x.sum;
+      min = Float.min x.min t.min;
+      max = Float.max x.max t.max;
+      count = t.count + x.count;
+    }
+
   let mean t = t.sum /. Float.of_int t.count
 end
 

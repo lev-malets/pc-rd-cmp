@@ -2,7 +2,7 @@ open Core_kernel
 open Cmdliner
 open Run_common
 
-let run config input parser last_stage =
+let run config input parser last_stage quota =
   let { filename; src } = mk_input input in
 
   let fn =
@@ -30,13 +30,20 @@ let run config input parser last_stage =
   in
 
   let test = Core_bench.Bench.Test.create ~name:"test" fn in
-  Core_bench.Bench.bench [ test ]
+  let run_config =
+    Core_bench.Bench.Run_config.create
+      ~time_quota:(Core.Time.Span.of_sec quota)
+      ()
+  in
+  Core_bench.Bench.bench ~run_config [ test ]
 
 let cmd =
+  let quota = Arg.(value & opt float 10. & info ~docv:"SECONDS" [ "quota" ]) in
+
   let open Args in
   let doc = "" in
   let man = [ `S Manpage.s_description ] in
-  ( Term.(const run $ config $ input $ parser $ last_stage),
+  ( Term.(const run $ config $ input $ parser $ last_stage $ quota),
     Term.info "bench" ~doc ~man )
 
 let () = Term.exit @@ Term.eval cmd

@@ -3,8 +3,6 @@ open Core_kernel
 module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
   type s = Conf.Log.elem
 
-  let config = Conf.config
-
   module State = struct
     module Line = struct
       type t = { no : int; start : int }
@@ -85,7 +83,7 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
   end
 
   module Basic = struct
-    type log_elem = s
+    module Conf = Conf
 
     module Simple = struct
       include Angstrom
@@ -314,7 +312,7 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
               | Some info ->
                   {
                     p =
-                      (if config.debug then
+                      (if Conf.config.debug then
                        {
                          run =
                            (fun i ->
@@ -681,7 +679,7 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       | _ -> failwith "unreachable"
   end
 
-  include Pc.Make (Basic) (Conf)
+  include Pc.Make (Basic)
   open Parser
 
   let char c =

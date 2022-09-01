@@ -1,9 +1,9 @@
 open Parsetree
 open Basic
 
-module type COMB = Pc.COMB with type log_elem = LogElement.t
-
 module type CONF = Pc.CONF with type Log.elem = LogElement.t
+
+module type COMB = Pc.COMB with type Conf.Log.elem = LogElement.t
 
 module type PARSE = sig
   val parse_interface :

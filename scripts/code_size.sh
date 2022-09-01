@@ -5,16 +5,16 @@ T=$(realpath $1)
 SYNTAX=$(realpath $2)
 CMP=$(realpath $D/..)
 
-xpath=$T/code_size
+xpath=$T/.scripts/code_size
 mkdir -p $xpath
 
 syntax_files=(
-	$SYNTAX/src/res_core.ml
-	$SYNTAX/src/res_token.ml
+    $SYNTAX/src/res_core.ml
+    $SYNTAX/src/res_token.ml
 )
 
 syntax_hlp_files=(
-	$SYNTAX/src/res_parser.ml
+    $SYNTAX/src/res_parser.ml
 )
 
 syntax_all=(
@@ -23,7 +23,7 @@ syntax_all=(
 )
 
 pc_files=(
-	$CMP/src/parser/basic.ml
+    $CMP/src/parser/basic.ml
     $CMP/src/parser/diagnostics.ml
     $CMP/src/parser/parser_basic.ml
     $CMP/src/parser/parser_expression.ml
@@ -41,8 +41,8 @@ pc_files=(
 )
 
 pc_hlp_files=(
-	$CMP/src/pc/pc.ml
-	# $CMP/src/pc/sigs.ml
+    $CMP/src/pc/pc.ml
+    # $CMP/src/pc/sigs.ml
     $CMP/src/tokenized/make.ml
     $CMP/src/tokenized/parser.ml
     # $CMP/src/tokenized/sigs.ml
@@ -61,7 +61,7 @@ pc_sha256=$(sha256sum $pc_all |
     cut -d' ' -f1 | sha256sum | cut -d' ' -f1)
 sha256=$(echo $syntax_sha256 $pc_sha256 | sha256sum | cut -d' ' -f1)
 
-if [[ -f $xpath/.done && $(cat $xpath/.done) = $sha256 ]]; then
+if [[ -f $xpath/.done && $(cat $xpath/.done) == $sha256 ]]; then
     exit 0
 fi
 
@@ -88,7 +88,7 @@ profile = default
 version = 0.19.0
 
 margin = 80
-' > $xpath/.hlp/.ocamlformat
+' >$xpath/.hlp/.ocamlformat
 
 (
     cd $xpath/.hlp
@@ -98,8 +98,8 @@ margin = 80
 rm -rf $xpath/.out
 mkdir -p $xpath/.out
 
-sloc_ ${syntax_files[*]} > $xpath/.out/syntax
-sloc_ ${syntax_hlp_files[*]} > $xpath/.out/syntax_hlp
+sloc_ ${syntax_files[*]} >$xpath/.out/syntax
+sloc_ ${syntax_hlp_files[*]} >$xpath/.out/syntax_hlp
 
-sloc_ ${pc_files[*]} > $xpath/.out/pc
-sloc_ ${pc_hlp_files[*]} > $xpath/.out/pc_hlp
+sloc_ ${pc_files[*]} >$xpath/.out/pc
+sloc_ ${pc_hlp_files[*]} >$xpath/.out/pc_hlp

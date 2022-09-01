@@ -5,7 +5,7 @@ module type POS = sig
 
   include
     Pc.COMB
-      with type log_elem = s
+      with type Conf.Log.elem = s
        and type 'a Simple.t = 'a Angstrom.t
        and type 'a t = 'a Parser.t
 
