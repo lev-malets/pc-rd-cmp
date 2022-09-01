@@ -19,7 +19,7 @@ module type TPC = sig
 
   include
     Pc.COMB
-      with type log_elem = s
+      with type Conf.Log.elem = s
        and type 'a Simple.t = ('a, tag, s) Parser.simple
        and type 'a t = ('a, tag, s) Parser.t
 

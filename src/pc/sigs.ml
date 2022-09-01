@@ -1,7 +1,42 @@
 open Base
 
+module type CONF_LOG = sig
+  type elem
+end
+
+type regexp_pair = { accept : Str.regexp; decline : Str.regexp }
+
+module Config = struct
+  module Peek = struct
+    module Auto = struct
+      type t = Disable | Enable of { min_variants : int }
+
+      let default_min_variants = 3
+
+      let default = Disable
+
+      let default_enable = Enable { min_variants = default_min_variants }
+    end
+
+    type t = { filter : regexp_pair; auto : Auto.t }
+  end
+
+  type t = {
+    debug : bool;
+    memoize : regexp_pair;
+    trace : regexp_pair;
+    peek : Peek.t;
+  }
+end
+
+module type CONF = sig
+  module Log : CONF_LOG
+
+  val config : Config.t
+end
+
 module type COMB_COMMON = sig
-  type log_elem
+  module Conf : CONF
 
   module Simple : sig
     type 'a t
@@ -24,9 +59,9 @@ module type COMB_COMMON = sig
 
     val exec : (unit -> 'a) -> 'a t
 
-    val log : log_elem -> unit t
+    val log : Conf.Log.elem -> unit t
 
-    val log_many : log_elem list -> unit t
+    val log_many : Conf.Log.elem list -> unit t
   end
 
   type 'a t
@@ -57,7 +92,7 @@ module type COMB_COMMON = sig
 
   val pos_end : Lexing.position t
 
-  val fold_log : 'a -> ('a -> log_elem -> 'a) -> 'a t
+  val fold_log : 'a -> ('a -> Conf.Log.elem -> 'a) -> 'a t
 
   val failed : _ t -> unit t
 
@@ -105,7 +140,9 @@ module type COMB_BASE = sig
   val ( <|> ) : 'a t -> 'a t -> 'a t
 
   val first_size : _ t -> int option
+
   val first_size_max : int
+
   val first_iter : f:(int -> unit) -> _ t -> unit
 end
 
@@ -151,39 +188,4 @@ module type COMB = sig
   val name_of_id : int -> string
 
   val name_of : 'a t -> string
-end
-
-module type CONF_LOG = sig
-  type elem
-end
-
-type regexp_pair = { accept : Str.regexp; decline : Str.regexp }
-
-module Conf = struct
-  module Peek = struct
-    module Auto = struct
-      type t = Disable | Enable of { min_variants : int }
-
-      let default_min_variants = 3
-
-      let default = Disable
-
-      let default_enable = Enable { min_variants = default_min_variants }
-    end
-
-    type t = { filter : regexp_pair; auto : Auto.t }
-  end
-
-  type t = {
-    debug : bool;
-    memoize : regexp_pair;
-    trace : regexp_pair;
-    peek : Peek.t;
-  }
-end
-
-module type CONF = sig
-  module Log : CONF_LOG
-
-  val config : Conf.t
 end

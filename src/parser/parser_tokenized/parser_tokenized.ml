@@ -203,14 +203,13 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
       & tkn_payload Integer >>| fun { value; suffix } -> (value, suffix)
 
     let number =
-      named "tkn:number"
-      & choice
-          [
-            ( tkn_payload Integer >>| fun { value; suffix } ->
-              Pconst_integer (value, suffix) );
-            ( tkn_payload Float >>| fun { value; suffix } ->
-              Pconst_float (value, suffix) );
-          ]
+      choice ~name:"tkn:number"
+        [
+          ( tkn_payload Integer >>| fun { value; suffix } ->
+            Pconst_integer (value, suffix) );
+          ( tkn_payload Float >>| fun { value; suffix } ->
+            Pconst_float (value, suffix) );
+        ]
 
     let character =
       named "tkn:character" & tkn_payload Character >>| fun c -> Pconst_char c

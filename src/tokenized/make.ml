@@ -2,8 +2,6 @@ open Base
 
 module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
   Sigs.TPC with type s = Conf.Log.elem and type tag = Tokenizer.Tag.t = struct
-  let config = Conf.config
-
   module Id = struct
     let next = ref 0
 
@@ -32,12 +30,11 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
   let tag2int : tag -> int = Caml.Obj.magic
 
   module Basic = struct
-    type log_elem = Conf.Log.elem
-
+    module Conf = Conf
     open Parser
 
     module Simple = struct
-      type 'a t = ('a, tag, log_elem) Parser.simple
+      type 'a t = ('a, tag, Conf.Log.elem) Parser.simple
 
       let ( >> ) p1 p2 =
         {
@@ -178,7 +175,7 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         }
     end
 
-    type 'a t = ('a, tag, log_elem) Parser.t
+    type 'a t = ('a, tag, Conf.Log.elem) Parser.t
 
     type 'b getter = { get : 'a 'c. ?info:'c t -> ('b -> 'a t) -> 'a t }
 
@@ -309,7 +306,7 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
               | Some info ->
                   {
                     p =
-                      (if config.debug then
+                      (if Conf.config.debug then
                        {
                          run =
                            (fun i ->
@@ -483,6 +480,7 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
       | Unknown -> None
       | Empty -> None
       | Consume { first; _ } -> Some (Tset.size first)
+
     let first_iter ~f p =
       match p.info with
       | Consume { first; _ } -> Tset.iter_code f first
@@ -765,7 +763,7 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
       { p; info = Empty; typ = Value { v = (); p }; id = Id.eof }
   end
 
-  include Pc.Make (Basic) (Conf)
+  include Pc.Make (Basic)
   open Parser
 
   let tkn_helper ~f tag =

@@ -2,24 +2,25 @@ open Core_kernel
 
 let read_file ~filename = In_channel.read_all filename
 
-let mk_conf file : ((module Pc_syntax.Sigs.CONF), string) Result.t =
+let mk_conf ?src filename : ((module Pc_syntax.Sigs.CONF), string) Result.t =
   let module Log = struct
     type elem = Pc_syntax.Basic.LogElement.t
   end in
-  match file with
-  | None ->
-      Result.map
-        ~f:(fun (module F : Pc.Utils.MK_CONF) : (module Pc_syntax.Sigs.CONF) ->
-          (module F (Log)))
-      @@ Pc.Utils.mk_conf ?filename:None ~src:"{}"
-  | Some filename ->
-      Result.map
-        ~f:(fun (module F : Pc.Utils.MK_CONF) : (module Pc_syntax.Sigs.CONF) ->
-          (module F (Log)))
-      @@ Pc.Utils.mk_conf ~filename ~src:(read_file ~filename)
+  let filename, src =
+    match (filename, src) with
+    | None, None -> (None, "{}")
+    | None, Some src -> (None, src)
+    | Some _, Some src -> (filename, src)
+    | Some f, None -> (filename, read_file ~filename:f)
+  in
 
-let mk_parse ?(tokenize = false) file : (module Pc_syntax.Sigs.PARSER) =
-  let (module Conf) = Result.ok_or_failwith @@ mk_conf file in
+  Result.map
+    ~f:(fun (module F : Pc.Utils.MK_CONF) : (module Pc_syntax.Sigs.CONF) ->
+      (module F (Log)))
+  @@ Pc.Utils.mk_conf ?filename ~src
+
+let mk_parse ?(tokenize = false) ?src file : (module Pc_syntax.Sigs.PARSER) =
+  let (module Conf) = Result.ok_or_failwith @@ mk_conf ?src file in
   if tokenize then
     let module Tpc = Tokenized.Make (Parser_tokenized.Lexer.Make ()) (Conf) in
     (module Parser_tokenized.Make (Tpc) : Pc_syntax.Sigs.PARSER)
@@ -330,11 +331,7 @@ module Args = struct
       value
       & opt
           (enum
-             [
-               ("parser-init", ParserInit);
-               ("parse", Parse);
-               ("result-print", ResultPrint);
-             ])
+             [ ("init", ParserInit); ("parse", Parse); ("print", ResultPrint) ])
           ResultPrint
       & info ~doc ~docv:"STAGE" [ "last-stage" ])
 end

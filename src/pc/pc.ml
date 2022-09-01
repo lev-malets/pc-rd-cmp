@@ -15,7 +15,12 @@ module Utils = struct
       | [ x ] -> "\\(" ^ x ^ "\\)"
       | x :: xs -> "\\(" ^ x ^ "\\)\\|" ^ loop xs
     in
-    Str.regexp @@ loop xs
+    let xs =
+      List.sort xs ~compare:(fun a b ->
+          Int.compare (String.length b) (String.length a))
+    in
+    let s = loop xs in
+    Str.regexp s
 
   let empty_regexp = mk_regexp []
 
@@ -34,6 +39,7 @@ module Utils = struct
     let open Result in
     let json = from_string ?fname:filename src in
 
+    (* Stdio.print_endline @@ Yojson.Safe.pretty_to_string json; *)
     let error_prefix s = Result.map_error ~f:(fun x -> s ^ " > " ^ x) in
 
     let to_bool x =
@@ -92,48 +98,46 @@ module Utils = struct
     in
 
     let to_peek_auto_conf x =
+      let open Config.Peek.Auto in
       match x with
-      | `Null -> Ok Conf.Peek.Auto.Disable
+      | `Null -> Ok Disable
       | `Assoc pairs ->
-          let min_variants = ref Conf.Peek.Auto.default_min_variants in
+          let min_variants = ref default_min_variants in
           let to_int x =
             match x with `Int i -> Ok i | _ -> Error "expected integer"
           in
 
           parse_fields [ Triplet ("min-variants", to_int, min_variants) ] pairs
-          >>| fun _ -> Conf.Peek.Auto.Enable { min_variants = !min_variants }
+          >>| fun _ -> Enable { min_variants = !min_variants }
       | _ -> Error "expected auto peek conf"
     in
 
     let to_peek_conf x =
+      let open Config.Peek in
       match x with
-      | `Null ->
-          Ok
-            Conf.Peek.
-              { filter = empty_regexp_pair; auto = Conf.Peek.Auto.default }
+      | `Null -> Ok { filter = empty_regexp_pair; auto = Auto.default }
       | `Assoc pairs ->
           let filter = ref empty_regexp_pair in
-          let auto = ref Conf.Peek.Auto.default in
+          let auto = ref Auto.default in
           parse_fields
             [
               Triplet ("filter", to_regexp_pair, filter);
               Triplet ("auto", to_peek_auto_conf, auto);
             ]
             pairs
-          >>| fun _ -> Conf.Peek.{ filter = !filter; auto = !auto }
+          >>| fun _ -> { filter = !filter; auto = !auto }
       | _ -> Error "expected peek conf"
     in
 
     let config =
+      let open Config in
       match json with
       | `Assoc pairs ->
           let debug = ref false in
           let memoize = ref empty_regexp_pair in
           let trace = ref empty_regexp_pair in
           let peek =
-            ref
-              Conf.Peek.
-                { filter = empty_regexp_pair; auto = Conf.Peek.Auto.default }
+            ref Peek.{ filter = empty_regexp_pair; auto = Peek.Auto.default }
           in
 
           parse_fields
@@ -145,8 +149,7 @@ module Utils = struct
             ]
             pairs
           >>| fun _ ->
-          Conf.
-            { memoize = !memoize; trace = !trace; peek = !peek; debug = !debug }
+          { memoize = !memoize; trace = !trace; peek = !peek; debug = !debug }
       | _ -> Error "expected object"
     in
 
@@ -168,16 +171,12 @@ module Utils = struct
     check_string pair.accept str && not (check_string pair.decline str)
 end
 
-module Make
-    (Basic : COMB_BASE)
-    (Config : CONF with type Log.elem = Basic.log_elem) :
+module Make (Basic : COMB_BASE) :
   COMB
     with type 'a t = 'a Basic.t
      and type 'a Simple.t = 'a Basic.Simple.t
-     and type log_elem = Basic.log_elem = struct
+     and module Conf = Basic.Conf = struct
   include Basic
-
-  let config = Config.config
 
   let ( + ) = ( <*> )
 
@@ -235,8 +234,8 @@ module Make
   let named (name : string) (p : 'a t) =
     let p =
       match
-        ( Utils.check_string__pair config.memoize name,
-          Utils.check_string__pair config.trace name )
+        ( Utils.check_string__pair Conf.config.memoize name,
+          Utils.check_string__pair Conf.config.trace name )
       with
       | false, false -> touch p
       | true, false ->
@@ -270,8 +269,8 @@ module Make
   let choice ?name (ps : 'a t list) =
     let open Base in
     let auto_peek_border =
-      let open Conf.Peek.Auto in
-      match config.peek.auto with
+      let open Config.Peek.Auto in
+      match Conf.config.peek.auto with
       | Disable -> None
       | Enable { min_variants } -> Some min_variants
     in
@@ -319,23 +318,24 @@ module Make
     let accept_cond =
       name
       |> Option.map ~f:(fun name ->
-             Utils.check_string config.peek.filter.accept name)
+             Utils.check_string Conf.config.peek.filter.accept name)
       |> Option.value ~default:false
     in
     let decline_cond =
       name
       |> Option.map ~f:(fun name ->
-             Utils.check_string config.peek.filter.decline name)
+             Utils.check_string Conf.config.peek.filter.decline name)
       |> Option.value ~default:false
     in
 
     if
       Base.(
-        config.debug && accept_cond && (not decline_cond) && not variant_cond)
+        Conf.config.debug && accept_cond && (not decline_cond)
+        && not variant_cond)
     then
       Caml.Printf.eprintf "choice: forced peek for %s\n"
         (Option.value ~default:"__unnamed__" name);
-    if Base.(config.debug && decline_cond && variant_cond) then
+    if Base.(Conf.config.debug && decline_cond && variant_cond) then
       Caml.Printf.eprintf "choice: forced alteration for %s\n"
         (Option.value ~default:"__unnamed__" name);
 

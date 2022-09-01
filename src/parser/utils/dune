@@ -19,3 +19,8 @@
  (modules exec)
  (libraries run_common)
  (modes byte exe))
+
+(executable
+ (name auto_memo)
+ (modules auto_memo)
+ (libraries run_common))
