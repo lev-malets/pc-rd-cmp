@@ -28,27 +28,36 @@ rec {
     };
   });
 
-  libs = with ocamlPackages; [
+  buildOnlyDeps = with ocamlPackages; [
+    ocaml
+    dune_2
+    findlib
+  ];
+
+  buildDeps = with ocamlPackages; [
     yojson
     bigstringaf
     fix
-    async
-    lwt
     ocaml-syntax-shims
     cmdliner
     core_bench
     core_kernel
     alcotest
   ];
-  tools =
-    (with ocamlPackages; [ ocaml dune_2 findlib ])
-    ++
+
+  checkDeps =
     (with pkgs; [
-      sqlite
+      (python3.withPackages (ps: with ps; [
+        black
+      ]))
       shfmt
       ocamlformat
-      nodePackages.sql-formatter
+      nodePackages.sloc
       treefmt
       nixpkgs-fmt
     ]);
+
+  perfDeps = with pkgs; [
+    linuxPackages.perf
+  ];
 }

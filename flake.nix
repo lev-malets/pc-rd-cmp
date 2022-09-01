@@ -35,21 +35,30 @@
         {
           default = mkShell {
             buildInputs =
-              ([ git perf-tools linuxPackages.perf ncurses ocamlformat gdb valgrind act ]) ++
-              (with b.ocamlPackages; [ ocaml-lsp utop ]) ++
-              b.tools ++ b.libs;
+              b.buildOnlyDeps ++
+              b.buildDeps ++
+              b.checkDeps ++
+              b.perfDeps ++
+              [
+                (pkgs.python3.withPackages (ps: with ps; [
+                  pandas
+                  black
+                  ipykernel
+                  pip
+                  plotly
+                  nbformat
+                ]))
+              ] ++
+              [ git ncurses gdb valgrind act ] ++
+              (with b.ocamlPackages; [ ocaml-lsp utop ]);
           };
 
-          actions = mkShell
-            {
-              buildInputs = [
-                shfmt
-                ocamlformat
-                nodePackages.sql-formatter
-                treefmt
-                nixpkgs-fmt
-              ];
-            };
+          bench = mkShell {
+            buildInputs =
+              b.buildOnlyDeps ++
+              b.buildDeps ++
+              b.perfDeps;
+          };
         });
     };
 }

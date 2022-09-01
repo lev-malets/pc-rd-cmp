@@ -1,12 +1,15 @@
 { pkgs, basic, ... }:
 
 let
+  deps = basic.buildOnlyDeps
+    ++ basic.buildDeps
+    ++ basic.checkDeps;
   user = "user";
   uid = 1000;
   gid = 100;
   envVarsSetup = with pkgs; [
     (
-      runCommand "env-vars-OCAMLPATH" { buildInputs = basic.libs ++ basic.tools; } ''
+      runCommand "env-vars-OCAMLPATH" { buildInputs = deps; } ''
         mkdir -p $out/envars
         echo $OCAMLPATH > $out/envars/OCAMLPATH
       ''
@@ -30,7 +33,7 @@ pkgs.dockerTools.buildLayeredImage {
       gnused
       gnupatch
     ])
-    ++ basic.libs ++ basic.tools
+    ++ deps
     ++ envVarsSetup;
   config = {
     Cmd =

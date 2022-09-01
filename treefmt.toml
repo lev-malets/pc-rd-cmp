@@ -9,6 +9,11 @@ options = ["--inplace"]
 includes = ["*.ml"]
 excludes = ["data/*", "tmp/*"]
 
+[formatter.python]
+command = "black"
+includes = ["*.py"]
+excludes = ["data/*", "tmp/*"]
+
 [formatter.shell]
 command = "sh"
 options = ["-eucx", """
@@ -16,13 +21,4 @@ if [[ $# -le 0 ]]; then exit 0; fi
 shfmt -i 4 -s -w "$@"
 """, "--"]
 includes = ["*.sh"]
-excludes = ["tmp/*"]
-
-[formatter.sql]
-command = "sh"
-options = ["-eucx", """
-if [[ $# -le 0 ]]; then exit 0; fi
-sql-formatter "$@" -l mariadb --lines-between-queries 2 -o "$@"
-""", "--"]
-includes = ["*.sql"]
 excludes = ["tmp/*"]
