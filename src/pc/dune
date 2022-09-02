@@ -1,3 +1,9 @@
 (library
  (name pc)
- (libraries fix core_kernel compiler-libs.common exec_info str yojson))
+ (libraries
+  rescript-syntax.compilerlibs406
+  fix
+  core
+  exec_info
+  str
+  yojson))

@@ -1,8 +1,11 @@
+(* based on Res_driver *)
+
+open Syntax
 module IO = Res_io
 open Res_driver
 
 let parse ~src ~filename ~parse =
-  Location.input_name := filename;
+  Compilerlibs406.Location.input_name := filename;
   let mode = Res_parser.ParseForTypeChecker in
   let engine = Res_parser.make ~mode src filename in
 
@@ -24,9 +27,8 @@ let parse ~src ~filename ~parse =
     }
   in
 
-  if parse_result.invalid then (
+  if parse_result.invalid then
     Res_diagnostics.printReport parse_result.diagnostics parse_result.source;
-    exit 1);
   parse_result
   [@@raises exit]
 

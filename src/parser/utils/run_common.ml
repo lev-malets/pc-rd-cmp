@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let read_file ~filename = In_channel.read_all filename
 
@@ -17,7 +17,7 @@ let mk_conf ?src filename : ((module Pc_syntax.Sigs.CONF), string) Result.t =
   Result.map
     ~f:(fun (module F : Pc.Utils.MK_CONF) : (module Pc_syntax.Sigs.CONF) ->
       (module F (Log)))
-  @@ Pc.Utils.mk_conf ?filename ~src
+  @@ Pc.Utils.mk_conf ?filename src
 
 let mk_parse ?(tokenize = false) ?src file : (module Pc_syntax.Sigs.PARSER) =
   let (module Conf) = Result.ok_or_failwith @@ mk_conf ?src file in
@@ -30,6 +30,7 @@ let mk_parse ?(tokenize = false) ?src file : (module Pc_syntax.Sigs.PARSER) =
 
 let dump_loc_mapping =
   let open Pc_syntax.Parsetree_mapping in
+  let open Compilerlibs406 in
   let open Parsetree in
   let open Location in
   let loc : 'a. 'a loc -> 'a loc = fun x -> { x with loc = none } in
@@ -198,25 +199,23 @@ let dump_loc_mapping =
   }
 
 type pv_pc = Angstrom | Tokenized
-
 type parser_variant = Pc of pv_pc | Rescript | Dummy
-
-type exec_stage = ParserInit | Parse | ResultPrint
+type exec_stage = ParserInit | Parse | ResultPrint [@@deriving eq]
 
 module Parser = struct
   module Rescript : Pc_syntax.Sigs.PARSE = struct
     let parse_interface ~src ~filename =
       let x = Res_parse_string.parse_interface ~src ~filename in
-      Some x
+      if x.invalid then None else Some x
 
     let parse_implementation ~src ~filename =
       let x = Res_parse_string.parse_implementation ~src ~filename in
-      Some x
+      if x.invalid then None else Some x
   end
 
   module Dummy : Pc_syntax.Sigs.PARSE = struct
     let parse_interface ~src ~filename =
-      let open Res_driver in
+      let open Syntax.Res_driver in
       Some
         {
           filename;
@@ -228,7 +227,7 @@ module Parser = struct
         }
 
     let parse_implementation ~src ~filename =
-      let open Res_driver in
+      let open Syntax.Res_driver in
       Some
         {
           filename;
@@ -246,7 +245,6 @@ module Parser = struct
     | Tokenized -> mk_parse ~tokenize:true config
 
   let rescipt : (module Pc_syntax.Sigs.PARSE) = (module Rescript)
-
   let dummy : (module Pc_syntax.Sigs.PARSE) = (module Dummy)
 
   let of_variant parser config : (module Pc_syntax.Sigs.PARSE) =
@@ -259,7 +257,6 @@ module Parser = struct
 end
 
 type input = { filename : string; src : string }
-
 type output = { channel : Out_channel.t; close : unit -> unit }
 
 let mk_input input =
@@ -268,7 +265,7 @@ let mk_input input =
       let filename =
         if Caml.Sys.file_exists "/dev/stdin" then "/dev/stdin" else "__stdin__"
       in
-      { filename; src = Core_kernel.In_channel.(input_all stdin) }
+      { filename; src = In_channel.(input_all stdin) }
   | Some filename -> { filename; src = read_file ~filename }
 
 let mk_output output =

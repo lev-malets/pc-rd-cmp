@@ -8,15 +8,15 @@ type 'a scan_result =
 let with_payload tag p = WithPayload { tag; payload = Caml.Obj.repr p }
 
 type 'a token = {
-  loc_start : Lexing.position;
-  loc_end : Lexing.position;
+  loc_start : Compilerlibs406.Lexing.position;
+  loc_end : Compilerlibs406.Lexing.position;
   tag : 'a;
   payload : Caml.Obj.t option;
 }
 
 type ('t, 'l) state_immutable = {
-  file_start : Lexing.position;
-  file_end : Lexing.position;
+  file_start : Compilerlibs406.Lexing.position;
+  file_end : Compilerlibs406.Lexing.position;
   tokens : 't token array;
   memo_tables : (int, (int, Caml.Obj.t) Hashtbl.t) Hashtbl.t;
   trace_depth : int ref;
@@ -39,7 +39,6 @@ let next_token_start state =
   else state.im.tokens.(state.pos).loc_start
 
 type ('a, 't, 'l) failure = ('t, 'l) state -> 'a option
-
 type ('a, 'r, 't, 'l) success = ('t, 'l) state -> 'a -> 'r option
 
 type ('a, 't, 'l) simple = {

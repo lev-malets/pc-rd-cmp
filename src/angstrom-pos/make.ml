@@ -1,4 +1,5 @@
-open Core_kernel
+open Core
+module Lexing = Compilerlibs406.Lexing
 
 module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
   type s = Conf.Log.elem
@@ -23,11 +24,8 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
     }
 
     let state = ref None
-
     let get () = match !state with Some x -> x | None -> failwith ""
-
     let set s = state := Some s
-
     let map f = set @@ f @@ get ()
 
     let init file_name =
@@ -57,7 +55,6 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
         }
 
     let trace_depth = ref 0
-
     let trace_entries = ref []
   end
 
@@ -70,15 +67,10 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       x
 
     let fail = get ()
-
     let t2 = get ()
-
     let t3 = get ()
-
     let t4 = get ()
-
     let cons = get ()
-
     let trace_entries = get ()
   end
 
@@ -95,7 +87,6 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
         }
 
       let ( >> ) = ( *> )
-
       let ( << ) = ( <* )
 
       let ( >>$ ) p v =
@@ -317,7 +308,7 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
                          run =
                            (fun i ->
                              let p = get @@ Lazy.force res in
-                             assert (p.info = info.info);
+                             assert (Parser.equal_info p.info info.info);
                              p.p.run i);
                        }
                       else { run = (fun i -> (get @@ Lazy.force res).p.run i) });
@@ -588,7 +579,7 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
           {
             Angstrom.Expose.Parser.run =
               (fun input pos more fail succ ->
-                let enter_time = Sys.time () in
+                let enter_time = Caml.Sys.time () in
                 let enter_pos = make_position pos in
                 let depth = State.trace_depth in
                 let entries = State.trace_entries in
@@ -599,7 +590,7 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
                   depth := d;
 
                   let exit_pos = make_position pos in
-                  let exit_time = Sys.time () in
+                  let exit_time = Caml.Sys.time () in
 
                   let entry =
                     Exec_info.
@@ -654,7 +645,6 @@ module Make (Conf : Pc.CONF) : Sigs.POS with type s = Conf.Log.elem = struct
       }
 
     let id p = p.id
-
     let simple p = p.p
 
     let eof =

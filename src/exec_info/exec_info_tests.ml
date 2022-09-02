@@ -1,5 +1,6 @@
 open Base
 open Exec_info
+open Compilerlibs406
 
 module Raws = struct
   let _x =
@@ -14,7 +15,6 @@ module Raws = struct
     }
 
   let empty = []
-
   let single = [ _x ]
 
   let complex =
@@ -40,14 +40,11 @@ end
 
 module Stats = struct
   let empty = to_stats Raws.empty
-
   let single = to_stats Raws.single
-
   let complex = to_stats Raws.complex
 end
 
 let%test "empty: stats are empty" = Hashtbl.length Stats.empty = 0
-
 let%test "single: stats table has one entry" = Hashtbl.length Stats.single = 1
 
 let%test "single stats" =

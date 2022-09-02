@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Run_common
 
 let print_ast ~pp ~output x =
@@ -10,8 +10,8 @@ let run input output ignore_loc =
   let (module Parse) = Parser.rescipt in
   let { filename; src } = mk_input input in
 
-  match Filename.extension filename with
-  | ".res" -> (
+  match Filename.split_extension filename with
+  | _, Some "res" -> (
       let x = Parse.parse_implementation ~filename ~src in
 
       match x with
@@ -22,8 +22,8 @@ let run input output ignore_loc =
               Pc_syntax.Parsetree_mapping.structure dump_loc_mapping x.parsetree
             else x.parsetree
           in
-          print_ast ~pp:Printast.implementation ~output pt)
-  | ".resi" -> (
+          print_ast ~pp:Compilerlibs406.Printast.implementation ~output pt)
+  | _, Some "resi" -> (
       let x = Parse.parse_interface ~filename ~src in
 
       match x with
@@ -34,13 +34,15 @@ let run input output ignore_loc =
               Pc_syntax.Parsetree_mapping.signature dump_loc_mapping x.parsetree
             else x.parsetree
           in
-          print_ast ~pp:Printast.interface ~output pt)
+          print_ast ~pp:Compilerlibs406.Printast.interface ~output pt)
   | _ -> failwith filename
 
 open Cmdliner
 
 let cmd =
   let open Args in
-  (Term.(const run $ input $ output $ ignore_loc), Term.info "print_expected")
+  Cmd.v
+    (Cmd.info "print_expected")
+    Term.(const run $ input $ output $ ignore_loc)
 
-let () = Term.exit @@ Term.eval cmd
+let () = Stdlib.exit @@ Cmd.eval cmd

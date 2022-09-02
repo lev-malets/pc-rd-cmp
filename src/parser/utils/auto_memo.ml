@@ -1,6 +1,8 @@
-open Core_kernel
+open Core
 open Run_common
 open Cmdliner
+open Float
+open Int
 
 let inex_forced =
   let open Hashtbl in
@@ -18,7 +20,7 @@ let inex_forced =
 let mk_conf inex =
   let inc, exc =
     Hashtbl.fold inex ~init:([], []) ~f:(fun ~key ~data (i, e) ->
-        if data > 0. then (key :: i, e) else (i, key :: e))
+        if data >. 0. then (key :: i, e) else (i, key :: e))
   in
 
   let mi =
@@ -33,9 +35,8 @@ let mk_conf inex =
 module type PARSER = sig
   include Pc_syntax.Sigs.PARSER
 
-  val str_p : Parsetree.structure Comb.t
-
-  val sig_p : Parsetree.signature Comb.t
+  val str_p : Compilerlibs406.Parsetree.structure Comb.t
+  val sig_p : Compilerlibs406.Parsetree.signature Comb.t
 end
 
 let mk_parse conf =
@@ -45,7 +46,6 @@ let mk_parse conf =
     open Comb
 
     let str_p = named "__root_str__" structure_parser
-
     let sig_p = named "__root_sig__" signature_parser
   end : PARSER)
 
@@ -53,13 +53,13 @@ let stats { filename; src } (module Parse : PARSER) agg_runs =
   let root_name, run =
     let open Parse in
     let open Comb in
-    match Filename.extension filename with
-    | ".res" ->
+    match Filename.split_extension filename with
+    | _, Some "res" ->
         ( "__root_str__",
           fun () ->
             let _, x = parse_string_with_trace str_p ~filename src in
             x )
-    | ".resi" ->
+    | _, Some "resi" ->
         ( "__root_sig__",
           fun () ->
             let _, x = parse_string_with_trace sig_p ~filename src in
@@ -78,7 +78,6 @@ let stats { filename; src } (module Parse : PARSER) agg_runs =
              | None -> data
              | Some x ->
                  {
-                   x with
                    call_count = x.call_count + data.call_count;
                    pos_count = x.pos_count + data.pos_count;
                    time = FloatStatistics.append data.time x.time;
@@ -132,7 +131,7 @@ let file_single_run input agg_runs chance_to_stop =
         let id = Hashtbl.find_exn P1.Comb.name2id candidate in
         let candidate_new_stats = Hashtbl.find_exn s1 id in
         let div = candidate_new_stats.time.sum /. time in
-        if div < 0.99 then
+        if div <. 0.99 then
           let _ =
             Hashtbl.set inex ~key:candidate
               ~data:(time -. candidate_new_stats.time.sum)
@@ -140,7 +139,7 @@ let file_single_run input agg_runs chance_to_stop =
           try_candidate root_name p1 s1
         else
           let _ =
-            if div <= 1.01 then Hashtbl.set inex ~key:candidate ~data:0.
+            if div <=. 1.01 then Hashtbl.set inex ~key:candidate ~data:0.
             else
               Hashtbl.set inex ~key:candidate
                 ~data:(time -. candidate_new_stats.time.sum)
@@ -160,7 +159,7 @@ let file_single_run input agg_runs chance_to_stop =
   in
   let sN_root = try_candidate root_name p0 s0 in
   let div = sN_root.time.sum /. s0_root.time.sum in
-  if div < 1. then (
+  if div <. 1. then (
     Printf.printf "  %.2f: %10.2f -> %10.2f" div
       (s0_root.time.sum *. 1_000_000. /. Float.of_int agg_runs)
       (sN_root.time.sum *. 1_000_000. /. Float.of_int agg_runs);
@@ -209,7 +208,7 @@ let run inputs output agg_runs file_runs chance_to_stop =
     Hashtbl.keys inex
     |> List.filter ~f:(fun x ->
            let d = Hashtbl.find_exn inex x in
-           d > 0.)
+           d >. 0.)
   in
   let inc =
     List.sort inc ~compare:(fun a b ->
@@ -220,7 +219,8 @@ let run inputs output agg_runs file_runs chance_to_stop =
 
   fprintf out.channel "Exclude\n";
   let inc =
-    Hashtbl.keys inex |> List.filter ~f:(fun x -> Hashtbl.find_exn inex x <= 0.)
+    Hashtbl.keys inex
+    |> List.filter ~f:(fun x -> Hashtbl.find_exn inex x <=. 0.)
   in
   let inc =
     List.sort inc ~compare:(fun a b ->
@@ -251,7 +251,7 @@ let chance_to_stop =
 
 let cmd =
   let open Args in
-  ( Term.(const run $ inputs $ output $ agg_runs $ file_runs $ chance_to_stop),
-    Term.info "exec" )
+  Cmd.v (Cmd.info "exec")
+    Term.(const run $ inputs $ output $ agg_runs $ file_runs $ chance_to_stop)
 
-let () = Term.exit @@ Term.eval cmd
+let () = Stdlib.exit @@ Cmd.eval cmd

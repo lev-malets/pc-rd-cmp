@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Cmdliner
 open Run_common
 
@@ -13,7 +13,7 @@ let run config input parser last_stage quota =
           ()
     | _ ->
         let parse_fn =
-          match Filename.extension filename with
+          match Filename.split_extension filename with
           | ".res" ->
               fun (module Parse : Pc_syntax.Sigs.PARSE) ->
                 let _ = Parse.parse_implementation ~filename ~src in
@@ -46,4 +46,4 @@ let cmd =
   ( Term.(const run $ config $ input $ parser $ last_stage $ quota),
     Term.info "bench" ~doc ~man )
 
-let () = Term.exit @@ Term.eval cmd
+let () = Stdlib.exit @@ Cmd.eval cmd

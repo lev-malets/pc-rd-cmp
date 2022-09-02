@@ -1,5 +1,6 @@
 open Base
 open Basic
+open Compilerlibs406
 open Parsetree
 open Asttypes
 open Ast_helper
@@ -31,7 +32,6 @@ struct
       module Comb = Comb
 
       let expression = getter.get @@ fun (module M : EXPRESSION) -> M.expression
-
       let expression_fun = getter.get @@ fun (module M) -> M.expression_fun
 
       let expression_sequence =
@@ -55,12 +55,10 @@ struct
           & (hlp2 @@ Vb.mk ?docs:None ?text:None)
             + pattern - ng - eq - ng + expression_fun
         in
-
         seq ~n:1 value_binding ~sep:(ng >> and' >> ng)
 
       let let' =
         let rec_flag = choice [ rec' >>$ Recursive; return Nonrecursive ] in
-
         named "expression:let"
           (with_loc
           & hlp3 Exp.let_ - let' - ng + rec_flag - ng + value_binding_list - del
@@ -98,7 +96,6 @@ struct
              in
              Exp.open_ ?loc ?attrs override name cont
            in
-
            with_loc
            & hlp3 f - open' + opt bang - ng + loc u_longident - del - ng
              + expression_sequence)
@@ -143,9 +140,7 @@ struct
               tail;
             ]
         in
-
         let label = tilda >> ng >> loc l_ident in
-
         let with_label =
           choice ~name:"expression:arrow:with_label"
             [
@@ -165,7 +160,6 @@ struct
               + label;
             ]
         in
-
         let with_value =
           choice ~name:"expression:arrow:with_value"
             [
@@ -176,7 +170,6 @@ struct
               mapping (fun (s, pat) -> (Labelled s, pat, None)) + with_label;
             ]
         in
-
         let nolabel =
           choice ~name:"expression:arrow:nolabel"
             [
@@ -187,25 +180,22 @@ struct
             ]
           >>| fun p -> (Nolabel, p, None)
         in
-
         let constr_unit =
           named "expression:arrow:unit"
             (let unit = l_paren >> r_paren >>$ Hc.lid [ "()" ] in
              let pat =
                loc unit >>| fun lid -> Pat.construct ~loc:lid.loc lid None
              in
-
-             mapping (fun p1 pat exp p2 ->
-                 Exp.fun_ ~loc:(loc_mk p1 p2) Nolabel None pat exp)
-             + pos + pat - ng + arrow_tail + pos)
+             exp_attrs & Sugar.async
+             & mapping (fun p1 pat exp p2 ->
+                   Exp.fun_ ~loc:(loc_mk p1 p2) Nolabel None pat exp)
+               + pos + pat - ng + arrow_tail + pos)
         in
-
         let with_many_args =
           let loop =
             fix_gen @@ fun getter ->
             let args_loop = getter.get @@ fun x -> x.args_loop in
             let types_loop = getter.get @@ fun x -> x.types_loop in
-
             let tail =
               choice ~name:"expression:arrow:many_args:tail"
                 [
@@ -215,7 +205,6 @@ struct
                   comma >> ng >> args_loop;
                 ]
             in
-
             let curried =
               choice ~name:"expression:arrow:many_args:curried"
                 [
@@ -228,7 +217,6 @@ struct
                   + pos + nolabel - ng + tail + pos;
                 ]
             in
-
             {
               args_loop =
                 choice ~name:"expression:arrow:many_args:args_loop"
@@ -242,15 +230,13 @@ struct
                   ];
             }
           in
-
           choice ~name:"expression:arrow:many_args"
             [
-              exp_attrs
+              exp_attrs & Sugar.async
               & l_paren >> ng >> exp_attrs (type' >> ng >> loop.types_loop);
-              exp_attrs & l_paren >> ng >> loop.args_loop;
+              exp_attrs & Sugar.async & l_paren >> ng >> loop.args_loop;
             ]
         in
-
         let constr_unit_uncurried =
           let unit =
             return (Longident.Lident "()") - l_paren - ng - dot - ng - r_paren
@@ -258,22 +244,21 @@ struct
           let pat =
             loc unit >>| fun lid -> Pat.construct ~loc:lid.loc lid None
           in
-
           named "expression:arrow:unit_uncur"
-            (mapping (fun p1 pat expr p2 ->
-                 Exp.fun_ ~loc:(loc_mk p1 p2) ~attrs:[ Hc.attr "bs" ] Nolabel
-                   None pat expr)
-            + pos + pat - ng + arrow_tail + pos)
+            (Sugar.async
+            & mapping (fun p1 pat expr p2 ->
+                  Exp.fun_ ~loc:(loc_mk p1 p2)
+                    ~attrs:[ Hc.attr "bs" ]
+                    Nolabel None pat expr)
+              + pos + pat - ng + arrow_tail + pos)
         in
-
         let only_arg =
           named "expression:arrow:one_arg"
-            (exp_attrs
+            (exp_attrs & Sugar.async
             & mapping (fun p1 p e p2 ->
                   Exp.fun_ ~loc:(loc_mk p1 p2) Nolabel None p e)
               + pos + pattern_atom - ng - arrow - ng + expression_fun + pos)
         in
-
         choice ~name:"expression:arrow"
           [ constr_unit; with_many_args; constr_unit_uncurried; only_arg ]
 
@@ -354,7 +339,6 @@ struct
           mapping (fun p1 pat ef dir et ea p2 ->
               Exp.for_ ~loc:(loc_mk p1 p2) pat ef et dir ea)
         in
-
         choice ~name:"expression:for"
           [
             mapping + pos - for' - ng + pattern - ng - in' - ng + expression
@@ -384,7 +368,6 @@ struct
         )
 
       let _unit_arg = _unit_arg_ Location.none
-
       let ident = with_loc & (hlp Exp.ident + loc l_longident)
 
       let jsx =
@@ -411,15 +394,12 @@ struct
               - question - ng + loc l_ident;
             ]
         in
-
         let children_list =
           with_loc
           & mapping (fun list -> list_helper list None)
             + seq expression ~sep:ng
         in
-
         let children = choice [ ellipsis >> expression; children_list ] in
-
         choice ~name:"expression:jsx"
           [
             named "jsx:leaf"
@@ -464,7 +444,6 @@ struct
                           (Longident.Ldot (tag.txt, "createElement"))
                           tag.loc
                    in
-
                    Exp.apply ~loc:(loc_mk p1 p2) tag
                      (args
                      @ [
@@ -529,12 +508,13 @@ struct
           (let nb =
              choice ~name:"expression:record:nb"
                [
-                 t2 + loc l_longident - ng - colon - ng + expression_fun;
-                 ( loc l_longident >>| fun lid ->
-                   (lid, Exp.ident ~loc:lid.loc lid) );
+                 t2 + loc l_longident - ng - colon - ng
+                 + Sugar.optional expression_fun;
+                 Sugar.optional1
+                   ( loc l_longident >>| fun lid ->
+                     (lid, Exp.ident ~loc:lid.loc (lid_drop_path lid)) );
                ]
            in
-
            with_loc
            & mapping (fun expr list loc -> Exp.record ~loc list expr)
              - l_brace - ng
@@ -553,13 +533,11 @@ struct
             + loc string_raw
             + opt (ng >> colon >> ng >> expression)
           in
-
           mapping (fun p1 list p2 -> Exp.record ~loc:(loc_mk p1 p2) list None)
           + pos - l_brace - ng
           + seq ~n:1 row ~sep ~trail:true
           - ng - r_brace + pos
         in
-
         named "bs_object"
           ( record >>| fun x ->
             Exp.extension ~loc:x.pexp_loc
@@ -739,18 +717,15 @@ struct
                 (Nolabel, e) );
             ]
         in
-
         let apply =
           named "expression:apply"
             (let flags = ref [] in
-
              let special_arg =
                mapping (fun loc ->
                    Exp.ident ~loc @@ Location.mkloc (Longident.Lident "__x") loc)
                + loc_of _'
                - exec (fun _ -> List.hd_exn !flags := true)
              in
-
              let params =
                choice ~name:"expression:apply:params"
                  [
@@ -761,14 +736,12 @@ struct
                      [ _unit_arg_ loc ] );
                  ]
              in
-
              let drop_flag =
                exec @@ fun _ ->
                let f = !(List.hd_exn !flags) in
                flags := List.tl_exn !flags;
                f
              in
-
              exec (fun _ -> flags := ref false :: !flags)
              >> choice
                   [
@@ -784,26 +757,25 @@ struct
                     drop_flag >> fail;
                   ])
         in
-
         let apply_uncurried =
           let apply_params = dot >> ng >> seq ~n:1 ~sep (labelled fail) in
-
           let args =
             named "expression:apply:uncurried:tail"
               (fold_left_cont_0_n
                  (mapping (fun args p2 expr ->
                       Exp.apply
                         ~loc:{ expr.pexp_loc with loc_end = p2 }
-                        ~attrs:[ Hc.attr "bs" ] expr args)
+                        ~attrs:[ Hc.attr "bs" ]
+                        expr args)
                  + apply_params + pos)
                  (mapping (fun args p3 cont expr ->
                       let expr = cont expr in
                       Exp.apply
                         ~loc:{ expr.pexp_loc with loc_end = p3 }
-                        ~attrs:[ Hc.attr "bs" ] expr args)
+                        ~attrs:[ Hc.attr "bs" ]
+                        expr args)
                  - ng - comma - ng + apply_params + pos))
           in
-
           let unit_arg =
             choice ~name:"expression:apply:uncurried:unit_arg"
               [
@@ -814,18 +786,17 @@ struct
                 return [ _unit_arg ] - l_paren - ng - dot - ng - r_paren;
               ]
           in
-
           choice ~name:"expression:apply:uncurried"
             [
               mapping (fun arg loc_end prev ->
                   Exp.apply
                     ~loc:{ prev.pexp_loc with loc_end }
-                    ~attrs:[ Hc.attr "bs" ] prev arg)
+                    ~attrs:[ Hc.attr "bs" ]
+                    prev arg)
               - ng + unit_arg + pos;
               ng >> l_paren >> ng >> args << opt sep << ng << r_paren;
             ]
         in
-
         let field =
           failed field_set_cont
           >> named "expression:field"
@@ -833,7 +804,6 @@ struct
                     Exp.field ~loc:{ prev.pexp_loc with loc_end } prev lid)
                - ng - dot - ng + loc l_longident + pos)
         in
-
         let object_get =
           failed object_set_cont
           >> named "expression:send"
@@ -841,7 +811,6 @@ struct
                     Exp.send ~loc:{ prev.pexp_loc with loc_end } prev str)
                - ng - l_bracket - ng + loc string_raw - ng - r_bracket + pos)
         in
-
         let array_get =
           failed array_set_cont
           >> named "expression:index"
@@ -853,7 +822,6 @@ struct
                - ng - l_bracket - ng + expression_constrainted - ng - r_bracket
                + pos)
         in
-
         choice [ apply; apply_uncurried; field; object_get; array_get ]
 
       let primary = named "expression:primary" (fold_left_cont_0_n atom tail)
@@ -864,7 +832,6 @@ struct
              choice ~name:"expression:set:cont"
                [ field_set_cont; object_set_cont; array_set_cont ]
            in
-
            fold_left_cont_0_1 primary set_cont)
 
       let unops = bang >>$ "not"
@@ -920,8 +887,8 @@ struct
           ]
 
       let p0 =
-        named "expression:p0"
-        & exp_attrs (choice ~name:"expression:p0:p" [ ifthenelse; unary ])
+        named "expression:p0" & exp_attrs & Sugar.await
+        & choice ~name:"expression:p0:p" [ ifthenelse; unary ]
 
       let expression_p0 = p0
 
@@ -935,7 +902,6 @@ struct
                 [ (Nolabel, left); (Nolabel, right) ])
           - ng + loc ops - ng + mp
         in
-
         fold_left_cont_0_n mp tail
 
       let left_assoc2 mp ops =
@@ -948,7 +914,6 @@ struct
                 [ (Nolabel, left); (Nolabel, right) ])
           + ops - ng + mp
         in
-
         fold_left_cont_0_n mp tail
 
       let p1 = named "expression:p1" @@ left_assoc p0 (minus_gt >>$ "|.")
@@ -973,7 +938,6 @@ struct
           >> choice ~name:"expression:p4:unl" [ minus_dot; minus ]
           >> failed ng_not_empty >> p0
         in
-
         named "expression:p4"
         @@ left_assoc2 p3
              (choice ~name:"expression:p4:op"
@@ -1020,13 +984,13 @@ struct
         named "expression:ternary"
           (with_loc
           & mapping (fun e1 e2 e3 loc ->
-                Exp.ifthenelse ~loc ~attrs:[ Hc.attr "ns.ternary" ] e1 e2
-                  (Some e3))
+                Exp.ifthenelse ~loc
+                  ~attrs:[ Hc.attr "ns.ternary" ]
+                  e1 e2 (Some e3))
             + p8 - ng - question - ng + expression_fun - ng - colon - ng
             + expression_fun)
 
       let expression = choice ~name:"expression" [ ternary; p8 ]
-
       let expression_fun = choice ~name:"expression_fun" [ fun'; expression ]
     end)
 

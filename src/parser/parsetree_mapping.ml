@@ -1,5 +1,5 @@
-open Parsetree
 open Base
+open Compilerlibs406.Parsetree
 
 type t = {
   signature : signature -> signature;
@@ -93,7 +93,6 @@ and class_type_declaration f x =
   f.class_type_declaration @@ class_infos class_type f x
 
 and attribute f x = f.attribute @@ id__payload f x
-
 and extension f x = f.extension @@ id__payload f x
 
 and id__payload f (s, p) =

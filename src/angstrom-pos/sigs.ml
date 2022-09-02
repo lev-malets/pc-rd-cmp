@@ -14,28 +14,16 @@ module type POS = sig
   end
 
   val advance : int -> unit t
-
   val any_char : char t
-
   val peek_char : char option t
-
   val s : string -> unit t
-
   val take_while : (char -> bool) -> string t
-
   val take_while1 : (char -> bool) -> string t
-
   val skip : (char -> bool) -> unit t
-
   val skip_while : (char -> bool) -> unit t
-
   val satisfy : (char -> bool) -> char t
-
   val new_line : string t
-
   val whitespace : unit t
-
   val with_literal : 'a t -> ('a * string) t
-
   val consumed : _ t -> string t
 end

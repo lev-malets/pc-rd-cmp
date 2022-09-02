@@ -1,18 +1,13 @@
-[formatter.nix]
-command = "nixpkgs-fmt"
-includes = ["*.nix"]
-excludes = ["tmp/*"]
-
 [formatter.ocaml]
 command = "ocamlformat"
 options = ["--inplace"]
 includes = ["*.ml"]
 excludes = ["data/*", "tmp/*"]
 
-[formatter.python]
-command = "black"
-includes = ["*.py"]
-excludes = ["data/*", "tmp/*"]
+# [formatter.python]
+# command = "black"
+# includes = ["*.py"]
+# excludes = ["data/*", "tmp/*"]
 
 [formatter.shell]
 command = "sh"

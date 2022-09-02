@@ -1,5 +1,10 @@
 (library
  (name tokenized)
- (libraries fix core_kernel compiler-libs.common exec_info pc)
+ (libraries
+  fix
+  core
+  exec_info
+  pc
+  rescript-syntax.compilerlibs406)
  (preprocess
-  (pps ppx_deriving__eq)))
+  (pps ppx_deriving.eq)))

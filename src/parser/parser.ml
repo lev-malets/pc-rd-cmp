@@ -1,5 +1,6 @@
 open Base
 open Basic
+open Compilerlibs406
 open Parsetree
 open Ast_helper
 open Asttypes
@@ -34,15 +35,10 @@ module Make (BasicBase : Sigs.BASIC_BASE) : Sigs.PARSER = struct
       module Comb = Comb
 
       let signature = getter.get @@ fun x -> x.signature
-
       let structure = getter.get @@ fun x -> x.structure
-
       let attribute = named "attribute" @@ id_payload_pair at
-
       let extension = named "extension" @@ id_payload_pair percent
-
       let attrs_ = named "attrs" & seq ~sep:ng ~trail:true attribute
-
       let attrs1_ = named "attrs1" @@ seq ~n:1 ~sep:ng ~trail:true attribute
 
       let pat_attrs p =
@@ -182,17 +178,18 @@ module Make (BasicBase : Sigs.BASIC_BASE) : Sigs.PARSER = struct
 
     let top_type mk =
       let first =
-        mapping (fun attrs eflag rec_flag decl ->
-            let decl =
-              match eflag with
-              | None -> decl
-              | Some loc -> tdecl_add_attr "genType" ~loc decl
-            in
+        mapping (fun attrs (*eflag*) rec_flag decl ->
+            (* let decl =
+                 match eflag with
+                 | None -> decl
+                 | Some loc -> tdecl_add_attr "genType" ~loc decl
+               in *)
             ( rec_flag,
               { decl with ptype_attributes = attrs @ decl.ptype_attributes } ))
         + attrs_
-        + opt (loc_of @@ export << ng)
-        - type' - ng
+        (* + opt (loc_of @@ export << ng) *)
+        - type'
+        - ng
         + choice
             [
               rec' >> ng >>$ Recursive;
@@ -203,15 +200,15 @@ module Make (BasicBase : Sigs.BASIC_BASE) : Sigs.PARSER = struct
       in
 
       let other =
-        mapping (fun attrs eflag decl ->
-            let decl =
-              match eflag with
-              | None -> decl
-              | Some loc -> tdecl_add_attr "genType" ~loc decl
-            in
+        mapping (fun attrs (*eflag*) decl ->
+            (* let decl =
+                 match eflag with
+                 | None -> decl
+                 | Some loc -> tdecl_add_attr "genType" ~loc decl
+               in *)
             { decl with ptype_attributes = attrs @ decl.ptype_attributes })
         + attrs_ - and' - ng
-        + opt (loc_of @@ export << ng)
+        (* + opt (loc_of @@ export << ng) *)
         + type_declaration
       in
 
@@ -475,38 +472,42 @@ module Make (BasicBase : Sigs.BASIC_BASE) : Sigs.PARSER = struct
            choice
              [
                with_loc
-               & mapping (fun attrs eflag rec_flag decl loc ->
-                     let decl =
-                       match eflag with
-                       | None -> decl attrs
-                       | Some loc -> decl (Hc.attr "genType" ~loc :: attrs)
-                     in
+               & mapping (fun attrs (*eflag*) rec_flag decl loc ->
+                     (* let decl =
+                          match eflag with
+                          | None -> decl attrs
+                          | Some loc -> decl (Hc.attr "genType" ~loc :: attrs)
+                        in *)
+                     let decl = decl attrs in
                      match rec_flag with
                      | None -> (Nonrecursive, decl loc)
                      | _ -> (Recursive, decl loc))
                  + attrs_
-                 + opt (loc_of export - ng)
-                 - let' - ng
+                 (* + opt (loc_of export - ng) *)
+                 - let'
+                 - ng
                  + opt (rec' << ng)
                  + helper;
-               with_loc
-               & mapping (fun attrs loc decl decl_loc ->
-                     ( Nonrecursive,
-                       decl (Hc.attr "genType" ~loc :: attrs) decl_loc ))
-                 + attrs_ + loc_of export - ng + helper;
+               (* with_loc
+                  & mapping (fun attrs loc decl decl_loc ->
+                        ( Nonrecursive,
+                          decl (Hc.attr "genType" ~loc :: attrs) decl_loc ))
+                    + attrs_ + loc_of export - ng + helper; *)
              ]
          in
          let other =
-           mapping (fun attrs p1 eflag x p2 ->
-               let decl =
-                 match eflag with
-                 | None -> x attrs
-                 | Some loc -> x (Hc.attr "genType" ~loc :: attrs)
-               in
+           mapping (fun attrs p1 (*eflag*) x p2 ->
+               (* let decl =
+                    match eflag with
+                    | None -> x attrs
+                    | Some loc -> x (Hc.attr "genType" ~loc :: attrs)
+                  in *)
+               let decl = x attrs in
                decl @@ loc_mk p1 p2)
            + attrs_ - and' - ng + pos
-           + opt (loc_of export - ng)
-           + helper + pos
+           (* + opt (loc_of export - ng) *)
+           + helper
+           + pos
          in
 
          with_del
@@ -578,7 +579,7 @@ module Make (BasicBase : Sigs.BASIC_BASE) : Sigs.PARSER = struct
 
     let p =
       mapping (fun x (comments, diagnostics) ->
-          Res_driver.
+          Syntax.Res_driver.
             {
               filename;
               source = src;
@@ -593,10 +594,7 @@ module Make (BasicBase : Sigs.BASIC_BASE) : Sigs.PARSER = struct
     parse_string p ~filename src
 
   let signature_parser = ng >> parsers.signature << ng
-
   let structure_parser = ng >> parsers.structure << ng
-
   let parse_interface = parse signature_parser
-
   let parse_implementation = parse structure_parser
 end

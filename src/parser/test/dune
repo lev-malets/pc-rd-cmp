@@ -11,4 +11,4 @@
 (executable
  (name test)
  (modules test)
- (libraries run_common alcotest))
+ (libraries run_common alcotest core_unix.sys_unix))

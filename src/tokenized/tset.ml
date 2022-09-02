@@ -1,7 +1,6 @@
 open Base
 
 type t = { w1 : Int64.t; w2 : Int64.t; w3 : Int64.t; w4 : Int64.t }
-
 type word_no = W1 | W2 | W3 | W4
 
 let word_no_of_code c =
@@ -46,7 +45,6 @@ let equal t1 t2 =
     && equal t1.w4 t2.w4)
 
 let of_list = List.fold_left ~f:add ~init:empty
-
 let singleton = add empty
 
 let range a b =

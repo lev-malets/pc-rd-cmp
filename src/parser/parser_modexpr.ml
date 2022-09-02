@@ -1,5 +1,6 @@
 open Base
 open Sigs
+open Compilerlibs406
 open Parsetree
 open Ast_helper
 open Basic

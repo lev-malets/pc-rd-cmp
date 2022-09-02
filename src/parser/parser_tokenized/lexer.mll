@@ -1,9 +1,11 @@
 {
 open Token
 open Tokenized.Parser
+open Core
 
-let char_code offset basic c = (Char.code c - Char.code basic + offset)
+let char_code offset basic c = (Char.to_int c - Char.to_int basic + offset)
 let cc16 c =
+    let open Char in
     if c < 'A' then
         char_code 0 '0' c
     else if c < 'a' then
@@ -139,7 +141,9 @@ and scan_token =
             match Lexing.lexeme lexbuf with
             | "and" -> Tag And
             | "as" -> Tag As
+            | "async" -> Tag Async
             | "assert" -> Tag Assert
+            | "await" -> Tag Await
             | "catch" -> Tag Catch
             | "constraint" -> Tag Constraint
             | "downto" -> Tag Downto
@@ -228,11 +232,11 @@ and char_end = parse | "'" { () }
 and char_escaped =
     parse
     | "x" (digit_16 as x1) (digit_16 as x2)
-        { Char.chr @@ cc16 x1 * 16 + cc16 x2 }
+        { Char.of_int_exn @@ cc16 x1 * 16 + cc16 x2 }
     | (digit_10 as x1) (digit_10 as x2) (digit_10 as x3)
-        { Char.chr @@ cc10 x1 * 100 + cc10 x2 * 10 + cc10 x3 }
+        { Char.of_int_exn @@ cc10 x1 * 100 + cc10 x2 * 10 + cc10 x3 }
     | "o" (digit_8 as x1) (digit_8 as x2) (digit_8 as x3)
-        { Char.chr @@ cc8 x1 * 64 + cc8 x2 * 8 + cc8 x3 }
+        { Char.of_int_exn @@ cc8 x1 * 64 + cc8 x2 * 8 + cc8 x3 }
     | '\\' { '\\' }
     | '\'' { '\'' }
     | ' ' { ' ' }
@@ -242,19 +246,25 @@ and char_escaped =
     | 'r' { '\r' }
 and char_escaped_for_string =
     parse
-    | "x" (digit_16 as x1) (digit_16 as x2) as x
-        { Some (Char.chr @@ cc16 x1 * 16 + cc16 x2, x) }
+    | "x" digit_16 digit_16 as x
+        { Some (x, x) }
     | (digit_10 as x1) (digit_10 as x2) (digit_10 as x3) as x
-        { Some (Char.chr @@ cc10 x1 * 100 + cc10 x2 * 10 + cc10 x3, x) }
-    | "o" (digit_8 as x1) (digit_8 as x2) (digit_8 as x3) as x
-        { Some (Char.chr @@ cc8 x1 * 64 + cc8 x2 * 8 + cc8 x3, x) }
-    | '\\' { Some ('\\', "\\") }
-    | '\'' { Some ('\'', "\'") }
-    | ' ' { Some (' ', " ") }
-    | 'n' { Some ('\n', "n") }
-    | 't' { Some ('\t', "t") }
-    | 'b' { Some ('\b', "b") }
-    | 'r' { Some ('\r', "r") }
+        {
+            let code = cc10 x1 * 100 + cc10 x2 * 10 + cc10 x3 in
+            let hex = Pc.Utils.to_hex_string code in
+            Some (x, hex)
+        }
+    | "o" digit_8 digit_8 digit_8 as x
+        { Some (x, x) }
+    | '\\' { Some ("\\", "\\") }
+    | '\'' { Some ("\'", "\'") }
+    | ' ' { Some (" ", " ") }
+    | 'n' { Some ("n", "n") }
+    | 't' { Some ("t", "t") }
+    | 'b' { Some ("b", "b") }
+    | 'r' { Some ("r", "r") }
+    | 'u' digit_16 digit_16 digit_16 digit_16 as x { Some (x, x) }
+    | '0' { Some ("0", "0") }
     | "" { None }
 and parse_string_ident =
     parse
@@ -271,7 +281,8 @@ and parse_string_ident =
     | '"' { () }
 and parse_template_string =
     parse
-    | [^ '\\' '`' '\n' '\r' '$']+ as x
+    | [^ '\\' '`' '\n' '\r' '$']+
+    | "\\`" | "\\$" | "\\\\" as x
         {
             Buffer.add_string buf x;
             parse_template_string lexbuf
@@ -280,21 +291,6 @@ and parse_template_string =
         {
             Lexing.new_line lexbuf;
             Buffer.add_string buf x;
-            parse_template_string lexbuf
-        }
-    | "\\`"
-        {
-            Buffer.add_char buf '`';
-            parse_template_string lexbuf
-        }
-    | "\\$"
-        {
-            Buffer.add_char buf '$';
-            parse_template_string lexbuf
-        }
-    | "\\\\"
-        {
-            Buffer.add_char buf '\\';
             parse_template_string lexbuf
         }
     | "${"
@@ -331,7 +327,7 @@ and parse_string =
         }
     | "\\\"" as x
         {
-            Buffer.add_char buf '\"';
+            Buffer.add_string buf x;
             Buffer.add_string buf2 x;
             parse_string lexbuf
         }
@@ -339,7 +335,8 @@ and parse_string =
         {
             begin match char_escaped_for_string lexbuf with
             | Some (x, s) ->
-                Buffer.add_char buf x;
+                Buffer.add_char buf '\\';
+                Buffer.add_string buf x;
                 Buffer.add_char buf2 '\\';
                 Buffer.add_string buf2 s
             | None ->

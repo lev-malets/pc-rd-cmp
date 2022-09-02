@@ -1,9 +1,9 @@
 (library
  (name exec_info)
  (modules exec_info)
- (libraries base)
+ (libraries base rescript-syntax.compilerlibs406)
  (preprocess
-  (pps ppx_sexp_conv ppx_deriving__ord)))
+  (pps ppx_sexp_conv ppx_deriving.ord)))
 
 (library
  (name exec_info_tests)

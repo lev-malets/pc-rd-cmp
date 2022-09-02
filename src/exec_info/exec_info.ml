@@ -1,4 +1,5 @@
 open Base
+open Compilerlibs406
 
 type entry = {
   id : int;
@@ -19,7 +20,6 @@ module PosKey = struct
     if c1 <> 0 then c1 else String.compare p1.pos_fname p2.pos_fname
 
   let sexp_of_t _ = failwith ""
-
   let hash p = p.Lexing.pos_bol
 end
 

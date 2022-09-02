@@ -1,7 +1,5 @@
 type string_info = { value : string; raw : string }
-
 type number_info = { value : string; suffix : char option }
-
 type e_cc_info = { code : int; raw : string }
 
 type t =
@@ -21,7 +19,9 @@ type t =
   | ErrorCharacterCode (* e_cc_info *)
   | And
   | As
+  | Async
   | Assert
+  | Await
   | Catch
   | Constraint
   | Downto

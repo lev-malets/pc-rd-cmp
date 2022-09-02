@@ -1,5 +1,6 @@
 open Base
 open Sigs
+open Compilerlibs406
 open Asttypes
 open Parsetree
 open Ast_helper
@@ -23,9 +24,7 @@ module Make (Basic : BASIC) (Core : CORE with module Comb = Basic.Comb) = struct
         getter.get @@ fun (module M : THIS) -> M.core_type_atom
 
       let core_type_fun = getter.get @@ fun (module M) -> M.core_type_fun
-
       let core_type = getter.get @@ fun (module M) -> M.core_type
-
       let core_type_poly = getter.get @@ fun (module M) -> M.core_type_poly
 
       let core_type_package =
@@ -42,7 +41,6 @@ module Make (Basic : BASIC) (Core : CORE with module Comb = Basic.Comb) = struct
             ]
 
       let var = with_loc & (hlp Typ.var + type_var)
-
       let any = with_loc & (mapping (fun loc -> Typ.any ~loc ()) - _')
 
       let constr =
@@ -235,7 +233,7 @@ module Make (Basic : BASIC) (Core : CORE with module Comb = Basic.Comb) = struct
       let label_declaration =
         named "label_declraration"
           (with_loc
-          & mapping (fun attrs mut name typ loc ->
+          & mapping (fun attrs mut name q typ loc ->
                 let mut = Base.Option.map mut ~f:(fun _ -> Asttypes.Mutable) in
                 let typ =
                   match typ with
@@ -246,11 +244,16 @@ module Make (Basic : BASIC) (Core : CORE with module Comb = Basic.Comb) = struct
                           { txt = Longident.Lident name.txt; loc = name.loc }
                         []
                 in
+                let attrs =
+                  if Option.is_none q then attrs
+                  else Hc.attr "ns.optional" :: attrs
+                in
 
                 Type.field ~loc ~attrs ?info:None ?mut name typ)
             + attrs_
             + opt (mutable' - ng)
             + loc l_ident
+            + opt (ng >> question)
             + opt (ng >> colon >> ng >> core_type_poly))
 
       let label_declarations =

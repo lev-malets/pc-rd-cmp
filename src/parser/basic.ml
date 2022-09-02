@@ -1,5 +1,7 @@
 open Base
+open Compilerlibs406
 open Parsetree
+open Syntax
 
 module LogElement = struct
   type t = Comment of Res_comment.t | Diagnostics of Res_diagnostics.t
@@ -57,10 +59,24 @@ let pat_loc p loc = { p with ppat_loc = loc }
 let pat_add_attr ?loc n x =
   { x with ppat_attributes = Hc.attr ?loc n :: x.ppat_attributes }
 
+let pat_prepend_attr ~loc_start ~attr x =
+  {
+    x with
+    ppat_attributes = attr :: x.ppat_attributes;
+    ppat_loc = { x.ppat_loc with loc_start };
+  }
+
 let exp_loc p loc = { p with pexp_loc = loc }
 
 let exp_add_attr ?loc n x =
   { x with pexp_attributes = Hc.attr ?loc n :: x.pexp_attributes }
+
+let exp_prepend_attr ~loc_start ~attr x =
+  {
+    x with
+    pexp_attributes = attr :: x.pexp_attributes;
+    pexp_loc = { x.pexp_loc with loc_start };
+  }
 
 let mod_loc p loc = { p with pmod_loc = loc }
 
@@ -83,3 +99,13 @@ let tdecl_add_attr ?loc n x =
 let str2lid x =
   let open Location in
   { x with txt = Longident.Lident x.txt }
+
+let lid_last_str x =
+  match[@warning "-8"] x.Location.txt with
+  | Longident.Lident s -> s
+  | Ldot (_, s) -> s
+
+let lid_drop_path x =
+  match[@warning "-8"] x.Location.txt with
+  | Longident.Lident _ -> x
+  | Ldot (_, s) -> { x with txt = Lident s }

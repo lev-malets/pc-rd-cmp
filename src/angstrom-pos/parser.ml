@@ -18,5 +18,6 @@ type _ typ =
       -> 'd typ
 
 type info = Unknown | Empty | Consume of { empty : bool; first : Charset.t }
+[@@deriving eq]
 
 type 'a t = { p : 'a Angstrom.t; info : info; typ : 'a typ; id : int }

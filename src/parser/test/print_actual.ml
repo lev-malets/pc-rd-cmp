@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Run_common
 
 let print_last_pos entries =
@@ -15,8 +15,8 @@ let run config input output parser ignore_loc =
   let (module Parse) = Parser.pc parser config in
   let { filename; src } = mk_input input in
 
-  match Filename.extension filename with
-  | ".res" -> (
+  match Filename.split_extension filename with
+  | _, Some "res" -> (
       let x, entries =
         Parse.Comb.parse_string_with_trace Parse.structure_parser ~filename src
       in
@@ -31,8 +31,8 @@ let run config input output parser ignore_loc =
               Pc_syntax.Parsetree_mapping.structure dump_loc_mapping x
             else x
           in
-          print_ast ~pp:Printast.implementation ~output pt)
-  | ".resi" -> (
+          print_ast ~pp:Compilerlibs406.Printast.implementation ~output pt)
+  | _, Some "resi" -> (
       let x, entries =
         Parse.Comb.parse_string_with_trace Parse.signature_parser ~filename src
       in
@@ -47,14 +47,14 @@ let run config input output parser ignore_loc =
               Pc_syntax.Parsetree_mapping.signature dump_loc_mapping x
             else x
           in
-          print_ast ~pp:Printast.interface ~output pt)
+          print_ast ~pp:Compilerlibs406.Printast.interface ~output pt)
   | _ -> failwith filename
 
 open Cmdliner
 
 let cmd =
   let open Args in
-  ( Term.(const run $ config $ input $ output $ parser_pc $ ignore_loc),
-    Term.info "print_actual" )
+  Cmd.v (Cmd.info "print_actual")
+    Term.(const run $ config $ input $ output $ parser_pc $ ignore_loc)
 
-let () = Term.exit @@ Term.eval cmd
+let () = Stdlib.exit @@ Cmd.eval cmd

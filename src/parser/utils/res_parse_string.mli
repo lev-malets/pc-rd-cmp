@@ -1,3 +1,6 @@
+open Syntax
+open Compilerlibs406
+
 val parse_implementation :
   src:string ->
   filename:string ->

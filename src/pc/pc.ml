@@ -1,3 +1,4 @@
+open Compilerlibs406
 open Base
 include Sigs
 
@@ -5,7 +6,6 @@ let loc_mk loc_start loc_end =
   Location.{ loc_start; loc_end; loc_ghost = false }
 
 let loc_comb loc1 loc2 = loc_mk loc1.Location.loc_start loc2.Location.loc_end
-
 let ( & ) = ( @@ )
 
 module Utils = struct
@@ -23,7 +23,6 @@ module Utils = struct
     Str.regexp s
 
   let empty_regexp = mk_regexp []
-
   let empty_regexp_pair = { accept = empty_regexp; decline = empty_regexp }
 
   module type MK_CONF = functor (Log : CONF_LOG) -> CONF with module Log = Log
@@ -33,9 +32,8 @@ module Utils = struct
         (string * (Yojson.Safe.t -> ('a, string) Result.t) * 'a Ref.t)
         -> unit parse_triplet
 
-  let mk_conf ?filename ~src : ((module MK_CONF), string) Result.t =
+  let mk_conf ?filename src : ((module MK_CONF), string) Result.t =
     let open Yojson.Safe in
-    let open Util in
     let open Result in
     let json = from_string ?fname:filename src in
 
@@ -169,6 +167,13 @@ module Utils = struct
 
   let check_string__pair pair str =
     check_string pair.accept str && not (check_string pair.decline str)
+
+  let to_hex_string c =
+    let to_hex_char c =
+      if c < 10 then Char.of_int_exn @@ (Char.to_int '0' + c)
+      else Char.of_int_exn @@ (Char.to_int 'a' + c - 10)
+    in
+    String.of_char_list [ 'x'; to_hex_char (c lsr 4); to_hex_char (c land 0xF) ]
 end
 
 module Make (Basic : COMB_BASE) :
@@ -179,11 +184,8 @@ module Make (Basic : COMB_BASE) :
   include Basic
 
   let ( + ) = ( <*> )
-
   let ( - ) = ( << )
-
   let fix ?info f = fix_gen (fun get -> f @@ get.get ?info (fun x -> x))
-
   let mapping = return
 
   let fold_left_0_n ~f nil p =
@@ -220,15 +222,10 @@ module Make (Basic : COMB_BASE) :
     + pos + p + pos_end
 
   let loc_of p = mapping loc_mk + pos - p + pos_end
-
   let with_loc p = mapping (fun p1 f p2 -> f (loc_mk p1 p2)) + pos + p + pos
-
   let memoid2id = Hashtbl.create (module Int)
-
   let id2memoid : (int, int) Hashtbl.t = Hashtbl.create (module Int)
-
   let name2id = Hashtbl.create (module String)
-
   let id2name = Hashtbl.create (module Int)
 
   let named (name : string) (p : 'a t) =

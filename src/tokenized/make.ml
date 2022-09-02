@@ -11,20 +11,14 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
       x
 
     let fail = get ()
-
     let t2 = get ()
-
     let t3 = get ()
-
     let t4 = get ()
-
     let cons = get ()
-
     let eof = get ()
   end
 
   type s = Conf.Log.elem
-
   type tag = Tokenizer.Tag.t
 
   let tag2int : tag -> int = Caml.Obj.magic
@@ -64,7 +58,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         }
 
       let exec f = { run = (fun state _fail succ -> succ state (f ())) }
-
       let lift f p = p >>| f
 
       let lift2 f p1 p2 =
@@ -150,7 +143,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         Lazy.force p
 
       let return x = { run = (fun state _fail succ -> succ state x) }
-
       let fail = { run = (fun state fail _succ -> fail state) }
 
       let many p =
@@ -176,7 +168,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
     end
 
     type 'a t = ('a, tag, Conf.Log.elem) Parser.t
-
     type 'b getter = { get : 'a 'c. ?info:'c t -> ('b -> 'a t) -> 'a t }
 
     let mk_parser_cont ~p ~typ p1 p2 =
@@ -327,7 +318,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
       { p = Simple.(return x); info = Empty; typ = Return x; id = Id.get () }
 
     let fail = { p = Simple.fail; info = Unknown; typ = Parser; id = Id.fail }
-
     let touch p = { p with id = Id.get () }
 
     let modify ~simple p =
@@ -335,7 +325,7 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
       | Parser -> { p = simple; id = Id.get (); typ = Parser; info = p.info }
       | _ -> failwith "check usage"
 
-    let pos : Lexing.position t =
+    let pos : Compilerlibs406.Lexing.position t =
       {
         p =
           {
@@ -346,7 +336,7 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         id = Id.get ();
       }
 
-    let pos_end : Lexing.position t =
+    let pos_end : Compilerlibs406.Lexing.position t =
       {
         p =
           { run = (fun state _fail succ -> succ state (prev_token_end state)) };
@@ -602,9 +592,9 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
                         {
                           id;
                           enter_time;
-                          enter_pos;
+                          enter_pos = Caml.Obj.magic enter_pos;
                           exit_time;
-                          exit_pos;
+                          exit_pos = Caml.Obj.magic exit_pos;
                           succeded;
                           depth = d;
                         }
@@ -661,15 +651,15 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
     let scan lexbuf =
       let rec loop tokens =
         Tokenizer.scan_space lexbuf;
-        let loc_start = lexbuf.lex_curr_p in
+        let loc_start = Caml.Obj.magic lexbuf.lex_curr_p in
         (* Caml.print_endline (Printf.sprintf "%d:%d" loc_start.pos_lnum Int.(loc_start.pos_cnum - loc_start.pos_bol + 1)); *)
         match Tokenizer.scan_token lexbuf with
         | Eof -> (tokens, loc_start)
         | Tag tag ->
-            let loc_end = lexbuf.lex_curr_p in
+            let loc_end = Caml.Obj.magic lexbuf.lex_curr_p in
             loop ({ loc_start; tag; payload = None; loc_end } :: tokens)
         | WithPayload { tag; payload } ->
-            let loc_end = lexbuf.lex_curr_p in
+            let loc_end = Caml.Obj.magic lexbuf.lex_curr_p in
             loop ({ loc_start; tag; payload = Some payload; loc_end } :: tokens)
       in
       let tokens, pos_eof = loop [] in
@@ -686,7 +676,7 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         {
           im =
             {
-              file_start = zero_pos;
+              file_start = Caml.Obj.magic zero_pos;
               file_end = pos_eof;
               tokens;
               memo_tables = Hashtbl.create (module Int);
@@ -719,7 +709,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
       x
 
     let id p = p.id
-
     let simple p = p.p
 
     let run p =
@@ -796,7 +785,6 @@ module Make (Tokenizer : Sigs.TOKENIZER) (Conf : Pc.CONF) :
         | _ -> None)
 
   let tkn_ tag = tkn_helper tag ~f:(fun _ -> Some ())
-
   let tkn_tag tag = tkn_helper tag ~f:(fun _ -> Some tag)
 
   let tkn_payload tag =

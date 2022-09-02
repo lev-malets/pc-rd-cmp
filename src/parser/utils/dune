@@ -1,18 +1,20 @@
 (library
  (name res_parse_string)
  (modules res_parse_string)
- (libraries syntax))
+ (libraries rescript-syntax.syntax))
 
 (library
  (name run_common)
  (modules run_common)
  (libraries
-  core_kernel
+  core
   res_parse_string
   pc_syntax
   parser_angstrom
   parser_tokenized
-  cmdliner))
+  cmdliner)
+ (preprocess
+  (pps ppx_deriving.eq)))
 
 (executable
  (name exec)

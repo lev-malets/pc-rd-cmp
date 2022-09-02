@@ -1,4 +1,5 @@
 open Base
+open Compilerlibs406
 open Sigs
 open Parsetree
 open Ast_helper
@@ -27,9 +28,7 @@ struct
       module Comb = Comb
 
       let _modtype = getter.get @@ fun (module M : THIS) -> M.modtype
-
       let modtype_functor = getter.get @@ fun (module M) -> M.modtype_functor
-
       let modtype_with = getter.get @@ fun (module M) -> M.modtype_with
 
       let modtype_atom =
@@ -107,20 +106,12 @@ struct
           choice ~name:"with constraint"
             [
               mapping (fun name decl ->
-                  let str =
-                    match[@warning "-8"] name.Location.txt with
-                    | Longident.Lident s -> s
-                    | Ldot (_, s) -> s
-                  in
+                  let str = lid_last_str name in
                   let decl = decl @@ Location.mkloc str name.loc in
                   Pwith_type (name, decl name.loc.loc_start))
               - type' - ng + loc l_longident - ng + type_decl eq;
               mapping (fun name decl ->
-                  let str =
-                    match[@warning "-8"] name.Location.txt with
-                    | Longident.Lident s -> s
-                    | Ldot (_, s) -> s
-                  in
+                  let str = lid_last_str name in
                   let decl = decl { name with txt = str } in
                   Pwith_typesubst (name, decl name.loc.loc_start))
               - type' - ng + loc l_longident - ng + type_decl colon_eq;

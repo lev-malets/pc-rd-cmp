@@ -1,6 +1,7 @@
-open Base
+open Compilerlibs406
 open Parsetree
 open Ast_helper
+open Base
 
 module type APOS = Angstrom_pos.S with type s = Pc_syntax.Basic.LogElement.t
 
@@ -15,185 +16,97 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
     open Comb
 
     let k x = s x >> failed (satisfy identifier's_character)
-
     let and' = k "and"
-
     let as' = k "as"
-
+    let async = k "async"
+    let await = k "await"
     let mutable' = k "mutable"
-
     let constraint' = k "constraint"
-
     let private' = k "private"
-
     let unpack = k "unpack"
-
     let export = k "export"
-
     let external' = k "external"
-
     let import = k "import"
-
     let from = k "from"
-
     let let' = k "let"
-
     let module' = k "module"
-
     let with' = k "with"
-
     let open' = k "open"
-
     let exception' = k "exception"
-
     let switch = k "switch"
-
     let try' = k "try"
-
     let catch = k "catch"
-
     let else' = k "else"
-
     let to' = k "to"
-
     let downto' = k "downto"
-
     let for' = k "for"
-
     let of' = k "of"
-
     let in' = k "in"
-
     let if' = k "if"
-
     let json_tag = k "json"
-
     let while' = k "while"
-
     let assert' = k "assert"
-
     let lazy' = k "lazy"
-
     let true' = k "true"
-
     let type' = k "type"
-
     let false' = k "false"
-
     let sig' = k "sig"
-
     let include' = k "include"
-
     let rec' = k "rec"
-
     let nonrec' = k "nonrec"
-
     let when' = k "when"
-
     let _' = k "_"
-
     let ampersand = s "&"
-
     let ampersand_ampersand = s "&&"
-
     let arrow = s "=>"
-
     let asterisk = s "*"
-
     let asterisk_asterisk = s "**"
-
     let asterisk_dot = s "*."
-
     let at = s "@"
-
     let at_at = s "@@"
-
     let bang = s "!"
-
     let bang_eq = s "!="
-
     let bang_eq_eq = s "!=="
-
     let colon = s ":"
-
     let colon_eq = s ":="
-
     let colon_gt = s ":>"
-
     let comma = s ","
-
     let dot = s "."
-
     let dot_dot = s ".."
-
     let ellipsis = s "..."
-
     let eq = s "="
-
     let eq_eq = s "=="
-
     let eq_eq_eq = s "==="
-
     let eq_op = failed arrow >> s "="
-
     let gt = s ">"
-
     let gt_eq = s ">="
-
     let hash = s "#"
-
     let hash_eq = s "#="
-
     let l_brace = s "{"
-
     let l_bracket = s "["
-
     let l_paren = s "("
-
     let list = s "list{"
-
     let lt = s "<"
-
     let lt_eq = s "<="
-
     let minus = s "-"
-
     let minus_dot = s "-."
-
     let minus_gt = s "->"
-
     let percent = s "%"
-
     let percent_percent = s "%%"
-
     let pipe = s "|"
-
     let pipe_gt = s "|>"
-
     let pipe_pipe = s "||"
-
     let plus = s "+"
-
     let plus_dot = s "+."
-
     let plus_eq = s "+="
-
     let plus_plus = s "++"
-
     let question = s "?"
-
     let r_brace = s "}"
-
     let r_bracket = s "]"
-
     let r_paren = s ")"
-
     let slash = s "/"
-
     let slash_dot = s "/."
-
     let tilda = s "~"
-
     let exp_sign = skip @@ function '-' | '+' -> true | _ -> false
 
     let value_part digit exp =
@@ -267,6 +180,14 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
     let decimal_code =
       satisfy (function '0' .. '9' -> true | _ -> false) >>| code 0 '0'
 
+    let oct_digit = satisfy (function '0' .. '7' -> true | _ -> false)
+    let dec_digit = satisfy (function '0' .. '9' -> true | _ -> false)
+
+    let hex_digit =
+      satisfy (function
+        | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> true
+        | _ -> false)
+
     let hexadecimal_code =
       choice
         [
@@ -275,27 +196,22 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
           satisfy (function 'A' .. 'F' -> true | _ -> false) >>| code 10 'A';
         ]
 
+    let hex_cc =
+      mapping Int.(fun _1 _2 -> (_1 * 16) + _2)
+      - s "x" + hexadecimal_code + hexadecimal_code
+
+    let dec_cc =
+      mapping Int.(fun _1 _2 _3 -> (_1 * 100) + (_2 * 10) + _3)
+      + (satisfy (function '0' .. '2' -> true | _ -> false) >>| code 0 '0')
+      + decimal_code + decimal_code
+
+    let oct_cc =
+      mapping Int.(fun _1 _2 _3 -> (_1 * 64) + (_2 * 8) + _3)
+      - s "o"
+      + (satisfy (function '0' .. '3' -> true | _ -> false) >>| code 0 '0')
+      + octal_code + octal_code
+
     let escaped =
-      let hex_cc =
-        mapping Int.(fun _1 _2 -> Char.of_int_exn @@ ((_1 * 16) + _2))
-        - s "x" + hexadecimal_code + hexadecimal_code
-      in
-
-      let dec_cc =
-        mapping
-          Int.(fun _1 _2 _3 -> Char.of_int_exn @@ ((_1 * 100) + (_2 * 10) + _3))
-        + (satisfy (function '0' .. '2' -> true | _ -> false) >>| code 0 '0')
-        + decimal_code + decimal_code
-      in
-
-      let oct_cc =
-        mapping
-          Int.(fun _1 _2 _3 -> Char.of_int_exn @@ ((_1 * 64) + (_2 * 8) + _3))
-        - s "o"
-        + (satisfy (function '0' .. '3' -> true | _ -> false) >>| code 0 '0')
-        + octal_code + octal_code
-      in
-
       choice ~name:"pa:char:escaped"
         [
           s "\\" >>$ '\\';
@@ -305,9 +221,9 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
           s "t" >>$ '\t';
           s "b" >>$ '\b';
           s "r" >>$ '\r';
-          hex_cc;
-          dec_cc;
-          oct_cc;
+          hex_cc >>| Char.of_int_exn;
+          dec_cc >>| Char.of_int_exn;
+          oct_cc >>| Char.of_int_exn;
         ]
 
     let p =
@@ -324,6 +240,23 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
 
     let character = p >>| Const.char
 
+    let escaped_in_string =
+      choice ~name:"pa:escaped_in_string"
+        [
+          s "\\" >>$ "\\\\";
+          s "\"" >>$ "\\\"";
+          s "n" >>$ "\\n";
+          s "t" >>$ "\\t";
+          s "b" >>$ "\\b";
+          s "r" >>$ "\\r";
+          s "0" >>$ "\\0";
+          consumed (s "u" >> hex_digit >> hex_digit >> hex_digit >> hex_digit)
+          >>| ( ^ ) "\\";
+          consumed (s "x" >> hex_digit >> hex_digit) >>| ( ^ ) "\\";
+          consumed (s "o" >> oct_digit >> oct_digit >> oct_digit) >>| ( ^ ) "\\";
+          consumed (dec_digit >> dec_digit >> dec_digit) >>| ( ^ ) "\\";
+        ]
+
     let string_raw =
       let parts =
         s "\""
@@ -335,13 +268,7 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
 
            cons + take_while not_escaped
            + choice
-               [
-                 s "\"" >>$ [];
-                 cons
-                 + choice
-                     [ s "\\" >> escaped >>| String.make 1; s "\\\"" >>$ "\"" ]
-                 + loop;
-               ]
+               [ s "\"" >>$ []; cons + (s "\\" >> escaped_in_string) + loop ]
       in
       parts >>| String.concat
 
@@ -360,6 +287,8 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
                  + choice
                      [
                        new_line;
+                       ( s "\\" >> dec_cc >>| fun c ->
+                         "\\" ^ Pc.Utils.to_hex_string c );
                        s ("\\" ^ q) >>$ "\\" ^ q;
                        s "\\\\" >>$ "\\\\";
                        s "\\" >>$ "\\";
@@ -371,25 +300,20 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
       Const.string ~quotation_delimiter:"js" @@ String.concat l
 
     let string_multiline = named "const:string:ml" & string_ml_helper ~q:"\""
-
     let template_no_template = string_ml_helper ~q:"`"
 
     let constant =
       choice ~name:"pa:constant" [ number; character; string_multiline ]
 
     let upper = function 'A' .. 'Z' -> true | _ -> false
-
     let lower = function 'a' .. 'z' | '_' -> true | _ -> false
 
     let c_ident first =
       consumed (skip first >> skip_while identifier's_character)
 
     let l_ident = named "l_ident" @@ failed @@ k "_" >> c_ident lower
-
     let u_ident = named "u_ident" @@ c_ident upper
-
     let ident = named "ident" & choice [ l_ident; u_ident ]
-
     let type_var = s "\'" >> ident
 
     let integer =
@@ -404,7 +328,8 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
         s "//"
         >> loc @@ take_while (function '\n' | '\r' -> false | _ -> true)
       in
-      p >>| fun { txt; loc } -> Res_comment.makeSingleLineComment ~loc txt
+      p >>| fun { txt; loc } ->
+      Syntax.Res_comment.makeSingleLineComment ~loc txt
 
     let multi_line_comment =
       let parts =
@@ -422,13 +347,14 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
       in
       let p = s "/*" >> parts in
       loc (p >>| String.concat) >>| fun { txt; loc } ->
-      Res_comment.makeMultiLineComment ~loc txt
+      Syntax.Res_comment.makeMultiLineComment ~loc ~docComment:false
+        ~standalone:false txt
 
     let comment =
       choice [ single_line_comment; multi_line_comment ]
       >>| fun x pos comments ->
       Pc_syntax.Basic.LogElement.Comment
-        (Res_comment.setPrevTokEndPos x pos;
+        (Syntax.Res_comment.setPrevTokEndPos x pos;
          x)
       :: comments
 
@@ -503,9 +429,9 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
         + choice
             [
               cons + new_line + parts;
-              cons + (s "\\`" >>$ "`") + parts;
-              cons + (s "\\$" >>$ "$") + parts;
-              cons + (s "\\\\" >>$ "\\") + parts;
+              cons + (s "\\`" >>$ "\\`") + parts;
+              cons + (s "\\$" >>$ "\\$") + parts;
+              cons + (s "\\\\" >>$ "\\\\") + parts;
               cons + (s "$" >> failed l_brace >>$ "$") + parts;
               return [];
             ]
@@ -525,6 +451,7 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
               tail
                 (Exp.apply
                    ~loc:(loc_mk prev.pexp_loc.loc_start pos)
+                   ~attrs:[ Hc.attr "res.template" ]
                    op
                    [ (Nolabel, prev); (Nolabel, expr) ]))
           - s "${" - ng + expression - ng - r_brace + pos + string_part
@@ -536,14 +463,16 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
                mapping (fun p2 str p1 prev ->
                    Exp.apply
                      ~loc:{ prev.pexp_loc with loc_end = p2 }
-                     ~attrs:[ Hc.attr "res.template" ] op
+                     ~attrs:[ Hc.attr "res.template" ]
+                     op
                      [ (Nolabel, prev); (Nolabel, str p1 p2) ])
                - s "`" + pos;
                mapping (fun p2 tail str p1 prev ->
                    tail
                    @@ Exp.apply
                         ~loc:{ prev.pexp_loc with loc_end = p2 }
-                        ~attrs:[ Hc.attr "res.template" ] op
+                        ~attrs:[ Hc.attr "res.template" ]
+                        op
                         [ (Nolabel, prev); (Nolabel, str p1 p2) ])
                + pos + tail;
              ]
@@ -559,7 +488,8 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
                        let e0 = str p1 pos1 in
                        let e1 =
                          Exp.apply ~loc:(loc_mk p1 pos2)
-                           ~attrs:[ Hc.attr "res.template" ] op
+                           ~attrs:[ Hc.attr "res.template" ]
+                           op
                            [ (Nolabel, e0); (Nolabel, expr) ]
                        in
                        tail e1)

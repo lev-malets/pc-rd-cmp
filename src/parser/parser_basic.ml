@@ -1,19 +1,15 @@
 open Base
+open Compilerlibs406
 open Parsetree
 
 module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
   include Base
 
   module type CORE = Sigs.CORE with module Comb = Comb
-
   module type MODEXPR = Sigs.MODEXPR with module Comb = Comb
-
   module type EXPRESSION = Sigs.EXPRESSION with module Comb = Comb
-
   module type PATTERN = Sigs.PATTERN with module Comb = Comb
-
   module type TYPE = Sigs.TYPE with module Comb = Comb
-
   module type MODTYPE = Sigs.MODTYPE with module Comb = Comb
 
   open Pc
@@ -50,7 +46,6 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
       + pos_end - ng + pos
 
   let with_del p = mapping (fun p1 f p2 -> f (loc_mk p1 p2)) + pos + p + del_pos
-
   let sep = ng >> comma >> ng
 
   let u_longident =
@@ -97,11 +92,8 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
          [ ident; string_raw; (integer >>| fun (x, _) -> x) ]
 
   let parens p = l_paren >> ng >> p << ng << r_paren
-
   let brackets p = l_bracket >> ng >> p << ng << r_bracket
-
   let braces p = l_brace >> ng >> p << ng << r_brace
-
   let chevrons p = lt >> ng >> p << ng << gt
 
   let na_hlp (f : ?loc:Warnings.loc -> 'a -> 'b) =
@@ -136,4 +128,39 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
       (f : ?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e)
       =
     return @@ fun attrs a b c d loc -> f ~attrs ~loc a b c d
+
+  module Sugar = struct
+    open Basic
+
+    let hlp ~get ~set ~update sym attr p =
+      let attr = Basic.Hc.attr attr in
+      mapping (fun loc_start f x ->
+          if Option.is_none f then x
+          else
+            let e = get x in
+            set x (update ~loc_start ~attr e))
+      + pos + opt sym - ng + p
+
+    let exp_hlp = hlp ~update:exp_prepend_attr
+    let pat_hlp = hlp ~update:pat_prepend_attr
+    let get x = x
+    let set _ x = x
+    let async = exp_hlp ~get ~set async "res.async"
+    let await = exp_hlp ~get ~set await "res.await"
+    let optional = exp_hlp ~get ~set question "ns.optional"
+
+    let optional1 p =
+      exp_hlp
+        ~get:(fun (_, x) -> x)
+        ~set:(fun (lid, _) x -> (lid, x))
+        question "ns.optional" p
+
+    let optional_pat = pat_hlp ~get ~set question "ns.optional"
+
+    let optional1_pat p =
+      pat_hlp
+        ~get:(fun (_, x) -> x)
+        ~set:(fun (lid, _) x -> (lid, x))
+        question "ns.optional" p
+  end
 end

@@ -1,5 +1,6 @@
 open Base
 open Sigs
+open Compilerlibs406
 open Asttypes
 open Parsetree
 open Ast_helper
@@ -71,18 +72,22 @@ struct
                loc_end
         in
 
+        let nb =
+          choice
+            [
+              t2 + loc l_longident - ng - colon - ng
+              + Sugar.optional_pat pattern_constrainted;
+              Sugar.optional1_pat
+              & mapping (fun lid ->
+                    ( lid,
+                      let str = lid2str lid in
+                      Pat.var ~loc:str.loc str ))
+                + loc l_longident;
+            ]
+        in
+
         with_loc
-        & hlp2 Pat.record - l_brace - ng
-          + seq ~n:1 ~sep
-              (mapping (fun lid pat ->
-                   match pat with
-                   | Some pat -> (lid, pat)
-                   | None ->
-                       ( lid,
-                         let str = lid2str lid in
-                         Pat.var ~loc:str.loc str ))
-              + loc l_longident
-              + opt (ng >> colon >> ng >> pattern_constrainted))
+        & hlp2 Pat.record - l_brace - ng + seq ~n:1 ~sep nb
           + choice ~name:"pattern:record:closed"
               [
                 opt sep >> ng >> r_brace >>$ Closed;

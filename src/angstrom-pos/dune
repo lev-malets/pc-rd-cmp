@@ -1,3 +1,5 @@
 (library
  (name angstrom_pos)
- (libraries angstrom fix core_kernel compiler-libs.common exec_info pc))
+ (libraries angstrom fix core exec_info pc)
+ (preprocess
+  (pps ppx_deriving.eq)))

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Run_common
 
 let search_files dirs =
@@ -6,17 +6,18 @@ let search_files dirs =
     match dirs with
     | [] -> acc
     | dir :: dirs ->
-        let files = Sys.readdir dir in
+        let files = Sys_unix.readdir dir in
         let rec loop_files i dirs acc =
           if i = Array.length files then loop dirs acc
           else
             let file = Filename.concat dir files.(i) in
-            if Sys.is_directory file then loop_files (i + 1) (file :: dirs) acc
-            else
-              match Filename.extension file with
-              | ".res" -> loop_files (i + 1) dirs ((file, false) :: acc)
-              | ".resi" -> loop_files (i + 1) dirs ((file, true) :: acc)
-              | _ -> loop_files (i + 1) dirs acc
+            match Sys_unix.is_directory file with
+            | `Yes -> loop_files (i + 1) (file :: dirs) acc
+            | _ -> (
+                match Filename.split_extension file with
+                | _, Some "res" -> loop_files (i + 1) dirs ((file, false) :: acc)
+                | _, Some "resi" -> loop_files (i + 1) dirs ((file, true) :: acc)
+                | _ -> loop_files (i + 1) dirs acc)
         in
         loop_files 0 dirs acc
   in
@@ -26,15 +27,15 @@ let files =
   search_files
     [
       "data/res";
-      "tmp/t/deps/syntax/tests/parsing/grammar";
-      "tmp/t/deps/syntax/benchmarks/data";
+      "tmp/deps/syntax/tests/parsing/grammar";
+      "tmp/deps/syntax/benchmarks/data";
     ]
   |> List.map ~f:(fun (n, f) -> (n, f, Stdio.In_channel.read_all n))
 
-let signature : Parsetree.signature Alcotest.testable =
+let signature : Compilerlibs406.Parsetree.signature Alcotest.testable =
   Alcotest.testable (fun fmt _ -> Fmt.pf fmt "<signature>") Poly.( = )
 
-let structure : Parsetree.structure Alcotest.testable =
+let structure : Compilerlibs406.Parsetree.structure Alcotest.testable =
   Alcotest.testable (fun fmt _ -> Fmt.pf fmt "<structure>") Poly.( = )
 
 let () =
@@ -42,11 +43,12 @@ let () =
   let config = Some "data/configs/test.json" in
   let (module Parse) = mk_parse ~tokenize:false config in
   let (module ParseT) = mk_parse ~tokenize:true config in
+  let och = Out_channel.create "out" in
 
   let mk_test_cases (module Parse : Pc_syntax.Sigs.PARSE) map_sig map_str =
     List.map files ~f:(fun (n, is_sig, s) ->
         let f =
-          let open Res_driver in
+          let open Syntax.Res_driver in
           if is_sig then fun () ->
             let expected =
               Parser.Rescript.parse_interface ~filename:n ~src:s
@@ -58,6 +60,7 @@ let () =
             in
             check' (option signature) ~msg:n ~expected ~actual
           else fun () ->
+            Printf.fprintf och "%s\n" n;
             let expected =
               Parser.Rescript.parse_implementation ~filename:n ~src:s
               |> Option.map ~f:(fun x -> map_str x.parsetree)
