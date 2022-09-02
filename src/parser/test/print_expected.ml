@@ -8,12 +8,10 @@ let print_ast ~pp ~output x =
 
 let run input output ignore_loc =
   let (module Parse) = Parser.rescipt in
-  let { filename; src } = mk_input input in
-
+  let {filename; src} = mk_input input in
   match Filename.split_extension filename with
   | _, Some "res" -> (
       let x = Parse.parse_implementation ~filename ~src in
-
       match x with
       | None -> failwith "x"
       | Some x ->
@@ -25,7 +23,6 @@ let run input output ignore_loc =
           print_ast ~pp:Compilerlibs406.Printast.implementation ~output pt)
   | _, Some "resi" -> (
       let x = Parse.parse_interface ~filename ~src in
-
       match x with
       | None -> failwith "x"
       | Some x ->

@@ -23,7 +23,7 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
           match p1.pos_cnum = p2.pos_cnum with
           | true -> fail
           | false -> return ())
-      + pos_end - ng + pos
+      <*> pos_end <*>. pos
 
   let ng_no_new_line =
     run
@@ -33,7 +33,7 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
           match p1.pos_lnum = p2.pos_lnum with
           | true -> return ()
           | false -> fail)
-      + pos_end - ng + pos
+      <*> pos_end <*>. pos
 
   let ng_new_line =
     run
@@ -43,9 +43,11 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
           match p1.pos_lnum = p2.pos_lnum with
           | true -> fail
           | false -> return ())
-      + pos_end - ng + pos
+      <*> pos_end <*>. pos
 
-  let with_del p = mapping (fun p1 f p2 -> f (loc_mk p1 p2)) + pos + p + del_pos
+  let with_del p =
+    mapping (fun p1 f p2 -> f (loc_mk p1 p2)) <*> pos <*> p <*> del_pos
+
   let sep = ng >> comma >> ng
 
   let u_longident =
@@ -57,44 +59,39 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
 
   let l_longident =
     choice ~name:"l_longident"
-      [
-        mapping (fun a b -> Longident.Ldot (a, b))
-        + u_longident - ng - dot - ng + l_ident;
-        (l_ident >>| fun s -> Longident.Lident s);
-      ]
+      [ mapping (fun a b -> Longident.Ldot (a, b))
+        <*> u_longident <<. dot <*>. l_ident
+      ; (l_ident >>| fun s -> Longident.Lident s) ]
 
   let longident =
     choice ~name:"longident"
-      [
-        mapping (fun a b ->
-            match b with None -> a | Some b -> Longident.Ldot (a, b))
-        + u_longident
-        + opt (ng >> dot >> ng >> l_ident);
-        (l_ident >>| fun s -> Longident.Lident s);
-      ]
+      [ mapping (fun a b ->
+            match b with
+            | None -> a
+            | Some b -> Longident.Ldot (a, b))
+        <*> u_longident
+        <*> opt (ng >> dot >> ng >> l_ident)
+      ; (l_ident >>| fun s -> Longident.Lident s) ]
 
   let attribute_id =
     fold_left_0_n
-      ~f:(fun buf x ->
-        Buffer.add_char buf '.';
-        Buffer.add_string buf x;
-        buf)
-      ( ident >>| fun x ->
-        let buf = Buffer.create (String.length x) in
-        Buffer.add_string buf x;
-        buf )
+      ~f:(fun buf x -> Buffer.add_char buf '.'; Buffer.add_string buf x; buf)
+      (ident
+      >>| fun x ->
+      let buf = Buffer.create (String.length x) in
+      Buffer.add_string buf x; buf)
       (ng >> dot >> ng >> ident)
     >>| Buffer.contents
 
   let variant_tag =
     hash >> ng
     >> choice ~name:"variant_tag:tag"
-         [ ident; string_raw; (integer >>| fun (x, _) -> x) ]
+         [ident; string_raw; (integer >>| fun (x, _) -> x)]
 
-  let parens p = l_paren >> ng >> p << ng << r_paren
-  let brackets p = l_bracket >> ng >> p << ng << r_bracket
-  let braces p = l_brace >> ng >> p << ng << r_brace
-  let chevrons p = lt >> ng >> p << ng << gt
+  let parens p = l_paren >> ng >> p <<. r_paren
+  let brackets p = l_bracket >> ng >> p <<. r_bracket
+  let braces p = l_brace >> ng >> p <<. r_brace
+  let chevrons p = lt >> ng >> p <<. gt
 
   let na_hlp (f : ?loc:Warnings.loc -> 'a -> 'b) =
     return @@ fun a loc -> f ~loc a
@@ -139,7 +136,7 @@ module Make (Base : Sigs.BASIC_BASE) : Sigs.BASIC = struct
           else
             let e = get x in
             set x (update ~loc_start ~attr e))
-      + pos + opt sym - ng + p
+      <*> pos <*> opt sym <*>. p
 
     let exp_hlp = hlp ~update:exp_prepend_attr
     let pat_hlp = hlp ~update:pat_prepend_attr

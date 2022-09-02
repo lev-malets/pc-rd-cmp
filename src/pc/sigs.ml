@@ -4,27 +4,23 @@ module type CONF_LOG = sig
   type elem
 end
 
-type regexp_pair = { accept : Str.regexp; decline : Str.regexp }
+type regexp_pair = {accept : Str.regexp; decline : Str.regexp}
 
 module Config = struct
   module Peek = struct
     module Auto = struct
-      type t = Disable | Enable of { min_variants : int }
+      type t = Disable | Enable of {min_variants : int}
 
       let default_min_variants = 3
       let default = Disable
-      let default_enable = Enable { min_variants = default_min_variants }
+      let default_enable = Enable {min_variants = default_min_variants}
     end
 
-    type t = { filter : regexp_pair; auto : Auto.t }
+    type t = {filter : regexp_pair; auto : Auto.t}
   end
 
-  type t = {
-    debug : bool;
-    memoize : regexp_pair;
-    trace : regexp_pair;
-    peek : Peek.t;
-  }
+  type t =
+    {debug : bool; memoize : regexp_pair; trace : regexp_pair; peek : Peek.t}
 end
 
 module type CONF = sig
@@ -53,7 +49,7 @@ module type COMB_COMMON = sig
   end
 
   type 'a t
-  type 'b getter = { get : 'a 'c. ?info:'c t -> ('b -> 'a t) -> 'a t }
+  type 'b getter = {get : 'a 'c. ?info:'c t -> ('b -> 'a t) -> 'a t}
 
   val simple : 'a t -> 'a Simple.t
   val ( >> ) : _ t -> 'a t -> 'a t
@@ -103,8 +99,6 @@ end
 module type COMB = sig
   include COMB_COMMON
 
-  val ( + ) : ('a -> 'b) t -> 'a t -> 'b t
-  val ( - ) : 'a t -> _ t -> 'a t
   val fix : ?info:_ t -> ('a t -> 'a t) -> 'a t
   val mapping : ('a -> 'b) -> ('a -> 'b) t
   val fold_left_0_n : f:('a -> 'b -> 'a) -> 'a t -> 'b t -> 'a t

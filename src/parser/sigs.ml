@@ -98,7 +98,6 @@ module type BASIC_BASE = sig
   val downto' : unit Comb.t
   val else' : unit Comb.t
   val exception' : unit Comb.t
-  val export : unit Comb.t
   val external' : unit Comb.t
   val false' : unit Comb.t
   val for' : unit Comb.t
@@ -198,6 +197,11 @@ module type BASIC_BASE = sig
   val ng : unit Comb.t
   val del_pos : Lexing.position Comb.t
   val del : unit Comb.t
+
+  val ( <<. ) : 'a Comb.t -> _ Comb.t -> 'a Comb.t
+  (** a <<. b = a << ng << b *)
+
+  val ( <*>. ) : ('a -> 'b) Comb.t -> 'a Comb.t -> 'b Comb.t
 end
 
 module type BASIC = sig
@@ -229,36 +233,36 @@ module type BASIC = sig
     (?loc:Warnings.loc -> 'a -> 'b) -> ('a -> Location.t -> 'b) Comb.t
 
   val hlp :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) ->
-    ('a -> Location.t -> 'b) Comb.t
+       (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b)
+    -> ('a -> Location.t -> 'b) Comb.t
 
   val hlp2 :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) ->
-    ('a -> 'b -> Location.t -> 'c) Comb.t
+       (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c)
+    -> ('a -> 'b -> Location.t -> 'c) Comb.t
 
   val hlp3 :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) ->
-    ('a -> 'b -> 'c -> Location.t -> 'd) Comb.t
+       (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd)
+    -> ('a -> 'b -> 'c -> Location.t -> 'd) Comb.t
 
   val hlp4 :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) ->
-    ('a -> 'b -> 'c -> 'd -> Location.t -> 'e) Comb.t
+       (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e)
+    -> ('a -> 'b -> 'c -> 'd -> Location.t -> 'e) Comb.t
 
   val hlp_a :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b) ->
-    (attributes -> 'a -> Location.t -> 'b) Comb.t
+       (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b)
+    -> (attributes -> 'a -> Location.t -> 'b) Comb.t
 
   val hlp2_a :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c) ->
-    (attributes -> 'a -> 'b -> Location.t -> 'c) Comb.t
+       (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c)
+    -> (attributes -> 'a -> 'b -> Location.t -> 'c) Comb.t
 
   val hlp3_a :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd) ->
-    (attributes -> 'a -> 'b -> 'c -> Location.t -> 'd) Comb.t
+       (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd)
+    -> (attributes -> 'a -> 'b -> 'c -> Location.t -> 'd) Comb.t
 
   val hlp4_a :
-    (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e) ->
-    (attributes -> 'a -> 'b -> 'c -> 'd -> Location.t -> 'e) Comb.t
+       (?loc:Warnings.loc -> ?attrs:attributes -> 'a -> 'b -> 'c -> 'd -> 'e)
+    -> (attributes -> 'a -> 'b -> 'c -> 'd -> Location.t -> 'e) Comb.t
 
   module Sugar : sig
     val async : expression Comb.t -> expression Comb.t

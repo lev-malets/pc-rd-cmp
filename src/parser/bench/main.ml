@@ -3,8 +3,7 @@ open Cmdliner
 open Run_common
 
 let run config input parser last_stage quota =
-  let { filename; src } = mk_input input in
-
+  let {filename; src} = mk_input input in
   let fn =
     match last_stage with
     | ParserInit ->
@@ -28,22 +27,20 @@ let run config input parser last_stage quota =
           let _ = parse_fn @@ Parser.of_variant parser config in
           ()
   in
-
   let test = Core_bench.Bench.Test.create ~name:"test" fn in
   let run_config =
     Core_bench.Bench.Run_config.create
       ~time_quota:(Core.Time.Span.of_sec quota)
       ()
   in
-  Core_bench.Bench.bench ~run_config [ test ]
+  Core_bench.Bench.bench ~run_config [test]
 
 let cmd =
-  let quota = Arg.(value & opt float 10. & info ~docv:"SECONDS" [ "quota" ]) in
-
+  let quota = Arg.(value & opt float 10. & info ~docv:"SECONDS" ["quota"]) in
   let open Args in
   let doc = "" in
-  let man = [ `S Manpage.s_description ] in
-  ( Term.(const run $ config $ input $ parser $ last_stage $ quota),
-    Term.info "bench" ~doc ~man )
+  let man = [`S Manpage.s_description] in
+  ( Term.(const run $ config $ input $ parser $ last_stage $ quota)
+  , Term.info "bench" ~doc ~man )
 
 let () = Stdlib.exit @@ Cmd.eval cmd

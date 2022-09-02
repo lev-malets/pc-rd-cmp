@@ -1,6 +1,6 @@
-type string_info = { value : string; raw : string }
-type number_info = { value : string; suffix : char option }
-type e_cc_info = { code : int; raw : string }
+type string_info = {value : string; raw : string}
+type number_info = {value : string; suffix : char option}
+type e_cc_info = {code : int; raw : string}
 
 type t =
   | LIdent (* of string *)
@@ -27,7 +27,6 @@ type t =
   | Downto
   | Else
   | Exception
-  | Export
   | External
   | False
   | For

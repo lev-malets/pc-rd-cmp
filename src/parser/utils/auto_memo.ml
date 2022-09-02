@@ -13,7 +13,6 @@ let inex_forced =
   add_exn t ~key:"expression:p8" ~data:Float.infinity;
   add_exn t ~key:"expression:in_braces" ~data:Float.infinity;
   add_exn t ~key:"attrs" ~data:Float.infinity;
-
   add_exn t ~key:"tkn:.*" ~data:Float.neg_infinity;
   t
 
@@ -22,7 +21,6 @@ let mk_conf inex =
     Hashtbl.fold inex ~init:([], []) ~f:(fun ~key ~data (i, e) ->
         if data >. 0. then (key :: i, e) else (i, key :: e))
   in
-
   let mi =
     String.concat ~sep:"," @@ List.map ~f:(fun x -> "\"" ^ x ^ "\"") inc
   in
@@ -49,24 +47,23 @@ let mk_parse conf =
     let sig_p = named "__root_sig__" signature_parser
   end : PARSER)
 
-let stats { filename; src } (module Parse : PARSER) agg_runs =
+let stats {filename; src} (module Parse : PARSER) agg_runs =
   let root_name, run =
     let open Parse in
     let open Comb in
     match Filename.split_extension filename with
     | _, Some "res" ->
-        ( "__root_str__",
-          fun () ->
+        ( "__root_str__"
+        , fun () ->
             let _, x = parse_string_with_trace str_p ~filename src in
             x )
     | _, Some "resi" ->
-        ( "__root_sig__",
-          fun () ->
+        ( "__root_sig__"
+        , fun () ->
             let _, x = parse_string_with_trace sig_p ~filename src in
             x )
     | _ -> failwith filename
   in
-
   let entries_list = List.init agg_runs ~f:(fun _ -> run ()) in
   let stats_list = List.map ~f:Exec_info.to_stats @@ entries_list in
   let stats = Hashtbl.create (module Int) in
@@ -77,14 +74,12 @@ let stats { filename; src } (module Parse : PARSER) agg_runs =
            Hashtbl.update stats key ~f:(function
              | None -> data
              | Some x ->
-                 {
-                   call_count = x.call_count + data.call_count;
-                   pos_count = x.pos_count + data.pos_count;
-                   time = FloatStatistics.append data.time x.time;
-                   time_individual =
+                 { call_count = x.call_count + data.call_count
+                 ; pos_count = x.pos_count + data.pos_count
+                 ; time = FloatStatistics.append data.time x.time
+                 ; time_individual =
                      FloatStatistics.append data.time_individual
-                       x.time_individual;
-                 })));
+                       x.time_individual })));
   (root_name, stats)
 
 let memo_candidate name_of_id stats (config : Pc.Config.t) change_to_stop =
@@ -104,10 +99,8 @@ let memo_candidate name_of_id stats (config : Pc.Config.t) change_to_stop =
             cond && not d
           in
           let cond = cond && data.call_count > data.pos_count in
-
           if cond then (name, data.time.sum) :: acc else acc)
     in
-
     let len = List.length list in
     if len = 0 then None
     else
@@ -144,12 +137,10 @@ let file_single_run input agg_runs chance_to_stop =
               Hashtbl.set inex ~key:candidate
                 ~data:(time -. candidate_new_stats.time.sum)
           in
-
           let conf = mk_conf inex in
           let p2 = mk_parse conf in
           try_candidate root_name p2 s0
   in
-
   let conf = mk_conf inex in
   let p0 = mk_parse conf in
   let root_name, s0 = stats input p0 agg_runs in
@@ -198,7 +189,8 @@ let run inputs output agg_runs file_runs chance_to_stop =
         let input = mk_input (Some input) in
         let inex_ = file_run input agg_runs file_runs chance_to_stop in
         Hashtbl.merge_into ~src:inex_ ~dst:inex ~f:(fun ~key:_ a -> function
-          | None -> Set_to (a *. weight) | Some b -> Set_to (b +. (a *. weight)));
+          | None -> Set_to (a *. weight)
+          | Some b -> Set_to (b +. (a *. weight)));
         loop xs
   in
   loop inputs;
@@ -216,7 +208,6 @@ let run inputs output agg_runs file_runs chance_to_stop =
   in
   List.iter inc ~f:(fun x ->
       fprintf out.channel "    %5.2f: %s\n" (Hashtbl.find_exn inex x) x);
-
   fprintf out.channel "Exclude\n";
   let inc =
     Hashtbl.keys inex
@@ -235,19 +226,19 @@ let inputs =
   Arg.(
     non_empty
     & opt_all (pair ~sep:'*' string float) []
-    & info ~doc ~docv:"FILE" [ "inputs" ])
+    & info ~doc ~docv:"FILE" ["inputs"])
 
 let file_runs =
   let doc = "Input file" in
-  Arg.(value & opt int 5 & info ~doc ~docv:"FILE" [ "file-runs" ])
+  Arg.(value & opt int 5 & info ~doc ~docv:"FILE" ["file-runs"])
 
 let agg_runs =
   let doc = "Input file" in
-  Arg.(value & opt int 10 & info ~doc ~docv:"FILE" [ "agg-runs" ])
+  Arg.(value & opt int 10 & info ~doc ~docv:"FILE" ["agg-runs"])
 
 let chance_to_stop =
   let doc = "Input file" in
-  Arg.(value & opt int 5 & info ~doc ~docv:"FILE" [ "chance-to-stop" ])
+  Arg.(value & opt int 5 & info ~doc ~docv:"FILE" ["chance-to-stop"])
 
 let cmd =
   let open Args in

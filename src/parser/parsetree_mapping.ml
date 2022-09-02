@@ -1,39 +1,38 @@
 open Base
 open Compilerlibs406.Parsetree
 
-type t = {
-  signature : signature -> signature;
-  signature_item : signature_item -> signature_item;
-  structure : structure -> structure;
-  structure_item : structure_item -> structure_item;
-  pattern : pattern -> pattern;
-  expression : expression -> expression;
-  core_type : core_type -> core_type;
-  module_expr : module_expr -> module_expr;
-  module_type : module_type -> module_type;
-  class_expr : class_expr -> class_expr;
-  class_field : class_field -> class_field;
-  class_type : class_type -> class_type;
-  class_type_field : class_type_field -> class_type_field;
-  attribute : attribute -> attribute;
-  extension : extension -> extension;
-  class_structure : class_structure -> class_structure;
-  class_description : class_description -> class_description;
-  class_type_declaration : class_type_declaration -> class_type_declaration;
-  extension_constructor : extension_constructor -> extension_constructor;
-  module_binding : module_binding -> module_binding;
-  module_type_declaration : module_type_declaration -> module_type_declaration;
-  module_declaration : module_declaration -> module_declaration;
-  open_description : open_description -> open_description;
-  type_extension : type_extension -> type_extension;
-  type_declaration : type_declaration -> type_declaration;
-  value_description : value_description -> value_description;
-  constructor_declaration : constructor_declaration -> constructor_declaration;
-  value_binding : value_binding -> value_binding;
-  label_declaration : label_declaration -> label_declaration;
-  include_description : include_description -> include_description;
-  include_declaration : include_declaration -> include_declaration;
-}
+type t =
+  { signature : signature -> signature
+  ; signature_item : signature_item -> signature_item
+  ; structure : structure -> structure
+  ; structure_item : structure_item -> structure_item
+  ; pattern : pattern -> pattern
+  ; expression : expression -> expression
+  ; core_type : core_type -> core_type
+  ; module_expr : module_expr -> module_expr
+  ; module_type : module_type -> module_type
+  ; class_expr : class_expr -> class_expr
+  ; class_field : class_field -> class_field
+  ; class_type : class_type -> class_type
+  ; class_type_field : class_type_field -> class_type_field
+  ; attribute : attribute -> attribute
+  ; extension : extension -> extension
+  ; class_structure : class_structure -> class_structure
+  ; class_description : class_description -> class_description
+  ; class_type_declaration : class_type_declaration -> class_type_declaration
+  ; extension_constructor : extension_constructor -> extension_constructor
+  ; module_binding : module_binding -> module_binding
+  ; module_type_declaration : module_type_declaration -> module_type_declaration
+  ; module_declaration : module_declaration -> module_declaration
+  ; open_description : open_description -> open_description
+  ; type_extension : type_extension -> type_extension
+  ; type_declaration : type_declaration -> type_declaration
+  ; value_description : value_description -> value_description
+  ; constructor_declaration : constructor_declaration -> constructor_declaration
+  ; value_binding : value_binding -> value_binding
+  ; label_declaration : label_declaration -> label_declaration
+  ; include_description : include_description -> include_description
+  ; include_declaration : include_declaration -> include_declaration }
 
 let rec signature f x =
   let x = f.signature x in
@@ -45,8 +44,7 @@ and structure f x =
 
 and signature_item f x =
   f.signature_item
-    {
-      x with
+    { x with
       psig_desc =
         (match x.psig_desc with
         | Psig_attribute a -> Psig_attribute (attribute f a)
@@ -61,13 +59,11 @@ and signature_item f x =
         | Psig_recmodule x -> Psig_recmodule (list module_declaration f x)
         | Psig_type (fl, x) -> Psig_type (fl, list type_declaration f x)
         | Psig_typext x -> Psig_typext (type_extension f x)
-        | Psig_value x -> Psig_value (value_description f x));
-    }
+        | Psig_value x -> Psig_value (value_description f x)) }
 
 and structure_item f x =
   f.structure_item
-    {
-      x with
+    { x with
       pstr_desc =
         (match x.pstr_desc with
         | Pstr_eval (e, a) -> Pstr_eval (expression f e, attributes f a)
@@ -84,7 +80,7 @@ and structure_item f x =
         | Pstr_class_type x -> Pstr_class_type (list class_type_declaration f x)
         | Pstr_include x -> Pstr_include (include_declaration f x)
         | Pstr_attribute x -> Pstr_attribute (attribute f x)
-        | Pstr_extension (e, a) -> Pstr_extension (extension f e, attributes f a));
+        | Pstr_extension (e, a) -> Pstr_extension (extension f e, attributes f a))
     }
 
 and class_description f x = f.class_description @@ class_infos class_type f x
@@ -96,8 +92,8 @@ and attribute f x = f.attribute @@ id__payload f x
 and extension f x = f.extension @@ id__payload f x
 
 and id__payload f (s, p) =
-  ( s,
-    match p with
+  ( s
+  , match p with
     | PPat (p, e) -> PPat (pattern f p, opt expression f e)
     | PSig s -> PSig (signature f s)
     | PStr s -> PStr (structure f s)
@@ -107,67 +103,53 @@ and attributes f l = list attribute f l
 
 and module_binding f x =
   f.module_binding
-    {
-      x with
-      pmb_expr = module_expr f x.pmb_expr;
-      pmb_attributes = attributes f x.pmb_attributes;
-    }
+    { x with
+      pmb_expr = module_expr f x.pmb_expr
+    ; pmb_attributes = attributes f x.pmb_attributes }
 
 and module_type_declaration f x =
   f.module_type_declaration
-    {
-      x with
-      pmtd_type = opt module_type f x.pmtd_type;
-      pmtd_attributes = attributes f x.pmtd_attributes;
-    }
+    { x with
+      pmtd_type = opt module_type f x.pmtd_type
+    ; pmtd_attributes = attributes f x.pmtd_attributes }
 
 and module_declaration f x =
   f.module_declaration
-    {
-      x with
-      pmd_type = module_type f x.pmd_type;
-      pmd_attributes = attributes f x.pmd_attributes;
-    }
+    { x with
+      pmd_type = module_type f x.pmd_type
+    ; pmd_attributes = attributes f x.pmd_attributes }
 
 and open_description f x =
-  f.open_description
-    { x with popen_attributes = attributes f x.popen_attributes }
+  f.open_description {x with popen_attributes = attributes f x.popen_attributes}
 
 and type_extension f x =
   f.type_extension
-    {
-      x with
-      ptyext_params = list (t2 core_type id) f x.ptyext_params;
-      ptyext_constructors = list extension_constructor f x.ptyext_constructors;
-      ptyext_private = x.ptyext_private;
-      ptyext_attributes = attributes f x.ptyext_attributes;
-    }
+    { x with
+      ptyext_params = list (t2 core_type id) f x.ptyext_params
+    ; ptyext_constructors = list extension_constructor f x.ptyext_constructors
+    ; ptyext_private = x.ptyext_private
+    ; ptyext_attributes = attributes f x.ptyext_attributes }
 
 and value_description f x =
   f.value_description
-    {
-      x with
-      pval_type = core_type f x.pval_type;
-      pval_attributes = attributes f x.pval_attributes;
-    }
+    { x with
+      pval_type = core_type f x.pval_type
+    ; pval_attributes = attributes f x.pval_attributes }
 
 and class_declaration f x = class_infos class_expr f x
 
 and class_infos : 'a. (t -> 'a -> 'a) -> t -> 'a class_infos -> 'a class_infos =
  fun e f x ->
-  {
-    x with
-    pci_params = list (t2 core_type id) f x.pci_params;
-    pci_expr = e f x.pci_expr;
-    pci_attributes = attributes f x.pci_attributes;
-  }
+  { x with
+    pci_params = list (t2 core_type id) f x.pci_params
+  ; pci_expr = e f x.pci_expr
+  ; pci_attributes = attributes f x.pci_attributes }
 
 and pattern f x =
   f.pattern
-    {
-      x with
-      ppat_attributes = attributes f x.ppat_attributes;
-      ppat_desc =
+    { x with
+      ppat_attributes = attributes f x.ppat_attributes
+    ; ppat_desc =
         (match x.ppat_desc with
         | Ppat_any -> Ppat_any
         | Ppat_alias (p, n) -> Ppat_alias (pattern f p, n)
@@ -186,15 +168,13 @@ and pattern f x =
         | Ppat_type lid -> Ppat_type lid
         | Ppat_unpack s -> Ppat_unpack s
         | Ppat_var s -> Ppat_var s
-        | Ppat_variant (s, p) -> Ppat_variant (s, opt pattern f p));
-    }
+        | Ppat_variant (s, p) -> Ppat_variant (s, opt pattern f p)) }
 
 and expression f x =
   f.expression
-    {
-      x with
-      pexp_attributes = attributes f x.pexp_attributes;
-      pexp_desc =
+    { x with
+      pexp_attributes = attributes f x.pexp_attributes
+    ; pexp_desc =
         (match x.pexp_desc with
         | Pexp_apply (e, l) ->
             Pexp_apply (expression f e, list (t2 id expression) f l)
@@ -210,11 +190,11 @@ and expression f x =
         | Pexp_field (e, lid) -> Pexp_field (expression f e, lid)
         | Pexp_for (p, e1, e2, fl, e3) ->
             Pexp_for
-              ( pattern f p,
-                expression f e1,
-                expression f e2,
-                fl,
-                expression f e3 )
+              ( pattern f p
+              , expression f e1
+              , expression f e2
+              , fl
+              , expression f e3 )
         | Pexp_fun (l, e1, p, e2) ->
             Pexp_fun (l, opt expression f e1, pattern f p, expression f e2)
         | Pexp_function l -> Pexp_function (list case f l)
@@ -249,15 +229,14 @@ and expression f x =
         | Pexp_tuple e -> Pexp_tuple (list expression f e)
         | Pexp_unreachable -> Pexp_unreachable
         | Pexp_variant (s, e) -> Pexp_variant (s, opt expression f e)
-        | Pexp_while (e1, e2) -> Pexp_while (expression f e1, expression f e2));
+        | Pexp_while (e1, e2) -> Pexp_while (expression f e1, expression f e2))
     }
 
 and core_type f x =
   f.core_type
-    {
-      x with
-      ptyp_attributes = attributes f x.ptyp_attributes;
-      ptyp_desc =
+    { x with
+      ptyp_attributes = attributes f x.ptyp_attributes
+    ; ptyp_desc =
         (match x.ptyp_desc with
         | Ptyp_any -> Ptyp_any
         | Ptyp_alias (c, s) -> Ptyp_alias (core_type f c, s)
@@ -271,8 +250,7 @@ and core_type f x =
         | Ptyp_poly (l, t) -> Ptyp_poly (l, core_type f t)
         | Ptyp_tuple l -> Ptyp_tuple (list core_type f l)
         | Ptyp_variant (l, fl, o) -> Ptyp_variant (list row_field f l, fl, o)
-        | Ptyp_var s -> Ptyp_var s);
-    }
+        | Ptyp_var s -> Ptyp_var s) }
 
 and object_field f = function
   | Otag (l, a, t) -> Otag (l, attributes f a, core_type f t)
@@ -286,17 +264,14 @@ and row_field f = function
 
 and class_stucture f x =
   f.class_structure
-    {
-      pcstr_self = pattern f x.pcstr_self;
-      pcstr_fields = list class_field f x.pcstr_fields;
-    }
+    { pcstr_self = pattern f x.pcstr_self
+    ; pcstr_fields = list class_field f x.pcstr_fields }
 
 and module_expr f x =
   f.module_expr
-    {
-      x with
-      pmod_attributes = attributes f x.pmod_attributes;
-      pmod_desc =
+    { x with
+      pmod_attributes = attributes f x.pmod_attributes
+    ; pmod_desc =
         (match x.pmod_desc with
         | Pmod_apply (m1, m2) -> Pmod_apply (module_expr f m1, module_expr f m2)
         | Pmod_constraint (m, t) ->
@@ -306,15 +281,13 @@ and module_expr f x =
             Pmod_functor (s, opt module_type f t, module_expr f m)
         | Pmod_ident x -> Pmod_ident x
         | Pmod_structure x -> Pmod_structure (structure f x)
-        | Pmod_unpack x -> Pmod_unpack (expression f x));
-    }
+        | Pmod_unpack x -> Pmod_unpack (expression f x)) }
 
 and module_type f x =
   f.module_type
-    {
-      x with
-      pmty_attributes = attributes f x.pmty_attributes;
-      pmty_desc =
+    { x with
+      pmty_attributes = attributes f x.pmty_attributes
+    ; pmty_desc =
         (match x.pmty_desc with
         | Pmty_alias x -> Pmty_alias x
         | Pmty_extension x -> Pmty_extension (extension f x)
@@ -324,8 +297,7 @@ and module_type f x =
         | Pmty_signature x -> Pmty_signature (signature f x)
         | Pmty_typeof x -> Pmty_typeof (module_expr f x)
         | Pmty_with (x, l) ->
-            Pmty_with (module_type f x, list with_constraint f l));
-    }
+            Pmty_with (module_type f x, list with_constraint f l)) }
 
 and with_constraint f = function
   | Pwith_type (lid, x) -> Pwith_type (lid, type_declaration f x)
@@ -335,62 +307,51 @@ and with_constraint f = function
 
 and type_declaration f x =
   f.type_declaration
-    {
-      x with
-      ptype_params = list (t2 core_type id) f x.ptype_params;
-      ptype_cstrs = list (t3 core_type core_type id) f x.ptype_cstrs;
-      ptype_manifest = opt core_type f x.ptype_manifest;
-      ptype_attributes = attributes f x.ptype_attributes;
-      ptype_kind =
+    { x with
+      ptype_params = list (t2 core_type id) f x.ptype_params
+    ; ptype_cstrs = list (t3 core_type core_type id) f x.ptype_cstrs
+    ; ptype_manifest = opt core_type f x.ptype_manifest
+    ; ptype_attributes = attributes f x.ptype_attributes
+    ; ptype_kind =
         (match x.ptype_kind with
         | Ptype_variant l -> Ptype_variant (list constructor_declaration f l)
         | Ptype_record l -> Ptype_record (list label_declaration f l)
         | Ptype_abstract -> Ptype_abstract
-        | Ptype_open -> Ptype_open);
-    }
+        | Ptype_open -> Ptype_open) }
 
 and constructor_declaration f x =
   f.constructor_declaration
-    {
-      x with
-      pcd_args = constructor_arguments f x.pcd_args;
-      pcd_res = opt core_type f x.pcd_res;
-      pcd_attributes = attributes f x.pcd_attributes;
-    }
+    { x with
+      pcd_args = constructor_arguments f x.pcd_args
+    ; pcd_res = opt core_type f x.pcd_res
+    ; pcd_attributes = attributes f x.pcd_attributes }
 
 and class_structure f x =
-  {
-    pcstr_self = pattern f x.pcstr_self;
-    pcstr_fields = list class_field f x.pcstr_fields;
-  }
+  { pcstr_self = pattern f x.pcstr_self
+  ; pcstr_fields = list class_field f x.pcstr_fields }
 
 and class_signature f x =
-  {
-    pcsig_self = core_type f x.pcsig_self;
-    pcsig_fields = list class_type_field f x.pcsig_fields;
-  }
+  { pcsig_self = core_type f x.pcsig_self
+  ; pcsig_fields = list class_type_field f x.pcsig_fields }
 
 and class_type f x =
   f.class_type
-    {
-      x with
-      pcty_attributes = attributes f x.pcty_attributes;
-      pcty_desc =
+    { x with
+      pcty_attributes = attributes f x.pcty_attributes
+    ; pcty_desc =
         (match x.pcty_desc with
         | Pcty_arrow (l, t1, t2) ->
             Pcty_arrow (l, core_type f t1, class_type f t2)
         | Pcty_constr (lid, l) -> Pcty_constr (lid, list core_type f l)
         | Pcty_extension x -> Pcty_extension (extension f x)
         | Pcty_open (fl, lid, t) -> Pcty_open (fl, lid, class_type f t)
-        | Pcty_signature s -> Pcty_signature (class_signature f s));
-    }
+        | Pcty_signature s -> Pcty_signature (class_signature f s)) }
 
 and class_type_field f x =
   f.class_type_field
-    {
-      x with
-      pctf_attributes = attributes f x.pctf_attributes;
-      pctf_desc =
+    { x with
+      pctf_attributes = attributes f x.pctf_attributes
+    ; pctf_desc =
         (match x.pctf_desc with
         | Pctf_attribute x -> Pctf_attribute (attribute f x)
         | Pctf_constraint (t1, t2) ->
@@ -398,15 +359,13 @@ and class_type_field f x =
         | Pctf_extension x -> Pctf_extension (extension f x)
         | Pctf_inherit x -> Pctf_inherit (class_type f x)
         | Pctf_method (s, f1, f2, t) -> Pctf_method (s, f1, f2, core_type f t)
-        | Pctf_val (s, f1, f2, t) -> Pctf_val (s, f1, f2, core_type f t));
-    }
+        | Pctf_val (s, f1, f2, t) -> Pctf_val (s, f1, f2, core_type f t)) }
 
 and class_expr f x =
   f.class_expr
-    {
-      x with
-      pcl_attributes = attributes f x.pcl_attributes;
-      pcl_desc =
+    { x with
+      pcl_attributes = attributes f x.pcl_attributes
+    ; pcl_desc =
         (match x.pcl_desc with
         | Pcl_apply (x, l) ->
             Pcl_apply (class_expr f x, list (t2 id expression) f l)
@@ -419,15 +378,13 @@ and class_expr f x =
         | Pcl_let (fl, l, x) ->
             Pcl_let (fl, list value_binding f l, class_expr f x)
         | Pcl_open (fl, lid, x) -> Pcl_open (fl, lid, class_expr f x)
-        | Pcl_structure x -> Pcl_structure (class_structure f x));
-    }
+        | Pcl_structure x -> Pcl_structure (class_structure f x)) }
 
 and class_field f x =
   f.class_field
-    {
-      x with
-      pcf_attributes = attributes f x.pcf_attributes;
-      pcf_desc =
+    { x with
+      pcf_attributes = attributes f x.pcf_attributes
+    ; pcf_desc =
         (match x.pcf_desc with
         | Pcf_attribute x -> Pcf_attribute (attribute f x)
         | Pcf_constraint (t1, t2) ->
@@ -436,8 +393,7 @@ and class_field f x =
         | Pcf_inherit (fl, c, s) -> Pcf_inherit (fl, class_expr f c, s)
         | Pcf_initializer x -> Pcf_initializer (expression f x)
         | Pcf_method (s, fl, x) -> Pcf_method (s, fl, class_field_kind f x)
-        | Pcf_val (s, fl, x) -> Pcf_val (s, fl, class_field_kind f x));
-    }
+        | Pcf_val (s, fl, x) -> Pcf_val (s, fl, class_field_kind f x)) }
 
 and class_field_kind f = function
   | Cfk_virtual t -> Cfk_virtual (core_type f t)
@@ -445,20 +401,16 @@ and class_field_kind f = function
 
 and value_binding f x =
   f.value_binding
-    {
-      x with
-      pvb_pat = pattern f x.pvb_pat;
-      pvb_expr = expression f x.pvb_expr;
-      pvb_attributes = attributes f x.pvb_attributes;
-    }
+    { x with
+      pvb_pat = pattern f x.pvb_pat
+    ; pvb_expr = expression f x.pvb_expr
+    ; pvb_attributes = attributes f x.pvb_attributes }
 
 and extension_constructor f x =
   f.extension_constructor
-    {
-      x with
-      pext_kind = extension_constructor_kind f x.pext_kind;
-      pext_attributes = attributes f x.pext_attributes;
-    }
+    { x with
+      pext_kind = extension_constructor_kind f x.pext_kind
+    ; pext_attributes = attributes f x.pext_attributes }
 
 and extension_constructor_kind f = function
   | Pext_decl (ca, ct) ->
@@ -471,18 +423,14 @@ and constructor_arguments f = function
 
 and label_declaration f x =
   f.label_declaration
-    {
-      x with
-      pld_type = core_type f x.pld_type;
-      pld_attributes = attributes f x.pld_attributes;
-    }
+    { x with
+      pld_type = core_type f x.pld_type
+    ; pld_attributes = attributes f x.pld_attributes }
 
 and case f x =
-  {
-    pc_lhs = pattern f x.pc_lhs;
-    pc_guard = opt expression f x.pc_guard;
-    pc_rhs = expression f x.pc_rhs;
-  }
+  { pc_lhs = pattern f x.pc_lhs
+  ; pc_guard = opt expression f x.pc_guard
+  ; pc_rhs = expression f x.pc_rhs }
 
 and include_description f x =
   f.include_description @@ include_infos module_type f x
@@ -493,11 +441,9 @@ and include_declaration f x =
 and include_infos :
       'a. (t -> 'a -> 'a) -> t -> 'a include_infos -> 'a include_infos =
  fun e f x ->
-  {
-    x with
-    pincl_mod = e f x.pincl_mod;
-    pincl_attributes = attributes f x.pincl_attributes;
-  }
+  { x with
+    pincl_mod = e f x.pincl_mod
+  ; pincl_attributes = attributes f x.pincl_attributes }
 
 and opt : 'a. (t -> 'a -> 'a) -> t -> 'a option -> 'a option =
  fun f m x -> Option.map ~f:(f m) x
@@ -510,49 +456,46 @@ and t2 : 'a 'b. (t -> 'a -> 'a) -> (t -> 'b -> 'b) -> t -> 'a * 'b -> 'a * 'b =
 
 and t3 :
       'a 'b 'c.
-      (t -> 'a -> 'a) ->
-      (t -> 'b -> 'b) ->
-      (t -> 'c -> 'c) ->
-      t ->
-      'a * 'b * 'c ->
-      'a * 'b * 'c =
+         (t -> 'a -> 'a)
+      -> (t -> 'b -> 'b)
+      -> (t -> 'c -> 'c)
+      -> t
+      -> 'a * 'b * 'c
+      -> 'a * 'b * 'c =
  fun f1 f2 f3 m (a, b, c) -> (f1 m a, f2 m b, f3 m c)
 
 and id : 'a. t -> 'a -> 'a = fun _ x -> x
 
 let default =
   let id : 'a. 'a -> 'a = fun x -> x in
-
-  {
-    signature = id;
-    signature_item = id;
-    structure = id;
-    structure_item = id;
-    pattern = id;
-    expression = id;
-    core_type = id;
-    module_expr = id;
-    module_type = id;
-    class_expr = id;
-    class_field = id;
-    class_type = id;
-    class_type_field = id;
-    attribute = id;
-    extension = id;
-    class_structure = id;
-    class_description = id;
-    class_type_declaration = id;
-    extension_constructor = id;
-    module_binding = id;
-    module_type_declaration = id;
-    module_declaration = id;
-    open_description = id;
-    type_extension = id;
-    type_declaration = id;
-    value_description = id;
-    constructor_declaration = id;
-    value_binding = id;
-    label_declaration = id;
-    include_description = id;
-    include_declaration = id;
-  }
+  { signature = id
+  ; signature_item = id
+  ; structure = id
+  ; structure_item = id
+  ; pattern = id
+  ; expression = id
+  ; core_type = id
+  ; module_expr = id
+  ; module_type = id
+  ; class_expr = id
+  ; class_field = id
+  ; class_type = id
+  ; class_type_field = id
+  ; attribute = id
+  ; extension = id
+  ; class_structure = id
+  ; class_description = id
+  ; class_type_declaration = id
+  ; extension_constructor = id
+  ; module_binding = id
+  ; module_type_declaration = id
+  ; module_declaration = id
+  ; open_description = id
+  ; type_extension = id
+  ; type_declaration = id
+  ; value_description = id
+  ; constructor_declaration = id
+  ; value_binding = id
+  ; label_declaration = id
+  ; include_description = id
+  ; include_declaration = id }

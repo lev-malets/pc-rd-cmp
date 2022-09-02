@@ -24,7 +24,6 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
     let constraint' = k "constraint"
     let private' = k "private"
     let unpack = k "unpack"
-    let export = k "export"
     let external' = k "external"
     let import = k "import"
     let from = k "from"
@@ -107,62 +106,82 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
     let slash = s "/"
     let slash_dot = s "/."
     let tilda = s "~"
-    let exp_sign = skip @@ function '-' | '+' -> true | _ -> false
+
+    let exp_sign =
+      skip
+      @@ function
+      | '-' | '+' -> true
+      | _ -> false
 
     let value_part digit exp =
       let skip_digits =
         skip_while (fun c -> Caml.( || ) (digit c) (Char.equal c '_'))
       in
-
       let int = skip digit >> skip_digits in
       let float = int >> dot >> skip_digits in
-
       match exp with
-      | None -> choice [ float >>$ true; int >>$ false ]
+      | None -> choice [float >>$ true; int >>$ false]
       | Some exp ->
           let exp = skip exp >> opt exp_sign >> skip digit >> skip_digits in
           choice
-            [
-              float >> exp >>$ true;
-              float >>$ true;
-              int >> exp >>$ true;
-              int >>$ false;
-            ]
+            [ float >> exp >>$ true
+            ; float >>$ true
+            ; int >> exp >>$ true
+            ; int >>$ false ]
 
     let value_part_2 =
-      value_part (function '0' .. '1' -> true | _ -> false) None
+      value_part
+        (function
+          | '0' .. '1' -> true
+          | _ -> false)
+        None
 
     let value_part_8 =
-      value_part (function '0' .. '7' -> true | _ -> false) None
+      value_part
+        (function
+          | '0' .. '7' -> true
+          | _ -> false)
+        None
 
     let value_part_10 =
       value_part
-        (function '0' .. '9' -> true | _ -> false)
-        (Some (function 'e' | 'E' -> true | _ -> false))
+        (function
+          | '0' .. '9' -> true
+          | _ -> false)
+        (Some
+           (function
+           | 'e' | 'E' -> true
+           | _ -> false))
 
     let value_part_16 =
       value_part
-        (function '0' .. '9' | 'A' .. 'F' | 'a' .. 'f' -> true | _ -> false)
-        (Some (function 'p' | 'P' -> true | _ -> false))
+        (function
+          | '0' .. '9' | 'A' .. 'F' | 'a' .. 'f' -> true
+          | _ -> false)
+        (Some
+           (function
+           | 'p' | 'P' -> true
+           | _ -> false))
 
     let value_part =
       let nondec =
         s "0"
         >> choice ~name:"pa:value_part:0"
-             [
-               s "b" >> value_part_2;
-               s "B" >> value_part_2;
-               s "o" >> value_part_8;
-               s "O" >> value_part_8;
-               s "x" >> value_part_16;
-               s "X" >> value_part_16;
-               value_part_8;
-             ]
+             [ s "b" >> value_part_2
+             ; s "B" >> value_part_2
+             ; s "o" >> value_part_8
+             ; s "O" >> value_part_8
+             ; s "x" >> value_part_16
+             ; s "X" >> value_part_16
+             ; value_part_8 ]
       in
-      choice [ nondec; value_part_10 ]
+      choice [nondec; value_part_10]
 
     let suffix_part =
-      opt @@ satisfy (function 'g' .. 'z' | 'G' .. 'Z' -> true | _ -> false)
+      opt
+      @@ satisfy (function
+           | 'g' .. 'z' | 'G' .. 'Z' -> true
+           | _ -> false)
 
     let number =
       named "pa:number"
@@ -170,18 +189,31 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
             match is_float with
             | true -> Pconst_float (value, suffix)
             | false -> Pconst_integer (value, suffix))
-        + with_literal value_part + suffix_part
+        <*> with_literal value_part <*> suffix_part
 
     let code offset basic c = Int.(Char.to_int c - Char.to_int basic + offset)
 
     let octal_code =
-      satisfy (function '0' .. '7' -> true | _ -> false) >>| code 0 '0'
+      satisfy (function
+        | '0' .. '7' -> true
+        | _ -> false)
+      >>| code 0 '0'
 
     let decimal_code =
-      satisfy (function '0' .. '9' -> true | _ -> false) >>| code 0 '0'
+      satisfy (function
+        | '0' .. '9' -> true
+        | _ -> false)
+      >>| code 0 '0'
 
-    let oct_digit = satisfy (function '0' .. '7' -> true | _ -> false)
-    let dec_digit = satisfy (function '0' .. '9' -> true | _ -> false)
+    let oct_digit =
+      satisfy (function
+        | '0' .. '7' -> true
+        | _ -> false)
+
+    let dec_digit =
+      satisfy (function
+        | '0' .. '9' -> true
+        | _ -> false)
 
     let hex_digit =
       satisfy (function
@@ -190,168 +222,180 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
 
     let hexadecimal_code =
       choice
-        [
-          decimal_code;
-          satisfy (function 'a' .. 'f' -> true | _ -> false) >>| code 10 'a';
-          satisfy (function 'A' .. 'F' -> true | _ -> false) >>| code 10 'A';
-        ]
+        [ decimal_code
+        ; satisfy (function
+            | 'a' .. 'f' -> true
+            | _ -> false)
+          >>| code 10 'a'
+        ; satisfy (function
+            | 'A' .. 'F' -> true
+            | _ -> false)
+          >>| code 10 'A' ]
 
     let hex_cc =
-      mapping Int.(fun _1 _2 -> (_1 * 16) + _2)
-      - s "x" + hexadecimal_code + hexadecimal_code
+      mapping (fun _1 _2 -> (_1 * 16) + _2)
+      << s "x" <*> hexadecimal_code <*> hexadecimal_code
 
     let dec_cc =
-      mapping Int.(fun _1 _2 _3 -> (_1 * 100) + (_2 * 10) + _3)
-      + (satisfy (function '0' .. '2' -> true | _ -> false) >>| code 0 '0')
-      + decimal_code + decimal_code
+      mapping (fun _1 _2 _3 -> (_1 * 100) + (_2 * 10) + _3)
+      <*> (satisfy (function
+             | '0' .. '2' -> true
+             | _ -> false)
+          >>| code 0 '0')
+      <*> decimal_code <*> decimal_code
 
     let oct_cc =
-      mapping Int.(fun _1 _2 _3 -> (_1 * 64) + (_2 * 8) + _3)
-      - s "o"
-      + (satisfy (function '0' .. '3' -> true | _ -> false) >>| code 0 '0')
-      + octal_code + octal_code
+      mapping (fun _1 _2 _3 -> (_1 * 64) + (_2 * 8) + _3)
+      << s "o"
+      <*> (satisfy (function
+             | '0' .. '3' -> true
+             | _ -> false)
+          >>| code 0 '0')
+      <*> octal_code <*> octal_code
 
     let escaped =
       choice ~name:"pa:char:escaped"
-        [
-          s "\\" >>$ '\\';
-          s "\'" >>$ '\'';
-          s " " >>$ ' ';
-          s "n" >>$ '\n';
-          s "t" >>$ '\t';
-          s "b" >>$ '\b';
-          s "r" >>$ '\r';
-          hex_cc >>| Char.of_int_exn;
-          dec_cc >>| Char.of_int_exn;
-          oct_cc >>| Char.of_int_exn;
-        ]
+        [ s "\\" >>$ '\\'
+        ; s "\'" >>$ '\''
+        ; s " " >>$ ' '
+        ; s "n" >>$ '\n'
+        ; s "t" >>$ '\t'
+        ; s "b" >>$ '\b'
+        ; s "r" >>$ '\r'
+        ; hex_cc >>| Char.of_int_exn
+        ; dec_cc >>| Char.of_int_exn
+        ; oct_cc >>| Char.of_int_exn ]
 
     let p =
       named "const:char"
         (s "\'"
         >> choice
-             [
-               s "\\" >> escaped;
-               satisfy (function
+             [ s "\\" >> escaped
+             ; satisfy (function
                  | '\\' | '\'' | '\n' | '\t' | '\b' | '\r' -> false
-                 | _ -> true);
-             ]
+                 | _ -> true) ]
         << s "\'")
 
     let character = p >>| Const.char
 
     let escaped_in_string =
       choice ~name:"pa:escaped_in_string"
-        [
-          s "\\" >>$ "\\\\";
-          s "\"" >>$ "\\\"";
-          s "n" >>$ "\\n";
-          s "t" >>$ "\\t";
-          s "b" >>$ "\\b";
-          s "r" >>$ "\\r";
-          s "0" >>$ "\\0";
-          consumed (s "u" >> hex_digit >> hex_digit >> hex_digit >> hex_digit)
-          >>| ( ^ ) "\\";
-          consumed (s "x" >> hex_digit >> hex_digit) >>| ( ^ ) "\\";
-          consumed (s "o" >> oct_digit >> oct_digit >> oct_digit) >>| ( ^ ) "\\";
-          consumed (dec_digit >> dec_digit >> dec_digit) >>| ( ^ ) "\\";
-        ]
+        [ s "\\" >>$ "\\\\"
+        ; s "\"" >>$ "\\\""
+        ; s "n" >>$ "\\n"
+        ; s "t" >>$ "\\t"
+        ; s "b" >>$ "\\b"
+        ; s "r" >>$ "\\r"
+        ; s "0" >>$ "\\0"
+        ; consumed (s "u" >> hex_digit >> hex_digit >> hex_digit >> hex_digit)
+          >>| ( ^ ) "\\"
+        ; consumed (s "x" >> hex_digit >> hex_digit) >>| ( ^ ) "\\"
+        ; consumed (s "o" >> oct_digit >> oct_digit >> oct_digit) >>| ( ^ ) "\\"
+        ; consumed (dec_digit >> dec_digit >> dec_digit) >>| ( ^ ) "\\" ]
 
     let string_raw =
       let parts =
         s "\""
-        >> fix @@ fun loop ->
+        >> fix
+           @@ fun loop ->
            let not_escaped = function
              | '\\' | '\"' | '\n' | '\t' | '\b' | '\r' -> false
              | _ -> true
            in
-
-           cons + take_while not_escaped
-           + choice
-               [ s "\"" >>$ []; cons + (s "\\" >> escaped_in_string) + loop ]
+           cons <*> take_while not_escaped
+           <*> choice
+                 [s "\"" >>$ []; cons <*> (s "\\" >> escaped_in_string) <*> loop]
       in
       parts >>| String.concat
 
     let string_ml_helper ~q =
       let list =
         s q
-        >> fix @@ fun loop ->
+        >> fix
+           @@ fun loop ->
            cons
-           + take_while (function
-               | '\n' | '\\' | '\r' -> false
-               | c -> not (Char.equal c q.[0]))
-           + choice
-               [
-                 s q >>$ [];
-                 cons
-                 + choice
-                     [
-                       new_line;
-                       ( s "\\" >> dec_cc >>| fun c ->
-                         "\\" ^ Pc.Utils.to_hex_string c );
-                       s ("\\" ^ q) >>$ "\\" ^ q;
-                       s "\\\\" >>$ "\\\\";
-                       s "\\" >>$ "\\";
-                     ]
-                 + loop;
-               ]
+           <*> take_while (function
+                 | '\n' | '\\' | '\r' -> false
+                 | c -> not (Char.equal c q.[0]))
+           <*> choice
+                 [ s q >>$ []
+                 ; cons
+                   <*> choice
+                         [ new_line
+                         ; (s "\\" >> dec_cc
+                           >>| fun c -> "\\" ^ Pc.Utils.to_hex_string c)
+                         ; s ("\\" ^ q) >>$ "\\" ^ q
+                         ; s "\\\\" >>$ "\\\\"
+                         ; s "\\" >>$ "\\" ]
+                   <*> loop ]
       in
-      list >>| fun l ->
-      Const.string ~quotation_delimiter:"js" @@ String.concat l
+      list
+      >>| fun l -> Const.string ~quotation_delimiter:"js" @@ String.concat l
 
     let string_multiline = named "const:string:ml" & string_ml_helper ~q:"\""
     let template_no_template = string_ml_helper ~q:"`"
 
     let constant =
-      choice ~name:"pa:constant" [ number; character; string_multiline ]
+      choice ~name:"pa:constant" [number; character; string_multiline]
 
-    let upper = function 'A' .. 'Z' -> true | _ -> false
-    let lower = function 'a' .. 'z' | '_' -> true | _ -> false
+    let upper = function
+      | 'A' .. 'Z' -> true
+      | _ -> false
+
+    let lower = function
+      | 'a' .. 'z' | '_' -> true
+      | _ -> false
 
     let c_ident first =
       consumed (skip first >> skip_while identifier's_character)
 
     let l_ident = named "l_ident" @@ failed @@ k "_" >> c_ident lower
     let u_ident = named "u_ident" @@ c_ident upper
-    let ident = named "ident" & choice [ l_ident; u_ident ]
+    let ident = named "ident" & choice [l_ident; u_ident]
     let type_var = s "\'" >> ident
 
     let integer =
       run
       & mapping (fun n ->
             let open Simple in
-            match n with Pconst_integer (n, s) -> return (n, s) | _ -> fail)
-        + number
+            match n with
+            | Pconst_integer (n, s) -> return (n, s)
+            | _ -> fail)
+        <*> number
 
     let single_line_comment =
       let p =
         s "//"
-        >> loc @@ take_while (function '\n' | '\r' -> false | _ -> true)
+        >> loc
+           @@ take_while (function
+                | '\n' | '\r' -> false
+                | _ -> true)
       in
-      p >>| fun { txt; loc } ->
-      Syntax.Res_comment.makeSingleLineComment ~loc txt
+      p >>| fun {txt; loc} -> Syntax.Res_comment.makeSingleLineComment ~loc txt
 
     let multi_line_comment =
       let parts =
-        fix @@ fun parts ->
+        fix
+        @@ fun parts ->
         cons
-        + take_while (function '*' | '\n' | '/' | '\r' -> false | _ -> true)
-        + choice
-            [
-              s "*/" >>$ [];
-              cons + new_line + parts;
-              mapping (fun l tail -> "/*" :: (l @ ("*/" :: tail)))
-              - s "/*" + parts + parts;
-              cons + (any_char >>| String.make 1) + parts;
-            ]
+        <*> take_while (function
+              | '*' | '\n' | '/' | '\r' -> false
+              | _ -> true)
+        <*> choice
+              [ s "*/" >>$ []
+              ; cons <*> new_line <*> parts
+              ; mapping (fun l tail -> "/*" :: (l @ ("*/" :: tail)))
+                << s "/*" <*> parts <*> parts
+              ; cons <*> (any_char >>| String.make 1) <*> parts ]
       in
       let p = s "/*" >> parts in
-      loc (p >>| String.concat) >>| fun { txt; loc } ->
+      loc (p >>| String.concat)
+      >>| fun {txt; loc} ->
       Syntax.Res_comment.makeMultiLineComment ~loc ~docComment:false
         ~standalone:false txt
 
     let comment =
-      choice [ single_line_comment; multi_line_comment ]
+      choice [single_line_comment; multi_line_comment]
       >>| fun x pos comments ->
       Pc_syntax.Basic.LogElement.Comment
         (Syntax.Res_comment.setPrevTokEndPos x pos;
@@ -360,8 +404,8 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
 
     let comments =
       fold_left_0_n
-        (t2 + comment + pos - whitespace)
-        (t2 + comment + pos - whitespace)
+        (t2 <*> comment <*> pos << whitespace)
+        (t2 <*> comment <*> pos << whitespace)
         ~f:(fun (f1, p1) (f2, p2) ->
           ((fun pos comments -> f2 p1 @@ f1 pos comments), p2))
 
@@ -373,10 +417,13 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
             match x with
             | Some (hlp, _) -> Simple.log_many (hlp pos [])
             | _ -> Simple.return ())
-        + pos - whitespace + opt comments
+        <*> pos << whitespace <*> opt comments
       in
       let p2 = run p in
-      { p2 with info = p.info }
+      {p2 with info = p.info}
+
+    let ( <<. ) a b = a << ng << b
+    let ( <*>. ) a b = a << ng <*> b
 
     let del_pos =
       run
@@ -389,11 +436,12 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
             | Some ';' -> advance 1 >> APos.pos.p
             | None -> return p1
             | _ -> (
-                APos.pos.p >>= fun p2 ->
+                APos.pos.p
+                >>= fun p2 ->
                 match p1.pos_lnum = p2.pos_lnum with
                 | true -> fail
                 | false -> return p1))
-        + pos - ng + peek_char
+        <*> pos <*>. peek_char
 
     let del =
       run
@@ -406,96 +454,88 @@ module Make (APos : APOS) : Pc_syntax.Sigs.PARSER = struct
             | Some ';' -> advance 1 >>$ ()
             | None -> return ()
             | _ -> (
-                APos.pos.p >>= fun p2 ->
+                APos.pos.p
+                >>= fun p2 ->
                 match p1.Lexing.pos_lnum = p2.pos_lnum with
                 | true -> fail
                 | false -> return ()))
-        + pos - ng + peek_char
+        <*> pos <*>. peek_char
 
     let template ~quote_tag ~expression =
       let open Pc_syntax.Basic in
       let open Parsetree in
       let open Ast_helper in
-      let op = Hc.expr_id [ "^" ] in
-
+      let op = Hc.expr_id ["^"] in
       let cons = cons in
-
       let parts =
-        fix @@ fun parts ->
+        fix
+        @@ fun parts ->
         cons
-        + take_while (function
-            | '\n' | '$' | '`' | '\\' | '\r' -> false
-            | _ -> true)
-        + choice
-            [
-              cons + new_line + parts;
-              cons + (s "\\`" >>$ "\\`") + parts;
-              cons + (s "\\$" >>$ "\\$") + parts;
-              cons + (s "\\\\" >>$ "\\\\") + parts;
-              cons + (s "$" >> failed l_brace >>$ "$") + parts;
-              return [];
-            ]
+        <*> take_while (function
+              | '\n' | '$' | '`' | '\\' | '\r' -> false
+              | _ -> true)
+        <*> choice
+              [ cons <*> new_line <*> parts
+              ; cons <*> (s "\\`" >>$ "\\`") <*> parts
+              ; cons <*> (s "\\$" >>$ "\\$") <*> parts
+              ; cons <*> (s "\\\\" >>$ "\\\\") <*> parts
+              ; cons <*> (s "$" >> failed l_brace >>$ "$") <*> parts
+              ; return [] ]
       in
       let string =
         mapping (fun l p1 p2 ->
             let str = String.concat l in
-            Exp.constant ~loc:(loc_mk p1 p2) ~attrs:[ Hc.attr "res.template" ]
+            Exp.constant ~loc:(loc_mk p1 p2) ~attrs:[Hc.attr "res.template"]
             @@ Const.string ~quotation_delimiter:quote_tag str)
-        + parts
+        <*> parts
       in
-
       let string_part =
-        fix @@ fun string_part ->
+        fix
+        @@ fun string_part ->
         let tail =
           mapping (fun expr pos tail prev ->
               tail
                 (Exp.apply
                    ~loc:(loc_mk prev.pexp_loc.loc_start pos)
-                   ~attrs:[ Hc.attr "res.template" ]
+                   ~attrs:[Hc.attr "res.template"]
                    op
-                   [ (Nolabel, prev); (Nolabel, expr) ]))
-          - s "${" - ng + expression - ng - r_brace + pos + string_part
+                   [(Nolabel, prev); (Nolabel, expr)]))
+          << s "${" <*>. expression <<. r_brace <*> pos <*> string_part
         in
-
         pos && string
         && choice
-             [
-               mapping (fun p2 str p1 prev ->
+             [ mapping (fun p2 str p1 prev ->
                    Exp.apply
-                     ~loc:{ prev.pexp_loc with loc_end = p2 }
-                     ~attrs:[ Hc.attr "res.template" ]
+                     ~loc:{prev.pexp_loc with loc_end = p2}
+                     ~attrs:[Hc.attr "res.template"]
                      op
-                     [ (Nolabel, prev); (Nolabel, str p1 p2) ])
-               - s "`" + pos;
-               mapping (fun p2 tail str p1 prev ->
+                     [(Nolabel, prev); (Nolabel, str p1 p2)])
+               << s "`" <*> pos
+             ; mapping (fun p2 tail str p1 prev ->
                    tail
                    @@ Exp.apply
-                        ~loc:{ prev.pexp_loc with loc_end = p2 }
-                        ~attrs:[ Hc.attr "res.template" ]
+                        ~loc:{prev.pexp_loc with loc_end = p2}
+                        ~attrs:[Hc.attr "res.template"]
                         op
-                        [ (Nolabel, prev); (Nolabel, str p1 p2) ])
-               + pos + tail;
-             ]
+                        [(Nolabel, prev); (Nolabel, str p1 p2)])
+               <*> pos <*> tail ]
       in
-
       pos
       && s "`"
          >> (string
             && choice
-                 [
-                   mapping (fun p2 str p1 -> str p1 p2) - s "`" + pos;
-                   mapping (fun pos1 expr pos2 tail str p1 ->
+                 [ mapping (fun p2 str p1 -> str p1 p2) << s "`" <*> pos
+                 ; mapping (fun pos1 expr pos2 tail str p1 ->
                        let e0 = str p1 pos1 in
                        let e1 =
                          Exp.apply ~loc:(loc_mk p1 pos2)
-                           ~attrs:[ Hc.attr "res.template" ]
+                           ~attrs:[Hc.attr "res.template"]
                            op
-                           [ (Nolabel, e0); (Nolabel, expr) ]
+                           [(Nolabel, e0); (Nolabel, expr)]
                        in
                        tail e1)
-                   + pos - s "${" - ng + expression - ng - r_brace + pos
-                   + string_part;
-                 ])
+                   <*> pos << s "${" <*>. expression <<. r_brace <*> pos
+                   <*> string_part ])
 
     let string_ident = s "\\" >> string_raw
   end

@@ -28,7 +28,6 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
     let constraint' = named "tkn:constraint" & tkn_ Constraint
     let private' = named "tkn:private" & tkn_ Private
     let unpack = named "tkn:unpack" & tkn_ Unpack
-    let export = named "tkn:export" & tkn_ Export
     let external' = named "tkn:external" & tkn_ External
     let import = named "tkn:import" & tkn_ Import
     let from = named "tkn:from" & tkn_ From
@@ -117,68 +116,62 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
 
     let integer =
       named "tkn:integer"
-      & tkn_payload Integer >>| fun { value; suffix } -> (value, suffix)
+      & tkn_payload Integer >>| fun {value; suffix} -> (value, suffix)
 
     let number =
       choice ~name:"tkn:number"
-        [
-          ( tkn_payload Integer >>| fun { value; suffix } ->
-            Pconst_integer (value, suffix) );
-          ( tkn_payload Float >>| fun { value; suffix } ->
-            Pconst_float (value, suffix) );
-        ]
+        [ (tkn_payload Integer
+          >>| fun {value; suffix} -> Pconst_integer (value, suffix))
+        ; (tkn_payload Float
+          >>| fun {value; suffix} -> Pconst_float (value, suffix)) ]
 
     let character =
       named "tkn:character" & tkn_payload Character >>| fun c -> Pconst_char c
 
     let string_raw =
-      named "tkn:string"
-      & tkn_payload String >>| fun { value; raw = _ } -> value
+      named "tkn:string" & tkn_payload String >>| fun {value; raw = _} -> value
 
     let string_multiline =
       choice
-        [
-          (tkn_payload String >>| fun { raw; value = _ } -> raw);
-          tkn_payload MultilineString;
-        ]
+        [ (tkn_payload String >>| fun {raw; value = _} -> raw)
+        ; tkn_payload MultilineString ]
       >>| Const.string ~quotation_delimiter:"js"
 
     let template_no_template =
       tkn_payload TemplateTail >>| Const.string ~quotation_delimiter:"js"
 
     let constant =
-      choice ~name:"pt:constant" [ number; character; string_multiline ]
+      choice ~name:"pt:constant" [number; character; string_multiline]
 
     let l_ident =
       named "l_ident"
       & choice
-          [
-            tkn_payload LIdent;
-            assert' >>$ "assert";
-            catch >>$ "catch";
-            downto' >>$ "downto";
-            from >>$ "from";
-            json_tag >>$ "json";
-            to' >>$ "to";
-            type' >>$ "type";
-            unpack >>$ "unpack";
-            with' >>$ "with";
-            async >>$ "async";
-            await >>$ "await";
-          ]
+          [ tkn_payload LIdent
+          ; assert' >>$ "assert"
+          ; catch >>$ "catch"
+          ; downto' >>$ "downto"
+          ; from >>$ "from"
+          ; json_tag >>$ "json"
+          ; to' >>$ "to"
+          ; type' >>$ "type"
+          ; unpack >>$ "unpack"
+          ; with' >>$ "with"
+          ; async >>$ "async"
+          ; await >>$ "await" ]
 
     let u_ident = named "u_ident" & tkn_payload UIdent
-    let ident = named "ident" & choice [ l_ident; u_ident ]
+    let ident = named "ident" & choice [l_ident; u_ident]
     let type_var = named "tkn:string:type_var" & tkn_payload TypeVar
 
     let single_line_comment =
       named "tkn:comment:s"
-      & loc (tkn_payload Comment) >>| fun { txt; loc } ->
-        Syntax.Res_comment.makeSingleLineComment ~loc txt
+      & loc (tkn_payload Comment)
+        >>| fun {txt; loc} -> Syntax.Res_comment.makeSingleLineComment ~loc txt
 
     let multi_line_comment =
       named "tkn:comment:m"
-      & loc (tkn_payload MultilineComment) >>| fun { txt; loc } ->
+      & loc (tkn_payload MultilineComment)
+        >>| fun {txt; loc} ->
         Syntax.Res_comment.makeMultiLineComment ~loc ~docComment:false
           ~standalone:false txt
 
@@ -187,113 +180,105 @@ module Make (Tpc : TPC) : Pc_syntax.Sigs.PARSER = struct
           Pc_syntax.Basic.LogElement.Comment
             (Syntax.Res_comment.setPrevTokEndPos x pt_pos;
              x))
-      + pos_end
-      + choice [ single_line_comment; multi_line_comment ]
+      <*> pos_end
+      <*> choice [single_line_comment; multi_line_comment]
 
     let ng =
       named "pt:nongrammar"
       &
       let p = seq comment >>| Simple.log_many in
       let p1 = run p in
-      { p1 with info = p.info }
+      {p1 with info = p.info}
+
+    let ( <<. ) a b = a << ng << b
+    let ( <*>. ) a b = a << ng <*> b
 
     let del_pos =
       choice
-        [
-          pos_end << ng << peek r_brace;
-          pos_end << ng << peek r_paren;
-          pos_end << ng << eof;
-          ng >> tkn_ Semicolon >> pos_end;
-          run
+        [ pos_end <<. peek r_brace
+        ; pos_end <<. peek r_paren
+        ; pos_end <<. eof
+        ; ng >> tkn_ Semicolon >> pos_end
+        ; run
           & mapping (fun p1 p2 ->
                 let open Simple in
                 let open Lexing in
                 match p1.pos_lnum = p2.pos_lnum with
                 | true -> fail
                 | false -> return p1)
-            + pos_end - ng + pos;
-        ]
+            <*> pos_end <*>. pos ]
 
     let del =
       choice
-        [
-          ng << peek r_brace;
-          ng << peek r_paren;
-          ng << eof;
-          ng << tkn_ Semicolon;
-          run
+        [ ng << peek r_brace
+        ; ng << peek r_paren
+        ; ng << eof
+        ; ng << tkn_ Semicolon
+        ; run
           & mapping (fun p1 p2 ->
                 let open Simple in
                 let open Lexing in
                 match p1.pos_lnum = p2.pos_lnum with
                 | true -> fail
                 | false -> return ())
-            + pos_end - ng + pos;
-        ]
+            <*> pos_end <*>. pos ]
 
     let template ~quote_tag ~expression =
       let open Pc_syntax.Basic in
       let open Parsetree in
       let open Ast_helper in
-      let op = Hc.expr_id [ "^" ] in
-
+      let op = Hc.expr_id ["^"] in
       let template_part = tkn_payload TemplatePart in
       let template_tail = tkn_payload TemplateTail in
       let mk_const str p1 p2 =
-        Exp.constant ~loc:(loc_mk p1 p2) ~attrs:[ Hc.attr "res.template" ]
+        Exp.constant ~loc:(loc_mk p1 p2) ~attrs:[Hc.attr "res.template"]
         @@ Const.string ~quotation_delimiter:quote_tag str
       in
-
       let tail =
-        fix @@ fun tail ->
+        fix
+        @@ fun tail ->
         choice
-          [
-            mapping (fun p1 str p2 prev ->
+          [ mapping (fun p1 str p2 prev ->
                 let str = mk_const str p1 p2 in
-
                 Exp.apply
-                  ~loc:{ prev.pexp_loc with loc_end = p2 }
-                  ~attrs:[ Hc.attr "res.template" ]
+                  ~loc:{prev.pexp_loc with loc_end = p2}
+                  ~attrs:[Hc.attr "res.template"]
                   op
-                  [ (Nolabel, prev); (Nolabel, str) ])
-            + pos + template_tail + pos_end;
-            mapping (fun p1 str p2 expr tail prev ->
+                  [(Nolabel, prev); (Nolabel, str)])
+            <*> pos <*> template_tail <*> pos_end
+          ; mapping (fun p1 str p2 expr tail prev ->
                 let str = mk_const str p1 p2 in
                 let e1 =
                   Exp.apply
-                    ~loc:{ prev.pexp_loc with loc_end = p2 }
-                    ~attrs:[ Hc.attr "res.template" ]
+                    ~loc:{prev.pexp_loc with loc_end = p2}
+                    ~attrs:[Hc.attr "res.template"]
                     op
-                    [ (Nolabel, prev); (Nolabel, str) ]
+                    [(Nolabel, prev); (Nolabel, str)]
                 in
                 let e2 =
                   Exp.apply
-                    ~loc:
-                      { prev.pexp_loc with loc_end = prev.pexp_loc.loc_start }
-                    ~attrs:[ Hc.attr "res.template" ]
+                    ~loc:{prev.pexp_loc with loc_end = prev.pexp_loc.loc_start}
+                    ~attrs:[Hc.attr "res.template"]
                     op
-                    [ (Nolabel, e1); (Nolabel, expr) ]
+                    [(Nolabel, e1); (Nolabel, expr)]
                 in
-
                 tail e2)
-            + pos + template_part + pos_end - ng + expression - ng + tail;
+            <*> pos <*> template_part <*> pos_end <*>. expression << ng <*> tail
           ]
       in
-
       choice
-        [
-          mapping (fun p1 str p2 -> mk_const str p1 p2)
-          + pos + template_tail + pos_end;
-          mapping (fun p1 str p2 expr tail ->
+        [ mapping (fun p1 str p2 -> mk_const str p1 p2)
+          <*> pos <*> template_tail <*> pos_end
+        ; mapping (fun p1 str p2 expr tail ->
               let e0 = mk_const str p1 p2 in
               let e1 =
                 Exp.apply ~loc:(loc_mk p1 p2)
-                  ~attrs:[ Hc.attr "res.template" ]
+                  ~attrs:[Hc.attr "res.template"]
                   op
-                  [ (Nolabel, e0); (Nolabel, expr) ]
+                  [(Nolabel, e0); (Nolabel, expr)]
               in
               tail e1)
-          + pos + template_part + pos_end - ng + expression - ng + tail;
+          <*> pos <*> template_part <*> pos_end <*>. expression << ng <*> tail
         ]
 
     let string_ident : string Comb.t =

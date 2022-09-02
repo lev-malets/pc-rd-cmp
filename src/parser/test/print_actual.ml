@@ -13,18 +13,14 @@ let print_ast ~pp ~output x =
 
 let run config input output parser ignore_loc =
   let (module Parse) = Parser.pc parser config in
-  let { filename; src } = mk_input input in
-
+  let {filename; src} = mk_input input in
   match Filename.split_extension filename with
   | _, Some "res" -> (
       let x, entries =
         Parse.Comb.parse_string_with_trace Parse.structure_parser ~filename src
       in
-
       match x with
-      | None ->
-          print_last_pos entries;
-          failwith "x"
+      | None -> print_last_pos entries; failwith "x"
       | Some x ->
           let pt =
             if ignore_loc then
@@ -36,11 +32,8 @@ let run config input output parser ignore_loc =
       let x, entries =
         Parse.Comb.parse_string_with_trace Parse.signature_parser ~filename src
       in
-
       match x with
-      | None ->
-          print_last_pos entries;
-          failwith "x"
+      | None -> print_last_pos entries; failwith "x"
       | Some x ->
           let pt =
             if ignore_loc then

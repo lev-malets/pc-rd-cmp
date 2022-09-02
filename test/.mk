@@ -1,4 +1,4 @@
 
 $D: src/parser/test
 	dune test
-	tmp/deps/treefmt/treefmt --fail-on-change
+	tmp/deps/treefmt/treefmt --fail-on-change --no-cache

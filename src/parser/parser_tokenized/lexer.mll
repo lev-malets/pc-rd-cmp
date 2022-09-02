@@ -149,7 +149,6 @@ and scan_token =
             | "downto" -> Tag Downto
             | "else" -> Tag Else
             | "exception" -> Tag Exception
-            | "export" -> Tag Export
             | "external" -> Tag External
             | "false" -> Tag False
             | "for" -> Tag For
