@@ -2,7 +2,7 @@ set -euo pipefail
 
 D=$(realpath $(dirname $0))
 T=$(realpath $1)
-SYNTAX=$(realpath $2)
+SYNTAX=$T/deps/syntax
 CMP=$(realpath $D/..)
 
 xpath=$T/.scripts/code_size
@@ -65,14 +65,8 @@ if [[ -f $xpath/.done && $(cat $xpath/.done) == $sha256 ]]; then
     exit 0
 fi
 
-function sloc_ {
-    sum=0
-
-    for f in $@; do
-        sum=$(expr $sum + $(sloc $f | awk -F ':' 'NR == 5 {print $2}'))
-    done
-
-    echo $sum
+function cloc_ {
+    cloc $@ | grep OCaml | awk '{print $5}'
 }
 
 rm -rf $xpath/.hlp
@@ -83,23 +77,17 @@ for file in ${syntax_all[*]} ${pc_all[*]}; do
     cp $file $xpath/.hlp/$file
 done
 
-echo '
-profile = default
-version = 0.19.0
-
-margin = 80
-' >$xpath/.hlp/.ocamlformat
-
 (
     cd $xpath/.hlp
+    cp $CMP/.ocamlformat .
     ocamlformat --inplace $(find . -type f ! -name .ocamlformat ! -name '*.mll')
 )
 
 rm -rf $xpath/.out
 mkdir -p $xpath/.out
 
-sloc_ ${syntax_files[*]} >$xpath/.out/syntax
-sloc_ ${syntax_hlp_files[*]} >$xpath/.out/syntax_hlp
+cloc_ ${syntax_files[*]} >$xpath/.out/syntax
+cloc_ ${syntax_hlp_files[*]} >$xpath/.out/syntax_hlp
 
-sloc_ ${pc_files[*]} >$xpath/.out/pc
-sloc_ ${pc_hlp_files[*]} >$xpath/.out/pc_hlp
+cloc_ ${pc_files[*]} >$xpath/.out/pc
+cloc_ ${pc_hlp_files[*]} >$xpath/.out/pc_hlp
