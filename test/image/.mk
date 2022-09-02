@@ -13,8 +13,8 @@ $D/delete-old: $D/tag
 		| awk '{print $$3}' \
 		| xargs -r docker image rm
 
-$D/push: $K/loaded
-	docker push $(shell cat $K/name)
+$D/push: $K/builded
+	docker push $(shell cat $D/tag)
 
 $D/run: $D/tag
 	bash $D/run.sh $<
